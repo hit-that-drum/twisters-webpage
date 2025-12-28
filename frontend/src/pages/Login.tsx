@@ -18,24 +18,29 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // isLogin 값에 따라 호출할 API 주소를 결정합니다.
-    const endpoint = isLogin ? '/api/login' : '/api/signup';
+    if (!formData.email || !formData.password || (!isLogin && !formData.name)) {
+      alert('모든 필드를 입력해주세요.');
+      return;
+    }
 
     try {
-      const response = await fetch(`http://localhost:5050${endpoint}`, {
+      const response = await fetch('http://localhost:5050/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        alert(isLogin ? 'Login Successful! 👋' : 'Signup Successful! 🎉');
-        if (isLogin) navigate('/dashboard'); // 로그인 성공 시 대시보드 등으로 이동
+        alert('회원가입 성공!');
+        navigate(`/home?userId=${data.userId}`);
       } else {
-        alert(isLogin ? 'Login Failed 😭' : 'Signup Failed 😭');
+        alert(`회원가입 실패: ${data.error || '알 수 없는 에러'}`);
       }
     } catch (error) {
       console.error('Error:', error);
+      alert('서버와 연결할 수 없습니다. 백엔드가 켜져 있는지 확인하세요.');
     }
   };
 
@@ -152,7 +157,7 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
             <p className="mt-10 text-center text-sm text-gray-600">
               {isLogin ? "Don't have an account?" : 'Have an account?'}{' '}
               <span
-                onClick={() => navigate(isLogin ? '/login' : '/signin')}
+                onClick={() => navigate(isLogin ? '/signup' : '/signin')}
                 className="cursor-pointer font-bold text-[#1a73e8] hover:underline"
               >
                 {isLogin ? 'Sign Up' : 'Sign In'}

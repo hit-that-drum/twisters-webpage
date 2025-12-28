@@ -24,16 +24,49 @@ const access: PoolOptions = {
 
 const pool = mysql.createPool(access);
 
-app.get('/api/users', async (req: Request, res: Response) => {
+// 회원가입 API 추가
+app.post('/api/signup', async (req: Request, res: Response) => {
+  const { name, email, password } = req.body;
+
   try {
-    // pool.query를 통해 DB의 데이터를 조회합니다.
-    const [rows] = await pool.query('SELECT * FROM users');
-    
-    // 조회된 데이터를 JSON 형식으로 프론트엔드에 응답합니다.
-    res.json(rows);
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: '모든 필드를 입력해주세요.' });
+    }
+
+    const [result] = await pool.query(
+      'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
+      [name, email, password],
+    );
+
+    res.status(201).json({ message: '회원가입 성공!', userId: (result as any).insertId });
+  } catch (error: any) {
+    if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
+      return res.status(400).json({ error: '이미 사용 중인 이메일입니다.' });
+    }
+    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+  }
+});
+
+app.get('/api/users', async (req: Request, res: Response) => {
+  const { userId } = req.query;
+
+  try {
+    if (userId) {
+      // 1. id가 존재하는 경우: 특정 사용자 검색
+      const [rows]: any = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: '해당 ID의 사용자를 찾을 수 없습니다.' });
+      }
+      return res.json(rows[0]); // 단일 객체 반환
+    } else {
+      // 2. id가 없는 경우: 전체 사용자 검색
+      const [rows] = await pool.query('SELECT * FROM users');
+      return res.json(rows); // 배열 반환
+    }
   } catch (error) {
     console.error('DB 조회 에러:', error);
-    res.status(500).json({ error: '데이터를 가져오는데 실패했습니다.' });
+    res.status(500).json({ error: '데이터베이스 조회 중 오류가 발생했습니다.' });
   }
 });
 
