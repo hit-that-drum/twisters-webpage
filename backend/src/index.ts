@@ -2,17 +2,16 @@ import express, { type Request, type Response } from 'express';
 import mysql, { type PoolOptions } from 'mysql2/promise';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import bcrypt from 'bcrypt';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5050;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Database Configuration
 const access: PoolOptions = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'devuser',
@@ -24,7 +23,10 @@ const access: PoolOptions = {
 
 const pool = mysql.createPool(access);
 
-// 회원가입 API 추가
+// 암호화 강도
+const SALT_ROUNDS = 10;
+
+// 회원가입
 app.post('/api/signup', async (req: Request, res: Response) => {
   const { name, email, password } = req.body;
 
@@ -33,9 +35,11 @@ app.post('/api/signup', async (req: Request, res: Response) => {
       return res.status(400).json({ error: '모든 필드를 입력해주세요.' });
     }
 
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
     const [result] = await pool.query(
       'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
-      [name, email, password],
+      [name, email, hashedPassword],
     );
 
     res.status(201).json({ message: '회원가입 성공!', userId: (result as any).insertId });
@@ -47,6 +51,7 @@ app.post('/api/signup', async (req: Request, res: Response) => {
   }
 });
 
+// 사용자 조회
 app.get('/api/users', async (req: Request, res: Response) => {
   const { userId } = req.query;
 
@@ -70,43 +75,57 @@ app.get('/api/users', async (req: Request, res: Response) => {
   }
 });
 
+// 로그인
 app.post('/api/signin', async (req: Request, res: Response) => {
   const { email, password } = req.body;
+
   try {
-    // 1. 이메일과 비밀번호가 일치하는 사용자 찾기
-    const [rows]: any = await pool.query('SELECT * FROM users WHERE email = ? AND password = ?', [
-      email,
-      password,
-    ]);
+    // 1. 사용자 조회
+    const [rows]: any = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
 
     if (rows.length === 0) {
-      // 정보가 일치하지 않으면 401(Unauthorized) 에러 반환
-      return res.status(401).json({ error: '이메일 또는 비밀번호가 일치하지 않습니다.' });
+      return res.status(401).json({ error: '존재하지 않는 사용자입니다.' });
     }
 
-    // 2. 로그인 성공 시 사용자 정보 반환 (비밀번호는 제외하는 것이 좋음)
     const user = rows[0];
-    res.json({
-      message: 'Login Successful!',
-      userId: user.id,
-      name: user.name,
-    });
+
+    // 2. 비밀번호 검증 (수정된 부분)
+    // hashedPassword가 아니라 사용자가 입력한 'password' 원본을 전달해야 합니다.
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(401).json({ error: '비밀번호가 일치하지 않습니다.' });
+    }
+
+    // 3. 성공 시 ID 반환
+    res.json({ message: '로그인 성공!', userId: user.id, name: user.name });
   } catch (error) {
-    console.error('Login Error:', error);
-    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+    console.error(error);
+    res.status(500).json({ error: '서버 에러' });
   }
 });
 
-app.post('/api/resetpassword', async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+// 비밀번호 재설정
+app.post('/api/reset-password', async (req: Request, res: Response) => {
+  const { email, newPassword } = req.body;
+
   try {
-    const [rows]: any = await pool.query('UPDATE users SET password = ? WHERE email = ?', [
-      password,
+    // 1. 새 비밀번호 해싱 (회원가입과 동일한 SALT_ROUNDS 사용)
+    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    // 2. 해당 사용자의 비밀번호 업데이트
+    const [result]: any = await pool.query('UPDATE users SET password = ? WHERE email = ?', [
+      hashedPassword,
       email,
     ]);
-    res.json({ message: '비밀번호 재설정 성공!' });
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: '해당 이메일의 사용자를 찾을 수 없습니다.' });
+    }
+
+    res.json({ message: '비밀번호가 성공적으로 변경되었습니다.' });
   } catch (error) {
-    console.error('Reset Password Error:', error);
+    console.error('Password Reset Error:', error);
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
   }
 });

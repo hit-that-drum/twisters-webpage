@@ -86,13 +86,16 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
         enqueueSnackbar('모든 필드를 입력해주세요.', { variant: 'error' });
         return;
       }
+      console.log('formData:', formData);
       try {
         const response = await fetch('http://localhost:5050/api/signin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         });
+        console.log('response:', response);
         const data = await response.json();
+        console.log('data:', data);
         if (response.ok) {
           enqueueSnackbar('로그인 성공!', { variant: 'success' });
           navigate(`/home?userId=${data.userId}`);
