@@ -1,8 +1,10 @@
-/* frontend/src/index.css */
+/* 1. 레이어 순서 정의: 맨 먼저 선언하여 우선순위를 확정합니다. */
+/* mui 레이어를 가장 앞에 두어 가장 낮은 우선순위를 갖게 합니다. */
+@layer mui, base, components, utilities;
 
-/* 1. Tailwind v4 핵심 엔진 로드 */
+/* 2. Tailwind 엔진 및 설정 로드 */
 @import 'tailwindcss';
-
+@config "../tailwind.config.js";
 @reference "../tailwind.config.js";
 
 /* 3. 커스텀 리셋 및 베이스 스타일 */
@@ -17,7 +19,6 @@
 
   body {
     -webkit-font-smoothing: antialiased;
-    /* @apply는 @import "tailwindcss"가 있어야 작동합니다 */
     @apply text-gray-900 bg-white;
     font-family: sans-serif;
   }
@@ -31,4 +32,11 @@
     display: block;
     max-width: 100%;
   }
+}
+
+/* 4. MUI 스타일이 들어갈 자리를 낮은 우선순위 레이어로 지정 */
+@layer mui {
+  /* 여기에 코드를 적지 않아도 레이어 선언 순서만으로 
+     MUI의 기본 스타일(Emotion/Styled-components)보다 
+     위의 base, components, utilities 레이어가 우선권을 갖게 됩니다. */
 }

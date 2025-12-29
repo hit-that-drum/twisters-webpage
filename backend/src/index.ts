@@ -70,6 +70,47 @@ app.get('/api/users', async (req: Request, res: Response) => {
   }
 });
 
+app.post('/api/signin', async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  try {
+    // 1. 이메일과 비밀번호가 일치하는 사용자 찾기
+    const [rows]: any = await pool.query('SELECT * FROM users WHERE email = ? AND password = ?', [
+      email,
+      password,
+    ]);
+
+    if (rows.length === 0) {
+      // 정보가 일치하지 않으면 401(Unauthorized) 에러 반환
+      return res.status(401).json({ error: '이메일 또는 비밀번호가 일치하지 않습니다.' });
+    }
+
+    // 2. 로그인 성공 시 사용자 정보 반환 (비밀번호는 제외하는 것이 좋음)
+    const user = rows[0];
+    res.json({
+      message: 'Login Successful!',
+      userId: user.id,
+      name: user.name,
+    });
+  } catch (error) {
+    console.error('Login Error:', error);
+    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+  }
+});
+
+app.post('/api/resetpassword', async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  try {
+    const [rows]: any = await pool.query('UPDATE users SET password = ? WHERE email = ?', [
+      password,
+      email,
+    ]);
+    res.json({ message: '비밀번호 재설정 성공!' });
+  } catch (error) {
+    console.error('Reset Password Error:', error);
+    res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`\n✅ Server is live at http://localhost:${PORT}`);
 });
