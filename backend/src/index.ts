@@ -3,14 +3,26 @@ import mysql, { type PoolOptions } from 'mysql2/promise';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import bcrypt from 'bcrypt';
+import { OAuth2Client } from 'google-auth-library';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const app = express();
 const PORT = process.env.PORT || 5050;
 
 app.use(cors());
 app.use(express.json());
+
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
 
 const access: PoolOptions = {
   host: process.env.DB_HOST || 'localhost',
@@ -127,6 +139,48 @@ app.post('/api/reset-password', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Password Reset Error:', error);
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+  }
+});
+
+const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID;
+const oauth2Client = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+console.log('GOOGLE_CLIENT_ID:', GOOGLE_CLIENT_ID);
+
+app.post('/api/auth/google', async (req: Request, res: Response) => {
+  console.log('req.body:', req.body);
+  const { token } = req.body;
+
+  try {
+    // 1. 구글 토큰 검증
+    const ticket = await oauth2Client.verifyIdToken({
+      idToken: token,
+      audience: GOOGLE_CLIENT_ID as string,
+    });
+
+    const payload = ticket.getPayload(); // 유저 정보(이메일, 이름 등)가 들어있음
+
+    if (!payload) return res.status(400).json({ error: '잘못된 토큰입니다.' });
+
+    const { email, name, sub: googleId } = payload;
+
+    // 2. DB 확인: 이미 있는 유저인지 확인
+    let [rows]: any = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+
+    if (rows.length === 0) {
+      // 3. 신규 유저라면 가입 처리 (비밀번호는 구글 로그인이므로 임의값이나 빈값 처리)
+      await pool.query('INSERT INTO users (email, name, google_id) VALUES (?, ?, ?)', [
+        email,
+        name,
+        googleId,
+      ]);
+      [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    }
+
+    const user = rows[0];
+    res.json({ message: '구글 로그인 성공', userId: user.id, name: user.name });
+  } catch (error) {
+    res.status(500).json({ error: '구글 인증 실패' });
   }
 });
 

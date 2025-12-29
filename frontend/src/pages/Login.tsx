@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FcGoogle } from 'react-icons/fc';
+// import { FcGoogle } from 'react-icons/fc';
 import { SiKakaotalk } from 'react-icons/si';
 import loginPageRightImage from '../../public/login_page_right_image.png';
 import { Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 
 const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
   const navigate = useNavigate();
@@ -111,6 +112,17 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    // 구글이 준 ID 토큰을 백엔드로 전송합니다.
+    const res = await fetch('http://localhost:5050/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: credentialResponse.credential }),
+    });
+    const data = await res.json();
+    console.log('로그인 성공:', data);
+  };
+
   return (
     <>
       <div className="flex min-h-screen w-full items-center justify-center bg-white p-4 md:p-8">
@@ -211,10 +223,18 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
 
               {/* Social Buttons */}
               <div className="flex flex-col space-y-3 sm:flex-row sm:space-x-4 sm:space-y-0">
-                <button className="flex w-full items-center justify-center space-x-2 rounded-xl border border-gray-200 py-3 text-sm font-semibold transition hover:bg-gray-50">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => console.log('Google Login Error')}
+                  containerProps={{
+                    className:
+                      'flex w-full items-center justify-center space-x-2 rounded-xl border border-gray-200 py-3 text-sm font-semibold transition hover:bg-gray-50',
+                  }}
+                />
+                {/* <button className="flex w-full items-center justify-center space-x-2 rounded-xl border border-gray-200 py-3 text-sm font-semibold transition hover:bg-gray-50">
                   <FcGoogle size={22} />
                   <span>Sign in with Google</span>
-                </button>
+                </button> */}
                 <button className="flex w-full items-center justify-center space-x-2 rounded-xl bg-[#FEE500] py-3 text-sm font-semibold text-[#191919] transition hover:bg-[#fada0a]">
                   <SiKakaotalk size={22} />
                   <span>Sign in with Kakao</span>
