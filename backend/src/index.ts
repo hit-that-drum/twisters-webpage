@@ -1,5 +1,4 @@
 import express, { type Request, type Response } from 'express';
-import mysql, { type PoolOptions } from 'mysql2/promise';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import bcrypt from 'bcrypt';
@@ -7,6 +6,7 @@ import { OAuth2Client } from 'google-auth-library';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import pool from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,17 +23,6 @@ app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   next();
 });
-
-const access: PoolOptions = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'devuser',
-  password: process.env.DB_PASSWORD || 'devpass',
-  database: process.env.DB_NAME || 'test_db',
-  waitForConnections: true,
-  connectionLimit: 10,
-};
-
-const pool = mysql.createPool(access);
 
 // 암호화 강도
 const SALT_ROUNDS = 10;

@@ -1,0 +1,13 @@
+# 예: MySQL 설정
+services:
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: twisters
+      MYSQL_DATABASE: twisters_db
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql

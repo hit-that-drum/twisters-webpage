@@ -38,3 +38,6 @@ lerna-debug.log*
 # 5. TypeScript 및 기타 빌드 정보
 *.tsbuildinfo
 .eslintcache
+
+# 6. 데이터베이스 데이터
+data/
