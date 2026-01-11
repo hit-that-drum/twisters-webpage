@@ -31,7 +31,7 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
       enqueueSnackbar('모든 필드를 입력해주세요.', { variant: 'error' });
       return;
     }
-    const response = await fetch('http://localhost:5050/api/resetpassword', {
+    const response = await fetch('http://localhost:5050/authentication/resetpassword', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -60,7 +60,7 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
         return;
       }
       try {
-        const response = await fetch('http://localhost:5050/api/signup', {
+        const response = await fetch('http://localhost:5050/authentication/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
@@ -89,7 +89,7 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
       }
       console.log('formData:', formData);
       try {
-        const response = await fetch('http://localhost:5050/api/signin', {
+        const response = await fetch('http://localhost:5050/authentication/signin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
@@ -114,7 +114,7 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     // 구글이 준 ID 토큰을 백엔드로 전송합니다.
-    const res = await fetch('http://localhost:5050/api/auth/google', {
+    const res = await fetch('http://localhost:5050/authentication/auth/google', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: credentialResponse.credential }),

@@ -9,14 +9,14 @@ export default function Home() {
 
   useEffect(() => {
     if (userId) {
-      fetch(`http://localhost:5050/api/users?userId=${userId}`)
+      fetch(`http://localhost:5050/authentication/users?userId=${userId}`)
         .then((response) => response.json())
         .then((data) => {
           setUser(data);
         })
         .catch((error) => console.error('Error fetching users:', error));
     } else {
-      fetch('http://localhost:5050/api/users')
+      fetch('http://localhost:5050/authentication/users')
         .then((response) => response.json())
         .then((data) => {
           setAllUsers(data);
