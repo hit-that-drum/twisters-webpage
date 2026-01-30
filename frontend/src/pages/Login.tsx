@@ -31,14 +31,17 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
       enqueueSnackbar('모든 필드를 입력해주세요.', { variant: 'error' });
       return;
     }
-    const response = await fetch('http://localhost:5050/authentication/resetpassword', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: formData.resetEmail,
-        password: formData.resetPassword,
-      }),
-    });
+    const response = await fetch(
+      `${import.meta.env.VITE_API_BASE_URL}/authentication/resetpassword`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.resetEmail,
+          password: formData.resetPassword,
+        }),
+      },
+    );
     const data = await response.json();
     if (response.ok) {
       enqueueSnackbar('비밀번호 재설정 성공!', { variant: 'success' });
@@ -60,7 +63,7 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
         return;
       }
       try {
-        const response = await fetch('http://localhost:5050/authentication/signup', {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/authentication/signup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
@@ -89,7 +92,7 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
       }
       console.log('formData:', formData);
       try {
-        const response = await fetch('http://localhost:5050/authentication/signin', {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/authentication/signin`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
@@ -114,7 +117,7 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     // 구글이 준 ID 토큰을 백엔드로 전송합니다.
-    const res = await fetch('http://localhost:5050/authentication/auth/google', {
+    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/authentication/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: credentialResponse.credential }),

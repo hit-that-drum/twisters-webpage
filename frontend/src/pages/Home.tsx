@@ -9,14 +9,14 @@ export default function Home() {
 
   useEffect(() => {
     if (userId) {
-      fetch(`http://localhost:5050/authentication/users?userId=${userId}`)
+      fetch(`${import.meta.env.VITE_API_BASE_URL}/authentication/users?userId=${userId}`)
         .then((response) => response.json())
         .then((data) => {
           setUser(data);
         })
         .catch((error) => console.error('Error fetching users:', error));
     } else {
-      fetch('http://localhost:5050/authentication/users')
+      fetch(`${import.meta.env.VITE_API_BASE_URL}/authentication/users`)
         .then((response) => response.json())
         .then((data) => {
           setAllUsers(data);

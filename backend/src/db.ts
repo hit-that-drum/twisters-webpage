@@ -11,7 +11,7 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const access: PoolOptions = {
-  host: process.env.DB_HOST || '127.0.0.1', // localhost 대신 127.0.0.1 권장
+  host: process.env.DB_HOST || 'db', // localhost 대신 127.0.0.1 권장
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '1234',
   database: process.env.DB_NAME || 'twisters_db', // 아까 확인한 DB 이름
