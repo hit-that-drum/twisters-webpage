@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import authRoutes from './routes/authRoutes.js';
+import passport from './config/passport.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -15,6 +16,8 @@ const PORT = process.env.PORT || 5050;
 
 app.use(cors());
 app.use(express.json());
+app.use(passport.initialize());
+// app.use(passport.session());
 
 // API 경로 연결 (/authentication로 시작하는 요청은 authRoutes가 처리함)
 app.use('/authentication', authRoutes);
