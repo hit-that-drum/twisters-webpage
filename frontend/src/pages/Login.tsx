@@ -6,6 +6,7 @@ import loginPageRightImage from '../../public/login_page_right_image.png';
 import { Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
+import { apiFetch } from '../utils/api';
 
 const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
   const navigate = useNavigate();
@@ -31,17 +32,13 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
       enqueueSnackbar('모든 필드를 입력해주세요.', { variant: 'error' });
       return;
     }
-    const response = await fetch(
-      `${import.meta.env.VITE_API_BASE_URL}/authentication/resetpassword`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.resetEmail,
-          password: formData.resetPassword,
-        }),
-      },
-    );
+    const response = await apiFetch('/authentication/resetpassword', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: formData.resetEmail,
+        password: formData.resetPassword,
+      }),
+    });
     const data = await response.json();
     if (response.ok) {
       enqueueSnackbar('비밀번호 재설정 성공!', { variant: 'success' });
@@ -63,15 +60,16 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
         return;
       }
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/authentication/signup`, {
+        const response = await apiFetch('/authentication/signup', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         });
 
         const data = await response.json();
 
-        if (response.ok) {
+        if (response.ok && data.token) {
+          console.log('data:', data.token);
+          localStorage.setItem('token', data.token);
           enqueueSnackbar('회원가입 성공!', { variant: 'success' });
           navigate(`/home?userId=${data.userId}`);
         } else {
@@ -92,9 +90,8 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
       }
       console.log('formData:', formData);
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/authentication/signin`, {
+        const response = await apiFetch('/authentication/signin', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         });
         console.log('response:', response);
@@ -117,9 +114,8 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     // 구글이 준 ID 토큰을 백엔드로 전송합니다.
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/authentication/auth/google`, {
+    const res = await apiFetch('/authentication/auth/google', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: credentialResponse.credential }),
     });
     const data = await res.json();
