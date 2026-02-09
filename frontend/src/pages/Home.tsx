@@ -1,19 +1,31 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
 
 export default function Home() {
+  const navigate = useNavigate();
   const { userId } = useParams();
-  const [allUsers, setAllUsers] = useState<{ name: string; email: string }[]>([]);
+  const [allUsers, setAllUsers] = useState<{ id: number; name: string; email: string }[]>([]);
   const [user, setUser] = useState<{ id: number; name: string; email: string } | null>(null);
 
   useEffect(() => {
     const loadUsers = async () => {
       try {
         if (userId) {
-          const response = await apiFetch(`/authentication/users?userId=${userId}`);
+          const response = await apiFetch('/authentication/me');
           const data = await response.json();
+
+          if (!response.ok) {
+            setUser(null);
+            return;
+          }
+
           setUser(data);
+
+          if (String(data.id) !== userId) {
+            navigate(`/${data.id}`, { replace: true });
+          }
+
           return;
         }
 
@@ -26,7 +38,7 @@ export default function Home() {
     };
 
     loadUsers();
-  }, [userId]);
+  }, [navigate, userId]);
 
   return (
     <div>
@@ -38,7 +50,7 @@ export default function Home() {
       ) : (
         <>
           {allUsers.map((item) => (
-            <div key={item.email}>
+            <div key={item.id}>
               <h2>{item.name}</h2>
               <p>{item.email}</p>
             </div>

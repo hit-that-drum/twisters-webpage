@@ -1,36 +1,49 @@
 import { type Request, type Response } from 'express';
 import bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
-import jwt from 'jsonwebtoken';
+import { type ResultSetHeader, type RowDataPacket } from 'mysql2/promise';
 import pool from '../db.js';
+import { buildAuthResponse } from '../authUtils.js';
 
 const SALT_ROUNDS = 10;
 const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID;
 const oauth2Client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
+interface AuthenticatedUser {
+  id: number;
+  name: string;
+  email: string;
+}
+
+interface PublicUserRow extends RowDataPacket {
+  id: number;
+  name: string;
+  email: string;
+}
+
+type AuthenticatedRequest = Request & {
+  user?: AuthenticatedUser;
+};
+
 export const signUp = async (req: Request, res: Response) => {
-  const { name, email, password } = req.body;
+  const { name, email, password } = req.body as {
+    name?: string;
+    email?: string;
+    password?: string;
+  };
+
   try {
     if (!name || !email || !password)
       return res.status(400).json({ error: '모든 필드를 입력해주세요.' });
+
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-    const [result] = await pool.query(
+    const [result] = await pool.query<ResultSetHeader>(
       'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
       [name, email, hashedPassword],
     );
-    const userId = (result as { insertId: number }).insertId;
-    const secretKey: string = process.env.JWT_SECRET || 'your_secret_key';
-    const token = jwt.sign({ id: userId, email }, secretKey, { expiresIn: '1h' });
+    const userId = result.insertId;
 
-    res.status(201).json({
-      message: '회원가입 성공!',
-      token,
-      userId,
-      user: {
-        id: userId,
-        name,
-      },
-    });
+    return res.status(201).json(buildAuthResponse({ id: userId, name, email }, '회원가입 성공!'));
   } catch (error: any) {
     if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
       return res.status(400).json({ error: '이미 사용 중인 이메일입니다.' });
@@ -39,20 +52,58 @@ export const signUp = async (req: Request, res: Response) => {
   }
 };
 
+export const getMe = async (req: Request, res: Response) => {
+  const authenticatedUser = (req as AuthenticatedRequest).user;
+
+  if (!authenticatedUser) {
+    return res.status(401).json({ error: '인증된 사용자 정보가 없습니다.' });
+  }
+
+  try {
+    const [rows] = await pool.query<PublicUserRow[]>('SELECT id, name, email FROM users WHERE id = ?', [
+      authenticatedUser.id,
+    ]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: '해당 사용자를 찾을 수 없습니다.' });
+    }
+
+    return res.json(rows[0]);
+  } catch (error) {
+    console.error('DB 조회 에러:', error);
+    return res.status(500).json({ error: '데이터베이스 조회 중 오류가 발생했습니다.' });
+  }
+};
+
 export const getUsers = async (req: Request, res: Response) => {
+  const authenticatedUser = (req as AuthenticatedRequest).user;
   const { userId } = req.query;
+
+  if (!authenticatedUser) {
+    return res.status(401).json({ error: '인증된 사용자 정보가 없습니다.' });
+  }
+
   try {
     if (userId) {
-      // 1. id가 존재하는 경우: 특정 사용자 검색
-      const [rows]: any = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+      const requestedUserId = Number(userId);
+      if (!Number.isInteger(requestedUserId)) {
+        return res.status(400).json({ error: '유효한 userId가 필요합니다.' });
+      }
+
+      if (requestedUserId !== authenticatedUser.id) {
+        return res.status(403).json({ error: '본인 정보만 조회할 수 있습니다.' });
+      }
+
+      const [rows] = await pool.query<PublicUserRow[]>('SELECT id, name, email FROM users WHERE id = ?', [
+        requestedUserId,
+      ]);
       if (rows.length === 0) {
         return res.status(404).json({ error: '해당 ID의 사용자를 찾을 수 없습니다.' });
       }
-      return res.json(rows[0]); // 단일 객체 반환
+      return res.json(rows[0]);
     } else {
-      // 2. id가 없는 경우: 전체 사용자 검색
-      const [rows] = await pool.query('SELECT * FROM users');
-      return res.json(rows); // 배열 반환
+      const [rows] = await pool.query<PublicUserRow[]>('SELECT id, name, email FROM users');
+      return res.json(rows);
     }
   } catch (error) {
     console.error('DB 조회 에러:', error);
@@ -60,36 +111,19 @@ export const getUsers = async (req: Request, res: Response) => {
   }
 };
 
-export const signIn = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
-  try {
-    // 1. 사용자 조회
-    const [rows]: any = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-    if (rows.length === 0) {
-      return res.status(401).json({ error: '존재하지 않는 사용자입니다.' });
-    }
-    const user = rows[0];
-    // 2. 비밀번호 검증 (수정된 부분)
-    // hashedPassword가 아니라 사용자가 입력한 'password' 원본을 전달해야 합니다.
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ error: '비밀번호가 일치하지 않습니다.' });
-    }
-    // 3. 성공 시 ID 반환
-    res.json({ message: '로그인 성공!', userId: user.id, name: user.name });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: '서버 에러' });
-  }
-};
-
 export const resetPassword = async (req: Request, res: Response) => {
-  const { email, newPassword } = req.body;
+  const { email, newPassword } = req.body as {
+    email?: string;
+    newPassword?: string;
+  };
+
+  if (!email || !newPassword) {
+    return res.status(400).json({ error: '이메일과 새 비밀번호를 입력해주세요.' });
+  }
+
   try {
-    // 1. 새 비밀번호 해싱 (회원가입과 동일한 SALT_ROUNDS 사용)
     const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    // 2. 해당 사용자의 비밀번호 업데이트
-    const [result]: any = await pool.query('UPDATE users SET password = ? WHERE email = ?', [
+    const [result] = await pool.query<ResultSetHeader>('UPDATE users SET password = ? WHERE email = ?', [
       hashedPassword,
       email,
     ]);
@@ -103,40 +137,49 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
-console.log('GOOGLE_CLIENT_ID:', GOOGLE_CLIENT_ID);
-
 export const googleAuth = async (req: Request, res: Response) => {
-  console.log('req.body:', req.body);
-  const { token } = req.body;
+  const { token } = req.body as { token?: string };
+
+  if (!token) {
+    return res.status(400).json({ error: '구글 토큰이 필요합니다.' });
+  }
 
   try {
-    // 1. 구글 토큰 검증
     const ticket = await oauth2Client.verifyIdToken({
       idToken: token,
       audience: GOOGLE_CLIENT_ID as string,
     });
 
-    const payload = ticket.getPayload(); // 유저 정보(이메일, 이름 등)가 들어있음
+    const payload = ticket.getPayload();
 
     if (!payload) return res.status(400).json({ error: '잘못된 토큰입니다.' });
 
     const { email, name, sub: googleId } = payload;
+    if (!email || !name || !googleId) {
+      return res.status(400).json({ error: '구글 사용자 정보를 가져오지 못했습니다.' });
+    }
 
-    // 2. DB 확인: 이미 있는 유저인지 확인
-    let [rows]: any = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    let [rows] = await pool.query<PublicUserRow[]>('SELECT id, name, email FROM users WHERE email = ?', [
+      email,
+    ]);
 
     if (rows.length === 0) {
-      // 3. 신규 유저라면 가입 처리 (비밀번호는 구글 로그인이므로 임의값이나 빈값 처리)
-      await pool.query('INSERT INTO users (email, name, google_id) VALUES (?, ?, ?)', [
+      await pool.query<ResultSetHeader>('INSERT INTO users (email, name, google_id) VALUES (?, ?, ?)', [
         email,
         name,
         googleId,
       ]);
-      [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+      [rows] = await pool.query<PublicUserRow[]>('SELECT id, name, email FROM users WHERE email = ?', [
+        email,
+      ]);
     }
 
     const user = rows[0];
-    res.json({ message: '구글 로그인 성공', userId: user.id, name: user.name });
+    if (!user) {
+      return res.status(500).json({ error: '구글 로그인 사용자 생성에 실패했습니다.' });
+    }
+
+    return res.json(buildAuthResponse(user, '구글 로그인 성공'));
   } catch (error) {
     res.status(500).json({ error: '구글 인증 실패' });
   }

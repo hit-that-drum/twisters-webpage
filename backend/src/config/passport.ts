@@ -3,6 +3,7 @@ import { Strategy as LocalStrategy } from 'passport-local';
 import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
 import bcrypt from 'bcrypt';
 import pool from '../db.js';
+import { getJwtSecret } from '../authUtils.js';
 
 // --- 1. LOCAL STRATEGY (For Logging In) ---
 passport.use(
@@ -32,8 +33,7 @@ passport.use(
 const jwtOptions = {
   // Look for the token in the 'Authorization: Bearer <TOKEN>' header
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  // Must match the secret used in your authRoutes.ts
-  secretOrKey: process.env.JWT_SECRET || 'your_secret_key',
+  secretOrKey: getJwtSecret(),
 };
 
 passport.use(

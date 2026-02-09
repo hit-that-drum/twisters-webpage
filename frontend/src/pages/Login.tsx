@@ -32,11 +32,11 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
       enqueueSnackbar('모든 필드를 입력해주세요.', { variant: 'error' });
       return;
     }
-    const response = await apiFetch('/authentication/resetpassword', {
+    const response = await apiFetch('/authentication/reset-password', {
       method: 'POST',
       body: JSON.stringify({
         email: formData.resetEmail,
-        password: formData.resetPassword,
+        newPassword: formData.resetPassword,
       }),
     });
     const data = await response.json();
@@ -131,13 +131,40 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
   };
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
-    // 구글이 준 ID 토큰을 백엔드로 전송합니다.
-    const res = await apiFetch('/authentication/auth/google', {
-      method: 'POST',
-      body: JSON.stringify({ token: credentialResponse.credential }),
-    });
-    const data = await res.json();
-    console.log('로그인 성공:', data);
+    if (!credentialResponse.credential) {
+      enqueueSnackbar('구글 인증 토큰을 받지 못했습니다.', { variant: 'error' });
+      return;
+    }
+
+    try {
+      const res = await apiFetch('/authentication/auth/google', {
+        method: 'POST',
+        body: JSON.stringify({ token: credentialResponse.credential }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+        }
+
+        const userIdx = data.user?.id ?? data.userId;
+        if (!userIdx) {
+          enqueueSnackbar('구글 로그인 응답에 사용자 ID가 없습니다.', { variant: 'error' });
+          return;
+        }
+
+        enqueueSnackbar('구글 로그인 성공!', { variant: 'success' });
+        navigate(`/${userIdx}`);
+      } else {
+        enqueueSnackbar(`구글 로그인 실패: ${data.error || '알 수 없는 에러'}`, {
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Google Login Error:', error);
+      enqueueSnackbar('구글 로그인 중 서버와 연결할 수 없습니다.', { variant: 'error' });
+    }
   };
 
   return (

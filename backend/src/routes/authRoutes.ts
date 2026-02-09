@@ -2,7 +2,7 @@ import * as authController from '../controllers/authController.js';
 import express from 'express';
 import { type Request, type Response, type NextFunction } from 'express';
 import passport from '../config/passport.js';
-import jwt from 'jsonwebtoken';
+import { buildAuthResponse } from '../authUtils.js';
 
 const router = express.Router();
 interface User {
@@ -25,30 +25,13 @@ router.post('/signin', (req: Request, res: Response, next: NextFunction) => {
         return res.status(401).json({ error: info?.message || 'Unauthorized' });
       }
 
-      // 1. Generate the JWT
-      // Use an environment variable for the secret in production!
-      const secretKey: string = process.env.JWT_SECRET || 'your_secret_key';
-
-      const token: string = jwt.sign(
-        { id: user.id, email: user.email }, // Payload
-        secretKey,
-        { expiresIn: '1h' },
-      );
-
-      // 2. Send the token back to the frontend
-      return res.json({
-        message: 'Logged in successfully!',
-        token: token,
-        user: {
-          id: user.id,
-          name: user.name,
-        },
-      });
+      return res.json(buildAuthResponse(user, 'Logged in successfully!'));
     },
   )(req, res, next);
 });
 
 router.post('/signup', authController.signUp);
+router.get('/me', passport.authenticate('jwt', { session: false }), authController.getMe);
 router.get('/users', passport.authenticate('jwt', { session: false }), authController.getUsers);
 router.post('/reset-password', authController.resetPassword);
 router.post('/auth/google', authController.googleAuth);
