@@ -1,43 +1,46 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { apiFetch } from '../utils/api';
 
 export default function Home() {
-  const [searchParams] = useSearchParams();
-  const userId = searchParams.get('userId');
+  const { userId } = useParams();
   const [allUsers, setAllUsers] = useState<{ name: string; email: string }[]>([]);
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+  const [user, setUser] = useState<{ id: number; name: string; email: string } | null>(null);
 
   useEffect(() => {
-    if (userId) {
-      fetch(`${import.meta.env.VITE_API_BASE_URL}/authentication/users?userId=${userId}`)
-        .then((response) => response.json())
-        .then((data) => {
+    const loadUsers = async () => {
+      try {
+        if (userId) {
+          const response = await apiFetch(`/authentication/users?userId=${userId}`);
+          const data = await response.json();
           setUser(data);
-        })
-        .catch((error) => console.error('Error fetching users:', error));
-    } else {
-      fetch(`${import.meta.env.VITE_API_BASE_URL}/authentication/users`)
-        .then((response) => response.json())
-        .then((data) => {
-          setAllUsers(data);
-        })
-        .catch((error) => console.error('Error fetching users:', error));
-    }
+          return;
+        }
+
+        const response = await apiFetch('/authentication/users');
+        const data = await response.json();
+        setAllUsers(data);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      }
+    };
+
+    loadUsers();
   }, [userId]);
 
   return (
     <div>
       {user ? (
         <>
-          <h2>{user?.name}</h2>
-          <p>{user?.email}</p>
+          <h2>User ID: {user.id}</h2>
+          <p>User Name: {user.name}</p>
         </>
       ) : (
         <>
-          {allUsers.map((user) => (
-            <div key={user.name}>
-              <h2>{user.name}</h2>
-              <p>{user.email}</p>
+          {allUsers.map((item) => (
+            <div key={item.email}>
+              <h2>{item.name}</h2>
+              <p>{item.email}</p>
             </div>
           ))}
         </>

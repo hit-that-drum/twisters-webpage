@@ -1,6 +1,7 @@
 import { type Request, type Response } from 'express';
 import bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
+import jwt from 'jsonwebtoken';
 import pool from '../db.js';
 
 const SALT_ROUNDS = 10;
@@ -17,7 +18,19 @@ export const signUp = async (req: Request, res: Response) => {
       'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
       [name, email, hashedPassword],
     );
-    res.status(201).json({ message: '회원가입 성공!', userId: (result as any).insertId });
+    const userId = (result as { insertId: number }).insertId;
+    const secretKey: string = process.env.JWT_SECRET || 'your_secret_key';
+    const token = jwt.sign({ id: userId, email }, secretKey, { expiresIn: '1h' });
+
+    res.status(201).json({
+      message: '회원가입 성공!',
+      token,
+      userId,
+      user: {
+        id: userId,
+        name,
+      },
+    });
   } catch (error: any) {
     if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
       return res.status(400).json({ error: '이미 사용 중인 이메일입니다.' });

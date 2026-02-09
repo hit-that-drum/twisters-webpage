@@ -10,8 +10,8 @@ function App() {
           <Route path="/" element={<Navigate to="/signup" />} />
           <Route path="/signup" element={<Login isLogin={false} />} />
           <Route path="/signin" element={<Login isLogin={true} />} />
+          <Route path="/:userId" element={<Home />} />
           <Route path="/home" element={<Home />} />
-          <Route path="/home/:userId" element={<Home />} />
         </Routes>
       </Router>
     </>

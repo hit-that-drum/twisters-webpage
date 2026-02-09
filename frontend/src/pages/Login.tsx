@@ -67,11 +67,19 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
 
         const data = await response.json();
 
-        if (response.ok && data.token) {
-          console.log('data:', data.token);
-          localStorage.setItem('token', data.token);
+        if (response.ok) {
+          if (data.token) {
+            localStorage.setItem('token', data.token);
+          }
+
+          const userIdx = data.user?.id ?? data.userId;
+          if (!userIdx) {
+            enqueueSnackbar('회원가입 성공 응답에 사용자 ID가 없습니다.', { variant: 'error' });
+            return;
+          }
+
           enqueueSnackbar('회원가입 성공!', { variant: 'success' });
-          navigate(`/home?userId=${data.userId}`);
+          navigate(`/${userIdx}`);
         } else {
           enqueueSnackbar(`회원가입 실패: ${data.error || '알 수 없는 에러'}`, {
             variant: 'error',
@@ -98,8 +106,18 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
         const data = await response.json();
         console.log('data:', data);
         if (response.ok) {
+          if (data.token) {
+            localStorage.setItem('token', data.token);
+          }
+
+          const userIdx = data.user?.id ?? data.userId;
+          if (!userIdx) {
+            enqueueSnackbar('로그인 성공 응답에 사용자 ID가 없습니다.', { variant: 'error' });
+            return;
+          }
+
           enqueueSnackbar('로그인 성공!', { variant: 'success' });
-          navigate(`/home?userId=${data.userId}`);
+          navigate(`/${userIdx}`);
         } else {
           enqueueSnackbar(`로그인 실패: ${data.error || '알 수 없는 에러'}`, { variant: 'error' });
         }
@@ -137,8 +155,11 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
                 {/* Name 필드: 회원가입 모드에서만 표시 */}
                 {!isLogin && (
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-800">Name</label>
+                    <label htmlFor="name" className="mb-2 block text-sm font-semibold text-gray-800">
+                      Name
+                    </label>
                     <input
+                      id="name"
                       type="text"
                       name="name"
                       value={formData.name}
@@ -152,10 +173,11 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
 
                 {/* Email */}
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-800">
+                  <label htmlFor="email" className="mb-2 block text-sm font-semibold text-gray-800">
                     Email address
                   </label>
                   <input
+                    id="email"
                     type="email"
                     name="email"
                     value={formData.email}
@@ -168,8 +190,11 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
 
                 {/* Password */}
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-800">Password</label>
+                  <label htmlFor="password" className="mb-2 block text-sm font-semibold text-gray-800">
+                    Password
+                  </label>
                   <input
+                    id="password"
                     type="password"
                     name="password"
                     value={formData.password}
@@ -234,7 +259,10 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
                   <FcGoogle size={22} />
                   <span>Sign in with Google</span>
                 </button> */}
-                <button className="flex w-full items-center justify-center space-x-2 rounded-xl bg-[#FEE500] py-3 text-sm font-semibold text-[#191919] transition hover:bg-[#fada0a]">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-center space-x-2 rounded-xl bg-[#FEE500] py-3 text-sm font-semibold text-[#191919] transition hover:bg-[#fada0a]"
+                >
                   <SiKakaotalk size={22} />
                   <span>Sign in with Kakao</span>
                 </button>
@@ -243,12 +271,13 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
               {/* Footer: 클릭 시 모드 전환 */}
               <p className="mt-10 text-center text-sm text-gray-600">
                 {isLogin ? "Don't have an account?" : 'Have an account?'}{' '}
-                <span
+                <button
+                  type="button"
                   onClick={() => navigate(isLogin ? '/signup' : '/signin')}
-                  className="cursor-pointer font-bold text-[#1a73e8] hover:underline"
+                  className="font-bold text-[#1a73e8] hover:underline"
                 >
                   {isLogin ? 'Sign Up' : 'Sign In'}
-                </span>
+                </button>
               </p>
             </div>
           </div>
@@ -278,12 +307,13 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
         <DialogContent>
           <DialogContentText>
             <div className="mb-4">
-              <label className="mb-2 block text-sm font-semibold text-gray-800">
-                Email address
-              </label>
-              <input
-                type="email"
-                name="resetEmail"
+               <label htmlFor="resetEmail" className="mb-2 block text-sm font-semibold text-gray-800">
+                 Email address
+               </label>
+               <input
+                 id="resetEmail"
+                 type="email"
+                 name="resetEmail"
                 value={formData.resetEmail}
                 onChange={handleChange}
                 placeholder="Enter your email"
@@ -292,10 +322,13 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
               />
             </div>
             <div className="mb-4">
-              <label className="mb-2 block text-sm font-semibold text-gray-800">Password</label>
-              <input
-                type="password"
-                name="resetPassword"
+               <label htmlFor="resetPassword" className="mb-2 block text-sm font-semibold text-gray-800">
+                 Password
+               </label>
+               <input
+                 id="resetPassword"
+                 type="password"
+                 name="resetPassword"
                 value={formData.resetPassword}
                 onChange={handleChange}
                 placeholder="Password"
