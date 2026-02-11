@@ -1,22 +1,21 @@
-# JWT Reset Password Flow
+# Modal Forgot Password Flow (Token-Verified)
 
 ## Overview
 
-This project uses a JWT-authenticated password reset flow.
+This project uses a modal-based forgot-password flow with reset tokens.
 
-- No email lookup is used for resetting password.
-- No reset-token table is required.
-- The authenticated user is resolved from `Authorization: Bearer <jwt>`.
+- The reset UI remains a modal in `/signin`.
+- Inputs remain two fields: email and new password.
+- The actual password update requires a valid reset token.
+- Reset tokens are random, SHA-256 hashed in DB, expire in 30 minutes, and are single-use.
 
-## Request/Response Contract
+## API Contract
 
-| Item | Value |
-| --- | --- |
-| Endpoint | `POST /authentication/reset-password` |
-| Auth | Required (`passport-jwt`) |
-| Body | `{ "newPassword": "string" }` |
-| Success | `200 { "message": "비밀번호가 성공적으로 변경되었습니다." }` |
-| Failure | `400`, `401`, `404`, `500` |
+| Endpoint | Purpose | Request Body |
+| --- | --- | --- |
+| `POST /authentication/request-reset` | Create reset token and reset link | `{ "email": "string" }` |
+| `POST /authentication/verify-reset-token` | Validate token before reset | `{ "email": "string", "token": "string" }` |
+| `POST /authentication/reset-password` | Complete password reset | `{ "email": "string", "newPassword": "string", "token": "string" }` |
 
 ## Sequence Diagram
 
@@ -24,45 +23,46 @@ This project uses a JWT-authenticated password reset flow.
 sequenceDiagram
   autonumber
   actor User
-  participant Frontend as Frontend (/reset-password)
+  participant Frontend as Frontend (Login Modal)
   participant API as Backend API
-  participant Auth as Passport JWT
   participant DB as MySQL
 
-  User->>Frontend: Enter new password
-  Frontend->>API: POST /authentication/reset-password\nAuthorization: Bearer <jwt>\n{ newPassword }
-  API->>Auth: Validate JWT and load user
-  Auth-->>API: req.user (id, name, email)
-  API->>DB: UPDATE users SET password = bcrypt(newPassword) WHERE id = req.user.id
-  DB-->>API: affectedRows
-  API-->>Frontend: 200 success / error status
-  Frontend-->>User: Show snackbar and redirect to /signin
+  User->>Frontend: Open forgot-password modal and input email/newPassword
+  Frontend->>API: POST /authentication/request-reset { email }
+  API->>DB: Store password_reset_tokens(token_hash, expires_at)
+  API-->>Frontend: Generic success (+ devResetLink in non-production)
+  Frontend->>Frontend: Apply resetToken/email from link query
+  Frontend->>API: POST /authentication/verify-reset-token { email, token }
+  API->>DB: Validate token_hash, expires_at, used_at, email match
+  API-->>Frontend: Token valid
+  Frontend->>API: POST /authentication/reset-password { email, newPassword, token }
+  API->>DB: Mark token used_at + update users.password (transaction)
+  API-->>Frontend: Reset success
 ```
 
 ## Backend Mapping
 
-- Route guard: `backend/src/routes/authRoutes.ts`
-  - `router.post('/reset-password', passport.authenticate('jwt', { session: false }), authController.resetPassword)`
-- Handler: `backend/src/controllers/authController.ts`
-  - Reads `req.user` from JWT auth context.
-  - Validates `newPassword` exists.
-  - Hashes password via `bcrypt.hash(newPassword, 10)`.
-  - Updates by user id (not by email).
+- Routes: `backend/src/routes/authRoutes.ts`
+  - `POST /authentication/request-reset`
+  - `POST /authentication/verify-reset-token`
+  - `POST /authentication/reset-password`
+- Controllers: `backend/src/controllers/authController.ts`
+  - `requestReset`: creates token hash row and returns generic message.
+  - `verifyResetToken`: validates token hash, expiry, single-use, email match.
+  - `resetPassword`: verifies token again, consumes token (`used_at`) and updates password in transaction.
 
 ## Frontend Mapping
 
-- Route: `frontend/src/App.tsx`
-  - Adds `/reset-password` page.
-- Entry point from login modal: `frontend/src/pages/Login.tsx`
-  - Forgot-password dialog navigates to `/reset-password`.
-  - No email/new-password inline reset form.
-- Reset screen: `frontend/src/pages/ResetPassword.tsx`
-  - Validates inputs and token presence.
-  - Calls `/authentication/reset-password` with `newPassword` only.
+- Modal component: `frontend/src/pages/Login.tsx`
+  - No reset token in URL: calls `request-reset`.
+  - Token in URL (`resetToken` query): verifies token then calls `reset-password`.
+  - Keeps two inputs (email, new password) and modal UX.
 
-## Data Model Notes
+## Data Model
 
-Only `users.password` is used for this flow.
-
-- `users.id` is the reset target key.
-- Reset happens for currently authenticated principal only.
+- Main user table: `users`
+- New reset table: `password_reset_tokens`
+  - `token_hash` (SHA-256)
+  - `expires_at` (30 min)
+  - `used_at` (single-use marker)
+  - `user_id` FK to `users.id`

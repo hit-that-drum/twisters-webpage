@@ -1,20 +1,27 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 // import { FcGoogle } from 'react-icons/fc';
-import { SiKakaotalk } from 'react-icons/si';
+// import { SiKakaotalk } from 'react-icons/si';
 import loginPageRightImage from '../../public/login_page_right_image.png';
 import { Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
-import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { apiFetch } from '../utils/api';
 
 const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const resetToken = searchParams.get('resetToken')?.trim() || '';
+  const resetEmailFromLink = searchParams.get('email')?.trim() || '';
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
   });
+  const [resetFormData, setResetFormData] = useState({
+    resetEmail: '',
+    resetPassword: '',
+  });
+  const [isResetSubmitting, setIsResetSubmitting] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -22,12 +29,122 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
 
   const [openForgotPasswordDialog, setOpenForgotPasswordDialog] = useState(false);
   const handleForgotPassword = () => {
+    setResetFormData((previous) => ({
+      ...previous,
+      resetEmail: resetEmailFromLink || formData.email || previous.resetEmail,
+    }));
     setOpenForgotPasswordDialog(true);
   };
 
+  const handleResetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setResetFormData({ ...resetFormData, [e.target.name]: e.target.value });
+  };
+
   const handleResetPassword = async () => {
-    setOpenForgotPasswordDialog(false);
-    navigate('/reset-password');
+    if (!resetFormData.resetEmail || !resetFormData.resetPassword) {
+      enqueueSnackbar('이메일과 새 비밀번호를 입력해주세요.', { variant: 'error' });
+      return;
+    }
+
+    const normalizedResetEmail = resetFormData.resetEmail.trim().toLowerCase();
+    if (!normalizedResetEmail) {
+      enqueueSnackbar('이메일 형식이 올바르지 않습니다.', { variant: 'error' });
+      return;
+    }
+
+    setIsResetSubmitting(true);
+
+    try {
+      if (!resetToken) {
+        const requestResetResponse = await apiFetch('/authentication/request-reset', {
+          method: 'POST',
+          body: JSON.stringify({
+            email: normalizedResetEmail,
+          }),
+        });
+        const requestResetData = await requestResetResponse.json();
+
+        if (!requestResetResponse.ok) {
+          enqueueSnackbar(`재설정 링크 요청 실패: ${requestResetData.error || '알 수 없는 에러'}`, {
+            variant: 'error',
+          });
+          return;
+        }
+
+        if (requestResetData.devResetLink) {
+          const linkUrl = new URL(requestResetData.devResetLink);
+          const nextSearchParams = new URLSearchParams(searchParams);
+          const linkToken = linkUrl.searchParams.get('resetToken');
+          const linkEmail = linkUrl.searchParams.get('email');
+
+          if (linkToken) {
+            nextSearchParams.set('resetToken', linkToken);
+          }
+          if (linkEmail) {
+            nextSearchParams.set('email', linkEmail);
+            setResetFormData((previous) => ({ ...previous, resetEmail: linkEmail }));
+          }
+
+          setSearchParams(nextSearchParams, { replace: true });
+          enqueueSnackbar('개발 환경 재설정 링크를 적용했습니다. 다시 비밀번호 재설정을 눌러주세요.', {
+            variant: 'info',
+          });
+          return;
+        }
+
+        enqueueSnackbar(requestResetData.message || '비밀번호 재설정 링크를 이메일로 보냈습니다.', {
+          variant: 'success',
+        });
+        return;
+      }
+
+      const verifyResponse = await apiFetch('/authentication/verify-reset-token', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: normalizedResetEmail,
+          token: resetToken,
+        }),
+      });
+      const verifyData = await verifyResponse.json();
+
+      if (!verifyResponse.ok) {
+        enqueueSnackbar(`토큰 검증 실패: ${verifyData.error || '알 수 없는 에러'}`, {
+          variant: 'error',
+        });
+        return;
+      }
+
+      const response = await apiFetch('/authentication/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: normalizedResetEmail,
+          newPassword: resetFormData.resetPassword,
+          token: resetToken,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        enqueueSnackbar(`비밀번호 재설정 실패: ${data.error || '알 수 없는 에러'}`, {
+          variant: 'error',
+        });
+        return;
+      }
+
+      enqueueSnackbar('비밀번호가 성공적으로 변경되었습니다.', { variant: 'success' });
+      setOpenForgotPasswordDialog(false);
+      setResetFormData({ resetEmail: '', resetPassword: '' });
+
+      const nextSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.delete('resetToken');
+      nextSearchParams.delete('email');
+      setSearchParams(nextSearchParams, { replace: true });
+    } catch (error) {
+      console.error('Password reset error:', error);
+      enqueueSnackbar('서버와 연결할 수 없습니다. 잠시 후 다시 시도해주세요.', { variant: 'error' });
+    } finally {
+      setIsResetSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -98,7 +215,16 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
           enqueueSnackbar('로그인 성공!', { variant: 'success' });
           navigate(`/${userIdx}`);
         } else {
-          enqueueSnackbar(`로그인 실패: ${data.error || '알 수 없는 에러'}`, { variant: 'error' });
+          const errorMessage = data.error || '알 수 없는 에러';
+          enqueueSnackbar(`로그인 실패: ${errorMessage}`, { variant: 'error' });
+
+          if (typeof errorMessage === 'string' && errorMessage.toLowerCase().includes('password')) {
+            setResetFormData((previous) => ({
+              ...previous,
+              resetEmail: formData.email || previous.resetEmail,
+            }));
+            setOpenForgotPasswordDialog(true);
+          }
         }
       } catch (error) {
         console.error('Error:', error);
@@ -106,43 +232,6 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
           variant: 'error',
         });
       }
-    }
-  };
-
-  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
-    if (!credentialResponse.credential) {
-      enqueueSnackbar('구글 인증 토큰을 받지 못했습니다.', { variant: 'error' });
-      return;
-    }
-
-    try {
-      const res = await apiFetch('/authentication/auth/google', {
-        method: 'POST',
-        body: JSON.stringify({ token: credentialResponse.credential }),
-      });
-      const data = await res.json();
-
-      if (res.ok) {
-        if (data.token) {
-          localStorage.setItem('token', data.token);
-        }
-
-        const userIdx = data.user?.id ?? data.userId;
-        if (!userIdx) {
-          enqueueSnackbar('구글 로그인 응답에 사용자 ID가 없습니다.', { variant: 'error' });
-          return;
-        }
-
-        enqueueSnackbar('구글 로그인 성공!', { variant: 'success' });
-        navigate(`/${userIdx}`);
-      } else {
-        enqueueSnackbar(`구글 로그인 실패: ${data.error || '알 수 없는 에러'}`, {
-          variant: 'error',
-        });
-      }
-    } catch (error) {
-      console.error('Google Login Error:', error);
-      enqueueSnackbar('구글 로그인 중 서버와 연결할 수 없습니다.', { variant: 'error' });
     }
   };
 
@@ -161,7 +250,10 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
                 {/* Name 필드: 회원가입 모드에서만 표시 */}
                 {!isLogin && (
                   <div>
-                    <label htmlFor="name" className="mb-2 block text-sm font-semibold text-gray-800">
+                    <label
+                      htmlFor="name"
+                      className="mb-2 block text-sm font-semibold text-gray-800"
+                    >
                       Name
                     </label>
                     <input
@@ -196,7 +288,10 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
 
                 {/* Password */}
                 <div>
-                  <label htmlFor="password" className="mb-2 block text-sm font-semibold text-gray-800">
+                  <label
+                    htmlFor="password"
+                    className="mb-2 block text-sm font-semibold text-gray-800"
+                  >
                     Password
                   </label>
                   <input
@@ -252,7 +347,7 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
               </div>
 
               {/* Social Buttons */}
-              <div className="flex flex-col space-y-3 sm:flex-row sm:space-x-4 sm:space-y-0">
+              {/* <div className="flex flex-col space-y-3 sm:flex-row sm:space-x-4 sm:space-y-0">
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
                   onError={() => console.log('Google Login Error')}
@@ -260,19 +355,19 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
                     className:
                       'flex w-full items-center justify-center space-x-2 rounded-xl border border-gray-200 py-3 text-sm font-semibold transition hover:bg-gray-50',
                   }}
-                />
-                {/* <button className="flex w-full items-center justify-center space-x-2 rounded-xl border border-gray-200 py-3 text-sm font-semibold transition hover:bg-gray-50">
+                /> */}
+              {/* <button className="flex w-full items-center justify-center space-x-2 rounded-xl border border-gray-200 py-3 text-sm font-semibold transition hover:bg-gray-50">
                   <FcGoogle size={22} />
                   <span>Sign in with Google</span>
                 </button> */}
-                <button
+              {/* <button
                   type="button"
                   className="flex w-full items-center justify-center space-x-2 rounded-xl bg-[#FEE500] py-3 text-sm font-semibold text-[#191919] transition hover:bg-[#fada0a]"
                 >
                   <SiKakaotalk size={22} />
                   <span>Sign in with Kakao</span>
                 </button>
-              </div>
+              </div> */}
 
               {/* Footer: 클릭 시 모드 전환 */}
               <p className="mt-10 text-center text-sm text-gray-600">
@@ -312,15 +407,47 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
         <DialogTitle>비밀번호 재설정</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            로그인된 계정의 JWT 토큰으로 비밀번호를 변경합니다. 다음 화면에서 새 비밀번호를
-            입력해주세요.
+            {resetToken
+              ? '토큰이 확인되었습니다. 이메일과 새 비밀번호를 입력해 재설정을 완료하세요.'
+              : '가입한 이메일을 입력하면 재설정 링크를 발송합니다. 개발 환경에서는 링크가 자동 적용됩니다.'}
           </DialogContentText>
+          <div className="mt-4 mb-4">
+            <label htmlFor="resetEmail" className="mb-2 block text-sm font-semibold text-gray-800">
+              Email address
+            </label>
+            <input
+              id="resetEmail"
+              type="email"
+              name="resetEmail"
+              value={resetFormData.resetEmail}
+              onChange={handleResetChange}
+              placeholder="Enter your email"
+              className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-green-700 focus:outline-none"
+              required
+            />
+          </div>
+          <div className="mb-4">
+            <label htmlFor="resetPassword" className="mb-2 block text-sm font-semibold text-gray-800">
+              New password
+            </label>
+            <input
+              id="resetPassword"
+              type="password"
+              name="resetPassword"
+              value={resetFormData.resetPassword}
+              onChange={handleResetChange}
+              placeholder="Enter your new password"
+              className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-green-700 focus:outline-none"
+              required
+            />
+          </div>
           <button
             type="button"
-            className="mt-4 w-full rounded-xl bg-[#3D5A2D] py-4 text-sm font-bold text-white transition-all hover:bg-[#2d4321] active:scale-[0.98]"
+            disabled={isResetSubmitting}
+            className="mt-4 w-full rounded-xl bg-[#3D5A2D] py-4 text-sm font-bold text-white transition-all hover:bg-[#2d4321] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             onClick={handleResetPassword}
           >
-            비밀번호 재설정 화면으로 이동
+            {isResetSubmitting ? '처리 중...' : '비밀번호 재설정'}
           </button>
         </DialogContent>
       </Dialog>

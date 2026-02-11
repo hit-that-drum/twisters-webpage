@@ -1,11 +1,14 @@
 import { type Request, type Response } from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { type ResultSetHeader, type RowDataPacket } from 'mysql2/promise';
 import pool from '../db.js';
 import { buildAuthResponse } from '../authUtils.js';
 
 const SALT_ROUNDS = 10;
+const RESET_TOKEN_TTL_MINUTES = 30;
+const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || 'http://localhost:5173';
 const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID;
 const oauth2Client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -18,6 +21,19 @@ interface AuthenticatedUser {
 interface PublicUserRow extends RowDataPacket {
   id: number;
   name: string;
+  email: string;
+}
+
+interface UserEmailRow extends RowDataPacket {
+  id: number;
+  email: string;
+}
+
+interface PasswordResetLookupRow extends RowDataPacket {
+  id: number;
+  user_id: number;
+  expires_at: Date;
+  used_at: Date | null;
   email: string;
 }
 
@@ -112,32 +128,190 @@ export const getUsers = async (req: Request, res: Response) => {
 };
 
 export const resetPassword = async (req: Request, res: Response) => {
-  const authenticatedUser = (req as AuthenticatedRequest).user;
-  const { newPassword } = req.body as {
+  const { email, newPassword, token } = req.body as {
+    email?: string;
     newPassword?: string;
+    token?: string;
   };
 
-  if (!authenticatedUser) {
-    return res.status(401).json({ error: '인증된 사용자 정보가 없습니다.' });
-  }
-
-  if (!newPassword) {
-    return res.status(400).json({ error: '새 비밀번호를 입력해주세요.' });
+  if (!email || !newPassword || !token) {
+    return res.status(400).json({ error: '이메일, 새 비밀번호, 토큰을 모두 입력해주세요.' });
   }
 
   try {
-    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    const [result] = await pool.query<ResultSetHeader>('UPDATE users SET password = ? WHERE id = ?', [
-      hashedPassword,
-      authenticatedUser.id,
-    ]);
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: '해당 사용자를 찾을 수 없습니다.' });
+    const normalizedEmail = email.trim().toLowerCase();
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const [rows] = await pool.query<PasswordResetLookupRow[]>(
+      `
+        SELECT prt.id, prt.user_id, prt.expires_at, prt.used_at, u.email
+        FROM password_reset_tokens prt
+        JOIN users u ON u.id = prt.user_id
+        WHERE prt.token_hash = ?
+        ORDER BY prt.id DESC
+        LIMIT 1
+      `,
+      [tokenHash],
+    );
+
+    const resetRow = rows[0];
+    if (!resetRow) {
+      return res.status(400).json({ error: '유효하지 않은 비밀번호 재설정 토큰입니다.' });
     }
+
+    if (resetRow.used_at) {
+      return res.status(400).json({ error: '이미 사용된 비밀번호 재설정 토큰입니다.' });
+    }
+
+    if (new Date(resetRow.expires_at).getTime() < Date.now()) {
+      return res.status(400).json({ error: '만료된 비밀번호 재설정 토큰입니다.' });
+    }
+
+    if (resetRow.email.toLowerCase() !== normalizedEmail) {
+      return res.status(400).json({ error: '토큰과 이메일이 일치하지 않습니다.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [consumeResult] = await connection.query<ResultSetHeader>(
+        `
+          UPDATE password_reset_tokens
+          SET used_at = NOW()
+          WHERE id = ? AND used_at IS NULL
+        `,
+        [resetRow.id],
+      );
+
+      if (consumeResult.affectedRows === 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: '이미 사용된 비밀번호 재설정 토큰입니다.' });
+      }
+
+      const [updateResult] = await connection.query<ResultSetHeader>(
+        'UPDATE users SET password = ? WHERE id = ?',
+        [hashedPassword, resetRow.user_id],
+      );
+
+      if (updateResult.affectedRows === 0) {
+        await connection.rollback();
+        return res.status(404).json({ error: '해당 사용자를 찾을 수 없습니다.' });
+      }
+
+      await connection.commit();
+    } catch (transactionError) {
+      await connection.rollback();
+      throw transactionError;
+    } finally {
+      connection.release();
+    }
+
     res.json({ message: '비밀번호가 성공적으로 변경되었습니다.' });
   } catch (error) {
     console.error('Password Reset Error:', error);
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+  }
+};
+
+export const requestReset = async (req: Request, res: Response) => {
+  const { email } = req.body as {
+    email?: string;
+  };
+
+  if (!email) {
+    return res.status(400).json({ error: '이메일을 입력해주세요.' });
+  }
+
+  try {
+    const normalizedEmail = email.trim().toLowerCase();
+    const [rows] = await pool.query<UserEmailRow[]>('SELECT id, email FROM users WHERE email = ? LIMIT 1', [
+      normalizedEmail,
+    ]);
+
+    const genericMessage = '입력한 이메일로 비밀번호 재설정 링크를 전송했습니다.';
+    const user = rows[0];
+    if (!user) {
+      return res.json({ message: genericMessage });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    await pool.query<ResultSetHeader>('UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL', [
+      user.id,
+    ]);
+
+    await pool.query<ResultSetHeader>(
+      `
+        INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+        VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE))
+      `,
+      [user.id, tokenHash, RESET_TOKEN_TTL_MINUTES],
+    );
+
+    const resetLink = `${FRONTEND_BASE_URL.replace(/\/+$/, '')}/signin?resetToken=${encodeURIComponent(rawToken)}&email=${encodeURIComponent(normalizedEmail)}`;
+
+    if (process.env.NODE_ENV === 'production') {
+      return res.json({ message: genericMessage });
+    }
+
+    return res.json({ message: genericMessage, devResetLink: resetLink });
+  } catch (error) {
+    console.error('Request Reset Error:', error);
+    return res.status(500).json({ error: '서버 에러가 발생했습니다.' });
+  }
+};
+
+export const verifyResetToken = async (req: Request, res: Response) => {
+  const { email, token } = req.body as {
+    email?: string;
+    token?: string;
+  };
+
+  if (!email || !token) {
+    return res.status(400).json({ error: '이메일과 토큰을 입력해주세요.' });
+  }
+
+  try {
+    const normalizedEmail = email.trim().toLowerCase();
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const [rows] = await pool.query<PasswordResetLookupRow[]>(
+      `
+        SELECT prt.id, prt.user_id, prt.expires_at, prt.used_at, u.email
+        FROM password_reset_tokens prt
+        JOIN users u ON u.id = prt.user_id
+        WHERE prt.token_hash = ?
+        ORDER BY prt.id DESC
+        LIMIT 1
+      `,
+      [tokenHash],
+    );
+
+    const resetRow = rows[0];
+    if (!resetRow) {
+      return res.status(400).json({ error: '유효하지 않은 비밀번호 재설정 토큰입니다.' });
+    }
+
+    if (resetRow.used_at) {
+      return res.status(400).json({ error: '이미 사용된 비밀번호 재설정 토큰입니다.' });
+    }
+
+    if (new Date(resetRow.expires_at).getTime() < Date.now()) {
+      return res.status(400).json({ error: '만료된 비밀번호 재설정 토큰입니다.' });
+    }
+
+    if (resetRow.email.toLowerCase() !== normalizedEmail) {
+      return res.status(400).json({ error: '토큰과 이메일이 일치하지 않습니다.' });
+    }
+
+    return res.json({ message: '유효한 비밀번호 재설정 토큰입니다.' });
+  } catch (error) {
+    console.error('Verify Reset Token Error:', error);
+    return res.status(500).json({ error: '서버 에러가 발생했습니다.' });
   }
 };
 
