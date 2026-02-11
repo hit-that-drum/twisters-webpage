@@ -12,6 +12,8 @@ interface User {
 }
 
 router.post('/signin', (req: Request, res: Response, next: NextFunction) => {
+  const rememberMe = req.body?.rememberMe === true || req.body?.rememberMe === 'true';
+
   // Use a generic type or cast to handle the 'user' return value
   passport.authenticate(
     'local',
@@ -25,7 +27,7 @@ router.post('/signin', (req: Request, res: Response, next: NextFunction) => {
         return res.status(401).json({ error: info?.message || 'Unauthorized' });
       }
 
-      return res.json(buildAuthResponse(user, 'Logged in successfully!'));
+      return res.json(buildAuthResponse(user, 'Logged in successfully!', { rememberMe }));
     },
   )(req, res, next);
 });

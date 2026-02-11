@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 // import { FcGoogle } from 'react-icons/fc';
 // import { SiKakaotalk } from 'react-icons/si';
@@ -6,6 +6,65 @@ import loginPageRightImage from '../../public/login_page_right_image.png';
 import { Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '../utils/api';
+import { clearAccessToken, getAccessToken, setAccessToken } from '../utils/authStorage';
+
+const WRONG_PASSWORD_ATTEMPTS_KEY = 'wrongPasswordAttemptsByEmail';
+const MAX_WRONG_PASSWORD_ATTEMPTS = 5;
+
+type WrongPasswordAttemptsByEmail = Record<string, number>;
+
+const readWrongPasswordAttempts = (): WrongPasswordAttemptsByEmail => {
+  try {
+    const storedValue = localStorage.getItem(WRONG_PASSWORD_ATTEMPTS_KEY);
+    if (!storedValue) {
+      return {};
+    }
+
+    const parsedValue = JSON.parse(storedValue);
+    if (!parsedValue || typeof parsedValue !== 'object') {
+      return {};
+    }
+
+    return parsedValue as WrongPasswordAttemptsByEmail;
+  } catch {
+    return {};
+  }
+};
+
+const writeWrongPasswordAttempts = (attempts: WrongPasswordAttemptsByEmail) => {
+  localStorage.setItem(WRONG_PASSWORD_ATTEMPTS_KEY, JSON.stringify(attempts));
+};
+
+const increaseWrongPasswordAttempt = (email: string) => {
+  const attempts = readWrongPasswordAttempts();
+  const nextAttempts = (attempts[email] || 0) + 1;
+  attempts[email] = nextAttempts;
+  writeWrongPasswordAttempts(attempts);
+  return nextAttempts;
+};
+
+const clearWrongPasswordAttempt = (email: string) => {
+  if (!email) {
+    return;
+  }
+
+  const attempts = readWrongPasswordAttempts();
+  if (!(email in attempts)) {
+    return;
+  }
+
+  delete attempts[email];
+  writeWrongPasswordAttempts(attempts);
+};
+
+const getWrongPasswordAttempt = (email: string) => {
+  if (!email) {
+    return 0;
+  }
+
+  const attempts = readWrongPasswordAttempts();
+  return attempts[email] || 0;
+};
 
 const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
   const navigate = useNavigate();
@@ -21,13 +80,71 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
     resetEmail: '',
     resetPassword: '',
   });
+  const [rememberFor30Days, setRememberFor30Days] = useState(false);
+  const [wrongPasswordAttemptCount, setWrongPasswordAttemptCount] = useState(0);
   const [isResetSubmitting, setIsResetSubmitting] = useState(false);
+  const normalizedLoginEmail = formData.email.trim().toLowerCase();
+  const remainingWrongPasswordAttempts = Math.max(
+    MAX_WRONG_PASSWORD_ATTEMPTS - wrongPasswordAttemptCount,
+    0,
+  );
+  const wrongPasswordIndicatorClassName =
+    wrongPasswordAttemptCount >= MAX_WRONG_PASSWORD_ATTEMPTS - 1
+      ? 'text-red-700'
+      : wrongPasswordAttemptCount >= 3
+        ? 'text-amber-700'
+        : 'text-emerald-700';
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const [openForgotPasswordDialog, setOpenForgotPasswordDialog] = useState(false);
+
+  useEffect(() => {
+    if (resetToken) {
+      setResetFormData((previous) => ({
+        ...previous,
+        resetEmail: resetEmailFromLink || previous.resetEmail,
+      }));
+      setOpenForgotPasswordDialog(true);
+      return;
+    }
+
+    const autoSignIn = async () => {
+      const token = getAccessToken();
+      if (!token) {
+        return;
+      }
+
+      try {
+        const response = await apiFetch('/authentication/me');
+        if (!response.ok) {
+          clearAccessToken();
+          return;
+        }
+
+        const data = await response.json();
+        if (data?.id) {
+          navigate(`/${data.id}`, { replace: true });
+        }
+      } catch (error) {
+        console.error('Auto sign-in error:', error);
+      }
+    };
+
+    autoSignIn();
+  }, [navigate, resetEmailFromLink, resetToken]);
+
+  useEffect(() => {
+    if (!isLogin || !normalizedLoginEmail) {
+      setWrongPasswordAttemptCount(0);
+      return;
+    }
+
+    setWrongPasswordAttemptCount(getWrongPasswordAttempt(normalizedLoginEmail));
+  }, [isLogin, normalizedLoginEmail]);
+
   const handleForgotPassword = () => {
     setResetFormData((previous) => ({
       ...previous,
@@ -165,7 +282,7 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
 
         if (response.ok) {
           if (data.token) {
-            localStorage.setItem('token', data.token);
+            setAccessToken(data.token, true);
           }
 
           const userIdx = data.user?.id ?? data.userId;
@@ -192,18 +309,24 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
         enqueueSnackbar('모든 필드를 입력해주세요.', { variant: 'error' });
         return;
       }
-      console.log('formData:', formData);
+
       try {
         const response = await apiFetch('/authentication/signin', {
           method: 'POST',
-          body: JSON.stringify(formData),
+          body: JSON.stringify({
+            ...formData,
+            rememberMe: rememberFor30Days,
+          }),
         });
-        console.log('response:', response);
+
         const data = await response.json();
-        console.log('data:', data);
+
         if (response.ok) {
+          clearWrongPasswordAttempt(normalizedLoginEmail);
+          setWrongPasswordAttemptCount(0);
+
           if (data.token) {
-            localStorage.setItem('token', data.token);
+            setAccessToken(data.token, rememberFor30Days);
           }
 
           const userIdx = data.user?.id ?? data.userId;
@@ -218,12 +341,30 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
           const errorMessage = data.error || '알 수 없는 에러';
           enqueueSnackbar(`로그인 실패: ${errorMessage}`, { variant: 'error' });
 
-          if (typeof errorMessage === 'string' && errorMessage.toLowerCase().includes('password')) {
-            setResetFormData((previous) => ({
-              ...previous,
-              resetEmail: formData.email || previous.resetEmail,
-            }));
-            setOpenForgotPasswordDialog(true);
+          const normalizedErrorMessage =
+            typeof errorMessage === 'string' ? errorMessage.toLowerCase() : '';
+
+          if (
+            normalizedLoginEmail &&
+            (normalizedErrorMessage.includes('incorrect password') ||
+              normalizedErrorMessage.includes('wrong password') ||
+              (typeof errorMessage === 'string' && errorMessage.includes('비밀번호')))
+          ) {
+            const wrongPasswordAttempts = increaseWrongPasswordAttempt(normalizedLoginEmail);
+            setWrongPasswordAttemptCount(wrongPasswordAttempts);
+
+            if (wrongPasswordAttempts >= MAX_WRONG_PASSWORD_ATTEMPTS) {
+              clearWrongPasswordAttempt(normalizedLoginEmail);
+              setWrongPasswordAttemptCount(0);
+              setResetFormData((previous) => ({
+                ...previous,
+                resetEmail: normalizedLoginEmail,
+              }));
+              setOpenForgotPasswordDialog(true);
+              enqueueSnackbar('비밀번호를 5회 연속 틀려 비밀번호 재설정 창을 열었습니다.', {
+                variant: 'warning',
+              });
+            }
           }
         }
       } catch (error) {
@@ -306,6 +447,13 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
                   />
                 </div>
 
+                {isLogin && normalizedLoginEmail && wrongPasswordAttemptCount > 0 && (
+                  <p className={`mt-2 text-xs font-medium ${wrongPasswordIndicatorClassName}`}>
+                    Wrong password attempts: {wrongPasswordAttemptCount}/{MAX_WRONG_PASSWORD_ATTEMPTS}
+                    {' · '}Remaining before auto reset: {remainingWrongPasswordAttempts}
+                  </p>
+                )}
+
                 {/* 추가된 영역: Remember me & Forgot Password */}
                 {isLogin && (
                   <div className="flex items-center justify-between">
@@ -313,6 +461,8 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
                       <input
                         type="checkbox"
                         id="remember"
+                        checked={rememberFor30Days}
+                        onChange={(event) => setRememberFor30Days(event.target.checked)}
                         className="h-4 w-4 rounded border-gray-300 accent-[#3D5A2D] cursor-pointer"
                       />
                       <label
