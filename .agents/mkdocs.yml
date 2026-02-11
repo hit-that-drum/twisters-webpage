@@ -1,0 +1,13 @@
+site_name: Twisters JWT Reset Docs
+docs_dir: docs
+site_dir: site
+theme:
+  name: mkdocs
+nav:
+  - JWT Reset Password Flow: reset-password-flow.md
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.superfences
+  - toc:
+      permalink: true
