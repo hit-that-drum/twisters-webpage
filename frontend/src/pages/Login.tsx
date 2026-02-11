@@ -14,8 +14,6 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
     name: '',
     email: '',
     password: '',
-    resetEmail: '',
-    resetPassword: '',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -28,27 +26,8 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
   };
 
   const handleResetPassword = async () => {
-    if (!formData.resetEmail || !formData.resetPassword) {
-      enqueueSnackbar('모든 필드를 입력해주세요.', { variant: 'error' });
-      return;
-    }
-    const response = await apiFetch('/authentication/reset-password', {
-      method: 'POST',
-      body: JSON.stringify({
-        email: formData.resetEmail,
-        newPassword: formData.resetPassword,
-      }),
-    });
-    const data = await response.json();
-    if (response.ok) {
-      enqueueSnackbar('비밀번호 재설정 성공!', { variant: 'success' });
-      setOpenForgotPasswordDialog(false);
-    } else {
-      enqueueSnackbar(`비밀번호 재설정 실패: ${data.error || '알 수 없는 에러'}`, {
-        variant: 'error',
-      });
-      setOpenForgotPasswordDialog(false);
-    }
+    setOpenForgotPasswordDialog(false);
+    navigate('/reset-password');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -333,44 +312,16 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
         <DialogTitle>비밀번호 재설정</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            <div className="mb-4">
-               <label htmlFor="resetEmail" className="mb-2 block text-sm font-semibold text-gray-800">
-                 Email address
-               </label>
-               <input
-                 id="resetEmail"
-                 type="email"
-                 name="resetEmail"
-                value={formData.resetEmail}
-                onChange={handleChange}
-                placeholder="Enter your email"
-                className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-green-700 focus:outline-none"
-                required
-              />
-            </div>
-            <div className="mb-4">
-               <label htmlFor="resetPassword" className="mb-2 block text-sm font-semibold text-gray-800">
-                 Password
-               </label>
-               <input
-                 id="resetPassword"
-                 type="password"
-                 name="resetPassword"
-                value={formData.resetPassword}
-                onChange={handleChange}
-                placeholder="Password"
-                className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-green-700 focus:outline-none"
-                required
-              />
-            </div>
-            <button
-              type="button"
-              className="w-full rounded-xl bg-[#3D5A2D] py-4 text-sm font-bold text-white transition-all hover:bg-[#2d4321] active:scale-[0.98]"
-              onClick={handleResetPassword}
-            >
-              비밀번호 재설정
-            </button>
+            로그인된 계정의 JWT 토큰으로 비밀번호를 변경합니다. 다음 화면에서 새 비밀번호를
+            입력해주세요.
           </DialogContentText>
+          <button
+            type="button"
+            className="mt-4 w-full rounded-xl bg-[#3D5A2D] py-4 text-sm font-bold text-white transition-all hover:bg-[#2d4321] active:scale-[0.98]"
+            onClick={handleResetPassword}
+          >
+            비밀번호 재설정 화면으로 이동
+          </button>
         </DialogContent>
       </Dialog>
     </>

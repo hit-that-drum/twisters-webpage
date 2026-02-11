@@ -112,23 +112,27 @@ export const getUsers = async (req: Request, res: Response) => {
 };
 
 export const resetPassword = async (req: Request, res: Response) => {
-  const { email, newPassword } = req.body as {
-    email?: string;
+  const authenticatedUser = (req as AuthenticatedRequest).user;
+  const { newPassword } = req.body as {
     newPassword?: string;
   };
 
-  if (!email || !newPassword) {
-    return res.status(400).json({ error: '이메일과 새 비밀번호를 입력해주세요.' });
+  if (!authenticatedUser) {
+    return res.status(401).json({ error: '인증된 사용자 정보가 없습니다.' });
+  }
+
+  if (!newPassword) {
+    return res.status(400).json({ error: '새 비밀번호를 입력해주세요.' });
   }
 
   try {
     const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    const [result] = await pool.query<ResultSetHeader>('UPDATE users SET password = ? WHERE email = ?', [
+    const [result] = await pool.query<ResultSetHeader>('UPDATE users SET password = ? WHERE id = ?', [
       hashedPassword,
-      email,
+      authenticatedUser.id,
     ]);
     if (result.affectedRows === 0) {
-      return res.status(404).json({ error: '해당 이메일의 사용자를 찾을 수 없습니다.' });
+      return res.status(404).json({ error: '해당 사용자를 찾을 수 없습니다.' });
     }
     res.json({ message: '비밀번호가 성공적으로 변경되었습니다.' });
   } catch (error) {
