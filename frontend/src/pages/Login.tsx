@@ -66,7 +66,7 @@ const getWrongPasswordAttempt = (email: string) => {
   return attempts[email] || 0;
 };
 
-const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
+export const Login = ({ isLogin }: { isLogin: boolean }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const resetToken = searchParams.get('resetToken')?.trim() || '';
@@ -92,8 +92,8 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
     wrongPasswordAttemptCount >= MAX_WRONG_PASSWORD_ATTEMPTS - 1
       ? 'text-red-700'
       : wrongPasswordAttemptCount >= 3
-        ? 'text-amber-700'
-        : 'text-emerald-700';
+      ? 'text-amber-700'
+      : 'text-emerald-700';
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -203,9 +203,12 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
           }
 
           setSearchParams(nextSearchParams, { replace: true });
-          enqueueSnackbar('개발 환경 재설정 링크를 적용했습니다. 다시 비밀번호 재설정을 눌러주세요.', {
-            variant: 'info',
-          });
+          enqueueSnackbar(
+            '개발 환경 재설정 링크를 적용했습니다. 다시 비밀번호 재설정을 눌러주세요.',
+            {
+              variant: 'info',
+            },
+          );
           return;
         }
 
@@ -258,7 +261,9 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
       setSearchParams(nextSearchParams, { replace: true });
     } catch (error) {
       console.error('Password reset error:', error);
-      enqueueSnackbar('서버와 연결할 수 없습니다. 잠시 후 다시 시도해주세요.', { variant: 'error' });
+      enqueueSnackbar('서버와 연결할 수 없습니다. 잠시 후 다시 시도해주세요.', {
+        variant: 'error',
+      });
     } finally {
       setIsResetSubmitting(false);
     }
@@ -449,7 +454,8 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
 
                 {isLogin && normalizedLoginEmail && wrongPasswordAttemptCount > 0 && (
                   <p className={`mt-2 text-xs font-medium ${wrongPasswordIndicatorClassName}`}>
-                    Wrong password attempts: {wrongPasswordAttemptCount}/{MAX_WRONG_PASSWORD_ATTEMPTS}
+                    Wrong password attempts: {wrongPasswordAttemptCount}/
+                    {MAX_WRONG_PASSWORD_ATTEMPTS}
                     {' · '}Remaining before auto reset: {remainingWrongPasswordAttempts}
                   </p>
                 )}
@@ -577,7 +583,10 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
             />
           </div>
           <div className="mb-4">
-            <label htmlFor="resetPassword" className="mb-2 block text-sm font-semibold text-gray-800">
+            <label
+              htmlFor="resetPassword"
+              className="mb-2 block text-sm font-semibold text-gray-800"
+            >
               New password
             </label>
             <input
@@ -604,5 +613,3 @@ const Login: React.FC<{ isLogin: boolean }> = ({ isLogin }) => {
     </>
   );
 };
-
-export default Login;

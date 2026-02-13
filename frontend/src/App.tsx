@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Login from './pages/Login';
+import { Login } from './pages/Login';
 import Home from './pages/Home';
+import Notice from './pages/Notice';
+import Settlement from './pages/Settlement';
+import Mypage from './pages/Mypage';
 import { apiFetch } from './utils/api';
 import { clearAccessToken, getAccessToken } from './utils/authStorage';
 
@@ -44,7 +47,9 @@ function RootRedirect() {
   if (!redirectPath) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white px-4">
-        <p className="text-sm font-semibold tracking-wide text-gray-600">Checking your session...</p>
+        <p className="text-sm font-semibold tracking-wide text-gray-600">
+          Checking your session...
+        </p>
       </div>
     );
   }
@@ -62,6 +67,9 @@ function App() {
           <Route path="/signin" element={<Login isLogin={true} />} />
           <Route path="/:userId" element={<Home />} />
           <Route path="/home" element={<Home />} />
+          <Route path="/notice" element={<Notice />} />
+          <Route path="/settlement" element={<Settlement />} />
+          <Route path="/mypage" element={<Mypage />} />
         </Routes>
       </Router>
     </>
