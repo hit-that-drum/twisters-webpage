@@ -1,5 +1,5 @@
-export * from './Login';
-export * from './Home';
-export * from './Notice';
-export * from './Settlement';
-export * from './Mypage';
+export { Login } from './Login';
+export { default as Home } from './Home';
+export { default as Notice } from './Notice';
+export { default as Settlement } from './Settlement';
+export { default as Mypage } from './MyPage';

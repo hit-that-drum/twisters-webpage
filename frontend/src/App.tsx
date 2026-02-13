@@ -4,7 +4,7 @@ import { Login } from './pages/Login';
 import Home from './pages/Home';
 import Notice from './pages/Notice';
 import Settlement from './pages/Settlement';
-import Mypage from './pages/Mypage';
+import MyPage from './pages/MyPage';
 import { apiFetch } from './utils/api';
 import { clearAccessToken, getAccessToken } from './utils/authStorage';
 
@@ -69,7 +69,7 @@ function App() {
           <Route path="/home" element={<Home />} />
           <Route path="/notice" element={<Notice />} />
           <Route path="/settlement" element={<Settlement />} />
-          <Route path="/mypage" element={<Mypage />} />
+          <Route path="/mypage" element={<MyPage />} />
         </Routes>
       </Router>
     </>

@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import authRoutes from './routes/authRoutes.js';
+import noticeRoutes from './routes/noticeRoutes.js';
 import passport from './config/passport.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +22,7 @@ app.use(passport.initialize());
 
 // API 경로 연결 (/authentication로 시작하는 요청은 authRoutes가 처리함)
 app.use('/authentication', authRoutes);
+app.use('/notice', noticeRoutes);
 
 app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
