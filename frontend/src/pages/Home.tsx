@@ -9,11 +9,6 @@ export default function Home() {
   const [allUsers, setAllUsers] = useState<{ id: number; name: string; email: string }[]>([]);
   const [user, setUser] = useState<{ id: number; name: string; email: string } | null>(null);
 
-  const handleLogout = () => {
-    clearAccessToken();
-    navigate('/signin', { replace: true });
-  };
-
   useEffect(() => {
     const loadUsers = async () => {
       try {
@@ -58,16 +53,6 @@ export default function Home() {
 
   return (
     <div className="p-6">
-      <div className="mb-4 flex justify-end">
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="rounded-lg bg-[#3D5A2D] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2d4321]"
-        >
-          Logout
-        </button>
-      </div>
-
       {user ? (
         <>
           <h2>User ID: {user.id}</h2>

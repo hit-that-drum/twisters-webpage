@@ -61,10 +61,11 @@ function App() {
     <>
       <Router>
         <Routes>
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="/signup" element={<Login isLogin={false} />} />
+          <Route path="/signin" element={<Login isLogin={true} />} />
+
           <Route element={<AppLayout />}>
-            <Route path="/" element={<RootRedirect />} />
-            <Route path="/signup" element={<Login isLogin={false} />} />
-            <Route path="/signin" element={<Login isLogin={true} />} />
             <Route path="/:userId" element={<Home />} />
             <Route path="/home" element={<Home />} />
             <Route path="/notice" element={<Notice />} />
