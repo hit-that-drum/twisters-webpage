@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '../utils/api';
-import { clearAccessToken, getAccessToken } from '../utils/authStorage';
+import { useAuth } from '../contexts/AuthContext';
 
 interface NoticeItem {
   id: number;
@@ -28,12 +28,6 @@ interface NoticeItem {
   updateDate: string;
   content: string;
   pinned: boolean;
-}
-
-interface MeInfo {
-  id: number;
-  name: string;
-  email: string;
 }
 
 const parseApiResponse = async (response: Response): Promise<unknown> => {
@@ -73,8 +67,8 @@ const getApiMessage = (payload: unknown, fallback: string) => {
 
 export default function Notice() {
   const navigate = useNavigate();
+  const { meInfo, logout } = useAuth();
   const [noticeList, setNoticeList] = useState<NoticeItem[]>([]);
-  const [meInfo, setMeInfo] = useState<MeInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingNoticeId, setDeletingNoticeId] = useState<number | null>(null);
@@ -92,39 +86,7 @@ export default function Notice() {
     pinned: false,
   });
 
-  const loadMeInfo = useCallback(async () => {
-    const token = getAccessToken();
-    if (!token) {
-      setMeInfo(null);
-      return;
-    }
-
-    try {
-      const response = await apiFetch('/authentication/me');
-      const payload = await parseApiResponse(response);
-
-      if (!response.ok) {
-        setMeInfo(null);
-        return;
-      }
-
-      if (payload && typeof payload === 'object') {
-        const id = (payload as { id?: unknown }).id;
-        const name = (payload as { name?: unknown }).name;
-        const email = (payload as { email?: unknown }).email;
-
-        if (typeof id === 'number' && typeof name === 'string' && typeof email === 'string') {
-          setMeInfo({ id, name, email });
-          return;
-        }
-      }
-
-      setMeInfo(null);
-    } catch (error) {
-      console.error('Failed to load me info:', error);
-      setMeInfo(null);
-    }
-  }, []);
+  console.log(meInfo);
 
   const loadNotices = useCallback(async () => {
     setIsLoading(true);
@@ -202,18 +164,24 @@ export default function Notice() {
   }, []);
 
   useEffect(() => {
-    void loadMeInfo();
     void loadNotices();
-  }, [loadMeInfo, loadNotices]);
+  }, [loadNotices]);
+
+  const canManageNotices = meInfo?.isAdmin === true;
 
   const requireAuthForMutation = () => {
-    if (meInfo) {
-      return true;
+    if (!meInfo) {
+      enqueueSnackbar('공지사항 작성/수정/삭제는 로그인 후 가능합니다.', { variant: 'error' });
+      navigate('/signin', { replace: true });
+      return false;
     }
 
-    enqueueSnackbar('공지사항 작성/수정/삭제는 로그인 후 가능합니다.', { variant: 'error' });
-    navigate('/signin', { replace: true });
-    return false;
+    if (!meInfo.isAdmin) {
+      enqueueSnackbar('관리자만 공지사항을 작성/수정/삭제할 수 있습니다.', { variant: 'error' });
+      return false;
+    }
+
+    return true;
   };
 
   const handleOpenAddDialog = () => {
@@ -298,8 +266,7 @@ export default function Notice() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          clearAccessToken();
-          setMeInfo(null);
+          logout();
           enqueueSnackbar('로그인이 만료되었습니다. 다시 로그인해주세요.', { variant: 'error' });
           navigate('/signin', { replace: true });
           return;
@@ -356,8 +323,7 @@ export default function Notice() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          clearAccessToken();
-          setMeInfo(null);
+          logout();
           enqueueSnackbar('로그인이 만료되었습니다. 다시 로그인해주세요.', { variant: 'error' });
           navigate('/signin', { replace: true });
           return;
@@ -401,8 +367,7 @@ export default function Notice() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          clearAccessToken();
-          setMeInfo(null);
+          logout();
           enqueueSnackbar('로그인이 만료되었습니다. 다시 로그인해주세요.', { variant: 'error' });
           navigate('/signin', { replace: true });
           return;
@@ -432,12 +397,16 @@ export default function Notice() {
             Notice
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {meInfo ? `Logged in as ${meInfo.name}` : '로그인 후 공지사항을 작성/수정/삭제할 수 있습니다.'}
+            {meInfo
+              ? `Logged in as ${meInfo.name}${meInfo.isAdmin ? ' (Admin)' : ''}`
+              : '로그인 후 공지사항을 작성/수정/삭제할 수 있습니다.'}
           </Typography>
         </Box>
-        <Button variant="contained" onClick={handleOpenAddDialog}>
-          ADD NOTICE
-        </Button>
+        {canManageNotices && (
+          <Button variant="contained" onClick={handleOpenAddDialog}>
+            ADD NOTICE
+          </Button>
+        )}
       </Box>
 
       {isLoading ? (
@@ -472,20 +441,26 @@ export default function Notice() {
                 Updated: {notice.updateUser} / {new Date(notice.updateDate).toLocaleString()}
               </Typography>
 
-              <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-                <Button variant="outlined" size="small" onClick={() => handleOpenEditDialog(notice)}>
-                  Edit
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  color="error"
-                  disabled={deletingNoticeId === notice.id}
-                  onClick={() => handleDeleteNotice(notice.id)}
-                >
-                  {deletingNoticeId === notice.id ? 'Deleting...' : 'Delete'}
-                </Button>
-              </Box>
+              {canManageNotices && (
+                <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => handleOpenEditDialog(notice)}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="error"
+                    disabled={deletingNoticeId === notice.id}
+                    onClick={() => handleDeleteNotice(notice.id)}
+                  >
+                    {deletingNoticeId === notice.id ? 'Deleting...' : 'Delete'}
+                  </Button>
+                </Box>
+              )}
             </AccordionDetails>
           </Accordion>
         ))

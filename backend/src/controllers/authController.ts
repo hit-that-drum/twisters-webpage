@@ -24,6 +24,13 @@ interface PublicUserRow extends RowDataPacket {
   email: string;
 }
 
+interface MeUserRow extends RowDataPacket {
+  id: number;
+  name: string;
+  email: string;
+  isAdmin: boolean | number;
+}
+
 interface UserEmailRow extends RowDataPacket {
   id: number;
   email: string;
@@ -76,7 +83,7 @@ export const getMe = async (req: Request, res: Response) => {
   }
 
   try {
-    const [rows] = await pool.query<PublicUserRow[]>('SELECT id, name, email FROM users WHERE id = ?', [
+    const [rows] = await pool.query<MeUserRow[]>('SELECT id, name, email, isAdmin FROM users WHERE id = ?', [
       authenticatedUser.id,
     ]);
 
@@ -84,7 +91,17 @@ export const getMe = async (req: Request, res: Response) => {
       return res.status(404).json({ error: '해당 사용자를 찾을 수 없습니다.' });
     }
 
-    return res.json(rows[0]);
+    const me = rows[0];
+    if (!me) {
+      return res.status(404).json({ error: '해당 사용자를 찾을 수 없습니다.' });
+    }
+
+    return res.json({
+      id: me.id,
+      name: me.name,
+      email: me.email,
+      isAdmin: Boolean(me.isAdmin),
+    });
   } catch (error) {
     console.error('DB 조회 에러:', error);
     return res.status(500).json({ error: '데이터베이스 조회 중 오류가 발생했습니다.' });

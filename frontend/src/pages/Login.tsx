@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/mate
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '../utils/api';
 import { clearAccessToken, getAccessToken, setAccessToken } from '../utils/authStorage';
+import { useAuth } from '../contexts/AuthContext';
 
 const WRONG_PASSWORD_ATTEMPTS_KEY = 'wrongPasswordAttemptsByEmail';
 const MAX_WRONG_PASSWORD_ATTEMPTS = 5;
@@ -68,6 +69,7 @@ const getWrongPasswordAttempt = (email: string) => {
 
 export const Login = ({ isLogin }: { isLogin: boolean }) => {
   const navigate = useNavigate();
+  const { refreshMeInfo } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const resetToken = searchParams.get('resetToken')?.trim() || '';
   const resetEmailFromLink = searchParams.get('email')?.trim() || '';
@@ -288,6 +290,7 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
         if (response.ok) {
           if (data.token) {
             setAccessToken(data.token, true);
+            await refreshMeInfo();
           }
 
           const userIdx = data.user?.id ?? data.userId;
@@ -332,6 +335,7 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
 
           if (data.token) {
             setAccessToken(data.token, rememberFor30Days);
+            await refreshMeInfo();
           }
 
           const userIdx = data.user?.id ?? data.userId;

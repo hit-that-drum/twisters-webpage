@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Login } from './pages/Login';
 import Home from './pages/Home';
@@ -6,46 +5,14 @@ import Notice from './pages/Notice';
 import Settlement from './pages/Settlement';
 import MyPage from './pages/MyPage';
 import AppLayout from './components/AppLayout';
-import { apiFetch } from './utils/api';
-import { clearAccessToken, getAccessToken } from './utils/authStorage';
+import { useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthProvider';
+import { getAccessToken } from './utils/authStorage';
 
 function RootRedirect() {
-  const [redirectPath, setRedirectPath] = useState<string | null>(null);
+  const { meInfo, isAuthLoading } = useAuth();
 
-  useEffect(() => {
-    const resolveRedirect = async () => {
-      const token = getAccessToken();
-      if (!token) {
-        setRedirectPath('/signup');
-        return;
-      }
-
-      try {
-        const response = await apiFetch('/authentication/me');
-        if (!response.ok) {
-          clearAccessToken();
-          setRedirectPath('/signin');
-          return;
-        }
-
-        const data = await response.json();
-        if (data?.id) {
-          setRedirectPath(`/${data.id}`);
-          return;
-        }
-
-        clearAccessToken();
-        setRedirectPath('/signin');
-      } catch {
-        clearAccessToken();
-        setRedirectPath('/signin');
-      }
-    };
-
-    resolveRedirect();
-  }, []);
-
-  if (!redirectPath) {
+  if (isAuthLoading) {
     return (
       <div className="px-6 py-8">
         <p className="text-sm font-semibold tracking-wide text-gray-600">Checking your session...</p>
@@ -53,12 +20,16 @@ function RootRedirect() {
     );
   }
 
-  return <Navigate to={redirectPath} replace />;
+  if (meInfo) {
+    return <Navigate to={`/${meInfo.id}`} replace />;
+  }
+
+  return <Navigate to={getAccessToken() ? '/signin' : '/signup'} replace />;
 }
 
 function App() {
   return (
-    <>
+    <AuthProvider>
       <Router>
         <Routes>
           <Route path="/" element={<RootRedirect />} />
@@ -74,7 +45,7 @@ function App() {
           </Route>
         </Routes>
       </Router>
-    </>
+    </AuthProvider>
   );
 }
 

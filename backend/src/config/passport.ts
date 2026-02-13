@@ -40,7 +40,7 @@ passport.use(
   new JwtStrategy(jwtOptions, async (jwtPayload, done) => {
     try {
       // jwtPayload contains the data we signed: { id, email }
-      const [rows]: any = await pool.query('SELECT id, name, email FROM users WHERE id = ?', [
+      const [rows]: any = await pool.query('SELECT id, name, email, isAdmin FROM users WHERE id = ?', [
         jwtPayload.id,
       ]);
       const user = rows[0];

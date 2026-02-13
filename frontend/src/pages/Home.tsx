@@ -2,31 +2,34 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
 import { clearAccessToken } from '../utils/authStorage';
+import { type MeInfo, useAuth } from '../contexts/AuthContext';
 
 export default function Home() {
   const navigate = useNavigate();
   const { userId } = useParams();
+  const { meInfo, isAuthLoading } = useAuth();
   const [allUsers, setAllUsers] = useState<{ id: number; name: string; email: string }[]>([]);
-  const [user, setUser] = useState<{ id: number; name: string; email: string } | null>(null);
+  const [user, setUser] = useState<MeInfo | null>(null);
 
   useEffect(() => {
     const loadUsers = async () => {
       try {
         if (userId) {
-          const response = await apiFetch('/authentication/me');
-          const data = await response.json();
+          if (isAuthLoading) {
+            return;
+          }
 
-          if (!response.ok) {
+          if (!meInfo) {
             setUser(null);
             clearAccessToken();
             navigate('/signin', { replace: true });
             return;
           }
 
-          setUser(data);
+          setUser(meInfo);
 
-          if (String(data.id) !== userId) {
-            navigate(`/${data.id}`, { replace: true });
+          if (String(meInfo.id) !== userId) {
+            navigate(`/${meInfo.id}`, { replace: true });
           }
 
           return;
@@ -48,8 +51,8 @@ export default function Home() {
       }
     };
 
-    loadUsers();
-  }, [navigate, userId]);
+    void loadUsers();
+  }, [isAuthLoading, meInfo, navigate, userId]);
 
   return (
     <div className="p-6">

@@ -6,6 +6,7 @@ interface AuthenticatedUser {
   id: number;
   name: string;
   email: string;
+  isAdmin?: boolean | number | string;
 }
 
 type AuthenticatedRequest = Request & {
@@ -64,6 +65,25 @@ const resolveAuditUser = (authenticatedUser: AuthenticatedUser) => {
   return authenticatedUser.email;
 };
 
+const isAdminUser = (authenticatedUser: AuthenticatedUser) => {
+  const rawIsAdmin = authenticatedUser.isAdmin;
+
+  if (typeof rawIsAdmin === 'boolean') {
+    return rawIsAdmin;
+  }
+
+  if (typeof rawIsAdmin === 'number') {
+    return rawIsAdmin === 1;
+  }
+
+  if (typeof rawIsAdmin === 'string') {
+    const normalized = rawIsAdmin.trim().toLowerCase();
+    return normalized === '1' || normalized === 'true';
+  }
+
+  return false;
+};
+
 export const getNotices = async (_req: Request, res: Response) => {
   try {
     const [rows] = await pool.query<NoticeRow[]>(
@@ -92,6 +112,10 @@ export const createNotice = async (req: Request, res: Response) => {
 
   if (!authenticatedUser) {
     return res.status(401).json({ error: '인증된 사용자 정보가 없습니다.' });
+  }
+
+  if (!isAdminUser(authenticatedUser)) {
+    return res.status(403).json({ error: '관리자만 공지사항을 등록할 수 있습니다.' });
   }
 
   if (!title || !content) {
@@ -132,6 +156,10 @@ export const updateNotice = async (req: Request, res: Response) => {
 
   if (!authenticatedUser) {
     return res.status(401).json({ error: '인증된 사용자 정보가 없습니다.' });
+  }
+
+  if (!isAdminUser(authenticatedUser)) {
+    return res.status(403).json({ error: '관리자만 공지사항을 수정할 수 있습니다.' });
   }
 
   if (!parsedNoticeId) {
@@ -175,6 +203,10 @@ export const deleteNotice = async (req: Request, res: Response) => {
 
   if (!authenticatedUser) {
     return res.status(401).json({ error: '인증된 사용자 정보가 없습니다.' });
+  }
+
+  if (!isAdminUser(authenticatedUser)) {
+    return res.status(403).json({ error: '관리자만 공지사항을 삭제할 수 있습니다.' });
   }
 
   if (!parsedNoticeId) {
