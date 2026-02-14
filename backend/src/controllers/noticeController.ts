@@ -1,5 +1,4 @@
 import { type Request, type Response } from 'express';
-import { type ResultSetHeader, type RowDataPacket } from 'mysql2/promise';
 import pool from '../db.js';
 
 interface AuthenticatedUser {
@@ -13,7 +12,7 @@ type AuthenticatedRequest = Request & {
   user?: AuthenticatedUser;
 };
 
-interface NoticeRow extends RowDataPacket {
+interface NoticeRow {
   id: number;
   title: string;
   createUser: string;
@@ -86,12 +85,12 @@ const isAdminUser = (authenticatedUser: AuthenticatedUser) => {
 
 export const getNotices = async (_req: Request, res: Response) => {
   try {
-    const [rows] = await pool.query<NoticeRow[]>(
-      'SELECT id, title, createUser, createDate, updateUser, updateDate, content, pinned FROM notice ORDER BY pinned DESC, createDate DESC',
+    const result = await pool.query<NoticeRow>(
+      'SELECT id, title, "createUser", "createDate", "updateUser", "updateDate", content, pinned FROM notice ORDER BY pinned DESC, "createDate" DESC',
     );
 
     return res.json(
-      rows.map((row) => ({
+      result.rows.map((row: NoticeRow) => ({
         ...row,
         pinned: Boolean(row.pinned),
       })),
@@ -133,8 +132,8 @@ export const createNotice = async (req: Request, res: Response) => {
     const auditUser = resolveAuditUser(authenticatedUser);
     const normalizedPinned = parsePinned(pinned, false);
 
-    await pool.query<ResultSetHeader>(
-      'INSERT INTO notice (title, createUser, updateUser, content, pinned) VALUES (?, ?, ?, ?, ?)',
+    await pool.query(
+      'INSERT INTO notice (title, "createUser", "updateUser", content, pinned) VALUES ($1, $2, $3, $4, $5)',
       [trimmedTitle, auditUser, auditUser, trimmedContent, normalizedPinned],
     );
 
@@ -181,12 +180,12 @@ export const updateNotice = async (req: Request, res: Response) => {
     const auditUser = resolveAuditUser(authenticatedUser);
     const normalizedPinned = parsePinned(pinned, false);
 
-    const [result] = await pool.query<ResultSetHeader>(
-      'UPDATE notice SET title = ?, updateUser = ?, content = ?, pinned = ? WHERE id = ?',
+    const result = await pool.query(
+      'UPDATE notice SET title = $1, "updateUser" = $2, content = $3, pinned = $4 WHERE id = $5',
       [trimmedTitle, auditUser, trimmedContent, normalizedPinned, parsedNoticeId],
     );
 
-    if (result.affectedRows === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({ error: '해당 공지사항을 찾을 수 없습니다.' });
     }
 
@@ -214,9 +213,9 @@ export const deleteNotice = async (req: Request, res: Response) => {
   }
 
   try {
-    const [result] = await pool.query<ResultSetHeader>('DELETE FROM notice WHERE id = ?', [parsedNoticeId]);
+    const result = await pool.query('DELETE FROM notice WHERE id = $1', [parsedNoticeId]);
 
-    if (result.affectedRows === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({ error: '해당 공지사항을 찾을 수 없습니다.' });
     }
 

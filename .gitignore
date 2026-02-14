@@ -8,6 +8,8 @@ out/
 
 # 2. 환경 변수 및 비밀번호 (보안을 위해 절대 Git에 올리면 안 됨)
 .env
+.env.development
+.env.production
 .env.local
 .env.development.local
 .env.test.local

@@ -2,7 +2,6 @@ import { type Request, type Response } from 'express';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
-import { type ResultSetHeader, type RowDataPacket } from 'mysql2/promise';
 import pool from '../db.js';
 import { buildAuthResponse } from '../authUtils.js';
 
@@ -18,25 +17,25 @@ interface AuthenticatedUser {
   email: string;
 }
 
-interface PublicUserRow extends RowDataPacket {
+interface PublicUserRow {
   id: number;
   name: string;
   email: string;
 }
 
-interface MeUserRow extends RowDataPacket {
+interface MeUserRow {
   id: number;
   name: string;
   email: string;
   isAdmin: boolean | number;
 }
 
-interface UserEmailRow extends RowDataPacket {
+interface UserEmailRow {
   id: number;
   email: string;
 }
 
-interface PasswordResetLookupRow extends RowDataPacket {
+interface PasswordResetLookupRow {
   id: number;
   user_id: number;
   expires_at: Date;
@@ -60,15 +59,20 @@ export const signUp = async (req: Request, res: Response) => {
       return res.status(400).json({ error: '모든 필드를 입력해주세요.' });
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-    const [result] = await pool.query<ResultSetHeader>(
-      'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
-      [name, email, hashedPassword],
+    const result = await pool.query<{ id: number }>(
+      'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id',
+      [name, email.toLowerCase(), hashedPassword],
     );
-    const userId = result.insertId;
+    const userId = result.rows[0]?.id;
+
+    if (!userId) {
+      return res.status(500).json({ error: '회원가입 처리 중 사용자 ID를 확인하지 못했습니다.' });
+    }
 
     return res.status(201).json(buildAuthResponse({ id: userId, name, email }, '회원가입 성공!'));
-  } catch (error: any) {
-    if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
+  } catch (error: unknown) {
+    const pgError = error as { code?: string };
+    if (pgError.code === '23505') {
       return res.status(400).json({ error: '이미 사용 중인 이메일입니다.' });
     }
     res.status(500).json({ error: '서버 에러가 발생했습니다.' });
@@ -83,15 +87,16 @@ export const getMe = async (req: Request, res: Response) => {
   }
 
   try {
-    const [rows] = await pool.query<MeUserRow[]>('SELECT id, name, email, isAdmin FROM users WHERE id = ?', [
-      authenticatedUser.id,
-    ]);
+    const result = await pool.query<MeUserRow>(
+      'SELECT id, name, email, "isAdmin" FROM users WHERE id = $1',
+      [authenticatedUser.id],
+    );
 
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: '해당 사용자를 찾을 수 없습니다.' });
     }
 
-    const me = rows[0];
+    const me = result.rows[0];
     if (!me) {
       return res.status(404).json({ error: '해당 사용자를 찾을 수 없습니다.' });
     }
@@ -127,16 +132,16 @@ export const getUsers = async (req: Request, res: Response) => {
         return res.status(403).json({ error: '본인 정보만 조회할 수 있습니다.' });
       }
 
-      const [rows] = await pool.query<PublicUserRow[]>('SELECT id, name, email FROM users WHERE id = ?', [
+      const result = await pool.query<PublicUserRow>('SELECT id, name, email FROM users WHERE id = $1', [
         requestedUserId,
       ]);
-      if (rows.length === 0) {
+      if (result.rows.length === 0) {
         return res.status(404).json({ error: '해당 ID의 사용자를 찾을 수 없습니다.' });
       }
-      return res.json(rows[0]);
+      return res.json(result.rows[0]);
     } else {
-      const [rows] = await pool.query<PublicUserRow[]>('SELECT id, name, email FROM users');
-      return res.json(rows);
+      const result = await pool.query<PublicUserRow>('SELECT id, name, email FROM users');
+      return res.json(result.rows);
     }
   } catch (error) {
     console.error('DB 조회 에러:', error);
@@ -159,19 +164,19 @@ export const resetPassword = async (req: Request, res: Response) => {
     const normalizedEmail = email.trim().toLowerCase();
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-    const [rows] = await pool.query<PasswordResetLookupRow[]>(
+    const lookupResult = await pool.query<PasswordResetLookupRow>(
       `
         SELECT prt.id, prt.user_id, prt.expires_at, prt.used_at, u.email
         FROM password_reset_tokens prt
         JOIN users u ON u.id = prt.user_id
-        WHERE prt.token_hash = ?
+        WHERE prt.token_hash = $1
         ORDER BY prt.id DESC
         LIMIT 1
       `,
       [tokenHash],
     );
 
-    const resetRow = rows[0];
+    const resetRow = lookupResult.rows[0];
     if (!resetRow) {
       return res.status(400).json({ error: '유효하지 않은 비밀번호 재설정 토큰입니다.' });
     }
@@ -189,41 +194,41 @@ export const resetPassword = async (req: Request, res: Response) => {
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    const connection = await pool.getConnection();
+    const client = await pool.connect();
 
     try {
-      await connection.beginTransaction();
+      await client.query('BEGIN');
 
-      const [consumeResult] = await connection.query<ResultSetHeader>(
+      const consumeResult = await client.query(
         `
           UPDATE password_reset_tokens
           SET used_at = NOW()
-          WHERE id = ? AND used_at IS NULL
+          WHERE id = $1 AND used_at IS NULL
         `,
         [resetRow.id],
       );
 
-      if (consumeResult.affectedRows === 0) {
-        await connection.rollback();
+      if (consumeResult.rowCount === 0) {
+        await client.query('ROLLBACK');
         return res.status(400).json({ error: '이미 사용된 비밀번호 재설정 토큰입니다.' });
       }
 
-      const [updateResult] = await connection.query<ResultSetHeader>(
-        'UPDATE users SET password = ? WHERE id = ?',
+      const updateResult = await client.query(
+        'UPDATE users SET password = $1 WHERE id = $2',
         [hashedPassword, resetRow.user_id],
       );
 
-      if (updateResult.affectedRows === 0) {
-        await connection.rollback();
+      if (updateResult.rowCount === 0) {
+        await client.query('ROLLBACK');
         return res.status(404).json({ error: '해당 사용자를 찾을 수 없습니다.' });
       }
 
-      await connection.commit();
+      await client.query('COMMIT');
     } catch (transactionError) {
-      await connection.rollback();
+      await client.query('ROLLBACK');
       throw transactionError;
     } finally {
-      connection.release();
+      client.release();
     }
 
     res.json({ message: '비밀번호가 성공적으로 변경되었습니다.' });
@@ -244,12 +249,12 @@ export const requestReset = async (req: Request, res: Response) => {
 
   try {
     const normalizedEmail = email.trim().toLowerCase();
-    const [rows] = await pool.query<UserEmailRow[]>('SELECT id, email FROM users WHERE email = ? LIMIT 1', [
+    const lookupResult = await pool.query<UserEmailRow>('SELECT id, email FROM users WHERE email = $1 LIMIT 1', [
       normalizedEmail,
     ]);
 
     const genericMessage = '입력한 이메일로 비밀번호 재설정 링크를 전송했습니다.';
-    const user = rows[0];
+    const user = lookupResult.rows[0];
     if (!user) {
       return res.json({ message: genericMessage });
     }
@@ -257,14 +262,14 @@ export const requestReset = async (req: Request, res: Response) => {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    await pool.query<ResultSetHeader>('UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL', [
+    await pool.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL', [
       user.id,
     ]);
 
-    await pool.query<ResultSetHeader>(
+    await pool.query(
       `
         INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
-        VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE))
+        VALUES ($1, $2, NOW() + ($3 * INTERVAL '1 minute'))
       `,
       [user.id, tokenHash, RESET_TOKEN_TTL_MINUTES],
     );
@@ -296,19 +301,19 @@ export const verifyResetToken = async (req: Request, res: Response) => {
     const normalizedEmail = email.trim().toLowerCase();
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-    const [rows] = await pool.query<PasswordResetLookupRow[]>(
+    const lookupResult = await pool.query<PasswordResetLookupRow>(
       `
         SELECT prt.id, prt.user_id, prt.expires_at, prt.used_at, u.email
         FROM password_reset_tokens prt
         JOIN users u ON u.id = prt.user_id
-        WHERE prt.token_hash = ?
+        WHERE prt.token_hash = $1
         ORDER BY prt.id DESC
         LIMIT 1
       `,
       [tokenHash],
     );
 
-    const resetRow = rows[0];
+    const resetRow = lookupResult.rows[0];
     if (!resetRow) {
       return res.status(400).json({ error: '유효하지 않은 비밀번호 재설정 토큰입니다.' });
     }
@@ -354,22 +359,22 @@ export const googleAuth = async (req: Request, res: Response) => {
       return res.status(400).json({ error: '구글 사용자 정보를 가져오지 못했습니다.' });
     }
 
-    let [rows] = await pool.query<PublicUserRow[]>('SELECT id, name, email FROM users WHERE email = ?', [
-      email,
+    let userResult = await pool.query<PublicUserRow>('SELECT id, name, email FROM users WHERE email = $1', [
+      email.toLowerCase(),
     ]);
 
-    if (rows.length === 0) {
-      await pool.query<ResultSetHeader>('INSERT INTO users (email, name, google_id) VALUES (?, ?, ?)', [
-        email,
+    if (userResult.rows.length === 0) {
+      await pool.query('INSERT INTO users (email, name, google_id) VALUES ($1, $2, $3)', [
+        email.toLowerCase(),
         name,
         googleId,
       ]);
-      [rows] = await pool.query<PublicUserRow[]>('SELECT id, name, email FROM users WHERE email = ?', [
-        email,
+      userResult = await pool.query<PublicUserRow>('SELECT id, name, email FROM users WHERE email = $1', [
+        email.toLowerCase(),
       ]);
     }
 
-    const user = rows[0];
+    const user = userResult.rows[0];
     if (!user) {
       return res.status(500).json({ error: '구글 로그인 사용자 생성에 실패했습니다.' });
     }

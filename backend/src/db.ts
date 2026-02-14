@@ -1,26 +1,52 @@
-import mysql, { type PoolOptions } from 'mysql2/promise';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { Pool, type QueryResultRow } from 'pg';
+import { loadEnvironment } from './config/env.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+loadEnvironment();
 
-// 설정 파일 경로 확인 (.env가 루트에 있다면 경로를 조정하세요)
-dotenv.config({ path: path.join(__dirname, '../../.env') });
+const databaseUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
 
-const access: PoolOptions = {
-  host: process.env.DB_HOST || 'db', // localhost 대신 127.0.0.1 권장
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '1234',
-  database: process.env.DB_NAME || 'twisters_db', // 아까 확인한 DB 이름
-  waitForConnections: true,
-  connectionLimit: 10,
+if (!databaseUrl) {
+  throw new Error('SUPABASE_DB_URL or DATABASE_URL must be configured.');
+}
+
+const resolveShouldUseSsl = () => {
+  const rawDbSsl = process.env.DB_SSL?.trim().toLowerCase();
+  if (rawDbSsl) {
+    if (['1', 'true', 'yes', 'on'].includes(rawDbSsl)) {
+      return true;
+    }
+
+    if (['0', 'false', 'no', 'off'].includes(rawDbSsl)) {
+      return false;
+    }
+  }
+
+  try {
+    const hostname = new URL(databaseUrl).hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === 'db') {
+      return false;
+    }
+  } catch (_error) {
+    return true;
+  }
+
+  return true;
 };
 
-// Pool 생성
-const pool = mysql.createPool(access);
+const shouldUseSsl = resolveShouldUseSsl();
 
-// 외부에서 사용할 수 있게 export
+const pool = new Pool({
+  connectionString: databaseUrl,
+  max: 10,
+  ssl: shouldUseSsl
+    ? {
+        rejectUnauthorized: false,
+      }
+    : false,
+});
+
+export const query = async <TRow extends QueryResultRow>(text: string, values: unknown[] = []) => {
+  return pool.query<TRow>(text, values);
+};
+
 export default pool;
