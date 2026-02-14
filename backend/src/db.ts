@@ -1,13 +1,7 @@
 import { Pool, type QueryResultRow } from 'pg';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { loadEnvironment } from './config/env.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-dotenv.config({ path: path.join(__dirname, '../../.env') });
+loadEnvironment();
 
 const databaseUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
 
