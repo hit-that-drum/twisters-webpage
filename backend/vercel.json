@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "functions": {
+    "api/[...route].ts": {
+      "runtime": "@vercel/node@5.3.24"
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/[...route].ts"
+    }
+  ]
+}
