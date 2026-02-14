@@ -112,6 +112,13 @@ Then run:
 - Backend: `cd backend && npm run dev`
 - Frontend: `cd frontend && npm run dev`
 
+For Docker Compose local dev:
+- `docker compose up --build`
+- If dependency resolution looks stale (for example `ERR_MODULE_NOT_FOUND`), reset volumes once:
+  `docker compose down -v && docker compose up --build`
+- If DB container keeps restarting after switching from MySQL to Postgres, reset volumes once:
+  `docker compose down -v && docker compose up --build`
+
 ## 6) Notes
 
 - Existing routes are unchanged (`/authentication/*`, `/notice/*`).
