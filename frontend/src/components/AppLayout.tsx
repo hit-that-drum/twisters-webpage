@@ -39,8 +39,10 @@ export default function AppLayout() {
         <Header handleLogout={handleLogout} />
       </div>
 
-      <main className="flex-1">
-        <Outlet />
+      <main className="flex-1 px-6 pb-6">
+        <div className="mx-auto w-full max-w-7xl rounded-2xl border border-gray-200 bg-white">
+          <Outlet />
+        </div>
       </main>
 
       <div className="px-6 pb-4">
