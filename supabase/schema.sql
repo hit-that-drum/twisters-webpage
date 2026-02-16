@@ -19,6 +19,14 @@ CREATE TABLE IF NOT EXISTS notice (
   pinned BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+CREATE TABLE IF NOT EXISTS settlement (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  settlement_date DATE NOT NULL,
+  item VARCHAR(255) NOT NULL,
+  amount INTEGER NOT NULL,
+  relation VARCHAR(100) NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -30,6 +38,8 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_password_reset_expires ON password_reset_tokens (expires_at);
+CREATE INDEX IF NOT EXISTS idx_settlement_date ON settlement (settlement_date DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_settlement_unique_entry ON settlement (settlement_date, item, amount, relation);
 
 CREATE OR REPLACE FUNCTION update_notice_updated_at()
 RETURNS TRIGGER AS $$

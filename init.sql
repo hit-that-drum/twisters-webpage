@@ -22,6 +22,15 @@ CREATE TABLE IF NOT EXISTS notice (
     pinned BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+CREATE TABLE IF NOT EXISTS settlement (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    settlement_date DATE NOT NULL,
+    item VARCHAR(255) NOT NULL,
+    amount INT NOT NULL,
+    relation VARCHAR(100) NOT NULL,
+    INDEX idx_settlement_date (settlement_date)
+);
+
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
