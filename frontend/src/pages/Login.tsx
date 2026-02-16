@@ -6,7 +6,7 @@ import loginPageRightImage from '../../public/login_page_right_image.png';
 import { Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '../utils/api';
-import { clearAccessToken, getAccessToken, setAccessToken } from '../utils/authStorage';
+import { clearAccessToken, getAccessToken, setAccessToken, setAuthTokens } from '../utils/authStorage';
 import { useAuth } from '../contexts/AuthContext';
 
 const WRONG_PASSWORD_ATTEMPTS_KEY = 'wrongPasswordAttemptsByEmail';
@@ -288,7 +288,10 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
         const data = await response.json();
 
         if (response.ok) {
-          if (data.token) {
+          if (typeof data.token === 'string' && typeof data.refreshToken === 'string') {
+            setAuthTokens(data.token, data.refreshToken, true);
+            await refreshMeInfo();
+          } else if (typeof data.token === 'string') {
             setAccessToken(data.token, true);
             await refreshMeInfo();
           }
@@ -333,7 +336,10 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
           clearWrongPasswordAttempt(normalizedLoginEmail);
           setWrongPasswordAttemptCount(0);
 
-          if (data.token) {
+          if (typeof data.token === 'string' && typeof data.refreshToken === 'string') {
+            setAuthTokens(data.token, data.refreshToken, rememberFor30Days);
+            await refreshMeInfo();
+          } else if (typeof data.token === 'string') {
             setAccessToken(data.token, rememberFor30Days);
             await refreshMeInfo();
           }

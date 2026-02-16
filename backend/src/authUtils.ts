@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { loadEnvironment } from './config/env.js';
 
 loadEnvironment();
@@ -6,6 +7,7 @@ loadEnvironment();
 interface JwtPayload {
   id: number;
   email: string;
+  sessionId: number;
 }
 
 interface AuthUser {
@@ -14,11 +16,7 @@ interface AuthUser {
   email: string;
 }
 
-interface BuildAuthResponseOptions {
-  rememberMe?: boolean;
-}
-
-type AccessTokenExpiry = '1h' | '30d';
+type AccessTokenExpiry = '15m' | '1h' | '30d';
 
 export const getJwtSecret = () => {
   const secret = process.env.JWT_SECRET;
@@ -28,20 +26,18 @@ export const getJwtSecret = () => {
   return secret;
 };
 
-export const createAccessToken = (payload: JwtPayload, expiresIn: AccessTokenExpiry = '1h') => {
+export const createAccessToken = (payload: JwtPayload, expiresIn: AccessTokenExpiry = '15m') => {
   return jwt.sign(payload, getJwtSecret(), { expiresIn });
 };
 
-export const buildAuthResponse = (user: AuthUser, message: string, options: BuildAuthResponseOptions = {}) => {
-  const expiresIn: AccessTokenExpiry = options.rememberMe ? '30d' : '1h';
+export const buildUserResponse = (user: AuthUser) => ({
+  userId: user.id,
+  user: {
+    id: user.id,
+    name: user.name,
+  },
+});
 
-  return {
-    message,
-    token: createAccessToken({ id: user.id, email: user.email }, expiresIn),
-    userId: user.id,
-    user: {
-      id: user.id,
-      name: user.name,
-    },
-  };
-};
+export const createRefreshToken = () => crypto.randomBytes(48).toString('base64url');
+
+export const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');

@@ -43,3 +43,20 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
     INDEX idx_password_reset_user (user_id),
     INDEX idx_password_reset_expires (expires_at)
 );
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    refresh_token_hash CHAR(64) NOT NULL UNIQUE,
+    remember_me BOOLEAN NOT NULL DEFAULT FALSE,
+    last_activity_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    idle_expires_at DATETIME NOT NULL,
+    absolute_expires_at DATETIME NOT NULL,
+    revoked_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_user_sessions_user
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_sessions_user (user_id),
+    INDEX idx_user_sessions_idle_expires (idle_expires_at)
+);

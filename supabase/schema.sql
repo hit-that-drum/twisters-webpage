@@ -36,8 +36,23 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  refresh_token_hash CHAR(64) NOT NULL UNIQUE,
+  remember_me BOOLEAN NOT NULL DEFAULT FALSE,
+  last_activity_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  idle_expires_at TIMESTAMPTZ NOT NULL,
+  absolute_expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_password_reset_expires ON password_reset_tokens (expires_at);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions (user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_idle_expires_at ON user_sessions (idle_expires_at);
 CREATE INDEX IF NOT EXISTS idx_settlement_date ON settlement (settlement_date DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_settlement_unique_entry ON settlement (settlement_date, item, amount, relation);
 

@@ -3,7 +3,12 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import pool from '../db.js';
-import { buildAuthResponse } from '../authUtils.js';
+import {
+  createSessionAuthResponse,
+  refreshSessionAuthResponse,
+  revokeSessionById,
+  touchSessionActivity,
+} from '../sessionService.js';
 
 const SALT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MINUTES = 30;
@@ -15,6 +20,7 @@ interface AuthenticatedUser {
   id: number;
   name: string;
   email: string;
+  sessionId?: number;
 }
 
 interface PublicUserRow {
@@ -69,7 +75,13 @@ export const signUp = async (req: Request, res: Response) => {
       return res.status(500).json({ error: '회원가입 처리 중 사용자 ID를 확인하지 못했습니다.' });
     }
 
-    return res.status(201).json(buildAuthResponse({ id: userId, name, email }, '회원가입 성공!'));
+    const sessionResponse = await createSessionAuthResponse(
+      { id: userId, name, email: email.toLowerCase() },
+      '회원가입 성공!',
+      true,
+    );
+
+    return res.status(201).json(sessionResponse);
   } catch (error: unknown) {
     const pgError = error as { code?: string };
     if (pgError.code === '23505') {
@@ -379,8 +391,63 @@ export const googleAuth = async (req: Request, res: Response) => {
       return res.status(500).json({ error: '구글 로그인 사용자 생성에 실패했습니다.' });
     }
 
-    return res.json(buildAuthResponse(user, '구글 로그인 성공'));
+    const sessionResponse = await createSessionAuthResponse(user, '구글 로그인 성공', true);
+    return res.json(sessionResponse);
   } catch (error) {
     res.status(500).json({ error: '구글 인증 실패' });
+  }
+};
+
+export const refreshSession = async (req: Request, res: Response) => {
+  const { refreshToken } = req.body as { refreshToken?: unknown };
+
+  if (typeof refreshToken !== 'string' || !refreshToken.trim()) {
+    return res.status(400).json({ error: 'refreshToken이 필요합니다.' });
+  }
+
+  try {
+    const refreshedAuth = await refreshSessionAuthResponse(refreshToken.trim());
+    if (!refreshedAuth) {
+      return res.status(401).json({ error: '세션이 만료되었습니다. 다시 로그인해주세요.' });
+    }
+
+    return res.json(refreshedAuth);
+  } catch (error) {
+    console.error('Session refresh error:', error);
+    return res.status(500).json({ error: '세션 갱신 중 오류가 발생했습니다.' });
+  }
+};
+
+export const heartbeat = async (req: Request, res: Response) => {
+  const authenticatedUser = (req as AuthenticatedRequest).user;
+  const sessionId = authenticatedUser?.sessionId;
+
+  if (!authenticatedUser || typeof sessionId !== 'number') {
+    return res.status(401).json({ error: '인증된 세션 정보가 없습니다.' });
+  }
+
+  try {
+    await touchSessionActivity(sessionId, true);
+    return res.json({ message: '세션 활동 시간이 갱신되었습니다.' });
+  } catch (error) {
+    console.error('Heartbeat error:', error);
+    return res.status(500).json({ error: '세션 활동 갱신 중 오류가 발생했습니다.' });
+  }
+};
+
+export const logout = async (req: Request, res: Response) => {
+  const authenticatedUser = (req as AuthenticatedRequest).user;
+  const sessionId = authenticatedUser?.sessionId;
+
+  if (!authenticatedUser || typeof sessionId !== 'number') {
+    return res.status(401).json({ error: '인증된 세션 정보가 없습니다.' });
+  }
+
+  try {
+    await revokeSessionById(sessionId);
+    return res.json({ message: '로그아웃되었습니다.' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    return res.status(500).json({ error: '로그아웃 처리 중 오류가 발생했습니다.' });
   }
 };

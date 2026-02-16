@@ -4,6 +4,27 @@ import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
 import bcrypt from 'bcrypt';
 import { query } from '../db.js';
 import { getJwtSecret } from '../authUtils.js';
+import { getAuthenticatedUserBySession, touchSessionActivity } from '../sessionService.js';
+
+interface AccessJwtPayload {
+  id?: unknown;
+  sessionId?: unknown;
+}
+
+const parseJwtNumericId = (rawValue: unknown) => {
+  if (typeof rawValue === 'number' && Number.isSafeInteger(rawValue) && rawValue > 0) {
+    return rawValue;
+  }
+
+  if (typeof rawValue === 'string') {
+    const parsed = Number(rawValue);
+    if (Number.isSafeInteger(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return null;
+};
 
 interface PassportUserRow {
   id: number;
@@ -11,6 +32,7 @@ interface PassportUserRow {
   email: string;
   password: string | null;
   isAdmin: boolean | null;
+  sessionId?: number;
 }
 
 // --- 1. LOCAL STRATEGY (For Logging In) ---
@@ -52,19 +74,28 @@ const jwtOptions = {
 };
 
 passport.use(
-  new JwtStrategy(jwtOptions, async (jwtPayload, done) => {
+  new JwtStrategy(jwtOptions, async (jwtPayload: AccessJwtPayload, done) => {
     try {
-      const result = await query<PassportUserRow>(
-        'SELECT id, name, email, "isAdmin" FROM users WHERE id = $1',
-        [jwtPayload.id],
-      );
-      const user = result.rows[0];
+      const userId = parseJwtNumericId(jwtPayload.id);
+      const sessionId = parseJwtNumericId(jwtPayload.sessionId);
 
-      if (user) {
-        return done(null, user);
-      } else {
+      if (!userId || !sessionId) {
         return done(null, false);
       }
+
+      const user = await getAuthenticatedUserBySession(userId, sessionId);
+
+      if (!user) {
+        return done(null, false);
+      }
+
+      try {
+        await touchSessionActivity(sessionId);
+      } catch (touchError) {
+        console.error('Session activity touch failed:', touchError);
+      }
+
+      return done(null, user);
     } catch (err) {
       return done(err, false);
     }
