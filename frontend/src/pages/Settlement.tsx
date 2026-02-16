@@ -1,4 +1,4 @@
-import { memo, type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, type ChangeEvent, type MouseEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -8,6 +8,8 @@ import {
   DialogContent,
   DialogTitle,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
@@ -26,9 +28,12 @@ interface SettlementRecord {
 interface SettlementFormState {
   date: string;
   item: string;
+  amountType: SettlementAmountType;
   amount: string;
   relation: string;
 }
+
+type SettlementAmountType = 'deposit' | 'withdraw';
 
 interface SettlementPayload {
   date: string;
@@ -90,6 +95,7 @@ const createDefaultForm = (): SettlementFormState => {
   return {
     date: localDate,
     item: '',
+    amountType: 'deposit',
     amount: '',
     relation: '',
   };
@@ -120,19 +126,21 @@ const buildSettlementPayload = (form: SettlementFormState) => {
     return { error: '항목을 입력해주세요.' };
   }
 
-  if (!Number.isFinite(parsedAmount) || !Number.isInteger(parsedAmount)) {
-    return { error: '금액은 정수로 입력해주세요.' };
+  if (!Number.isFinite(parsedAmount) || !Number.isInteger(parsedAmount) || parsedAmount < 0) {
+    return { error: '금액은 0 이상의 정수로 입력해주세요.' };
   }
 
   if (!relation) {
     return { error: 'Relation 값을 입력해주세요.' };
   }
 
+  const signedAmount = form.amountType === 'withdraw' ? -Math.abs(parsedAmount) : Math.abs(parsedAmount);
+
   return {
     value: {
       date,
       item,
-      amount: parsedAmount,
+      amount: signedAmount,
       relation,
     } satisfies SettlementPayload,
   };
@@ -141,7 +149,8 @@ const buildSettlementPayload = (form: SettlementFormState) => {
 const toFormStateFromRecord = (record: SettlementRecord): SettlementFormState => ({
   date: toInputDate(record.date),
   item: record.item,
-  amount: String(record.amount),
+  amountType: record.amount < 0 ? 'withdraw' : 'deposit',
+  amount: String(Math.abs(record.amount)),
   relation: record.relation,
 });
 
@@ -373,6 +382,20 @@ const AddSettlementDialog = memo(function AddSettlementDialog({
     await onSubmit(payloadData.value);
   };
 
+  const handleAmountTypeChange = (
+    _event: MouseEvent<HTMLElement>,
+    value: SettlementAmountType | null,
+  ) => {
+    if (!value) {
+      return;
+    }
+
+    setForm((previous) => ({
+      ...previous,
+      amountType: value,
+    }));
+  };
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Add Settlement</DialogTitle>
@@ -395,12 +418,30 @@ const AddSettlementDialog = memo(function AddSettlementDialog({
           value={form.item}
           onChange={handleChange}
         />
+        <Box sx={{ mt: 1.5 }}>
+          <Typography variant="body2" sx={{ mb: 0.75, color: '#374151', fontWeight: 600 }}>
+            금액 구분
+          </Typography>
+          <ToggleButtonGroup
+            exclusive
+            fullWidth
+            size="small"
+            color="primary"
+            value={form.amountType}
+            onChange={handleAmountTypeChange}
+            aria-label="amount type"
+          >
+            <ToggleButton value="deposit">입금</ToggleButton>
+            <ToggleButton value="withdraw">출금</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
         <TextField
           margin="dense"
           type="number"
           label="Amount"
           name="amount"
           fullWidth
+          inputProps={{ min: 0, step: 1 }}
           value={form.amount}
           onChange={handleChange}
         />
@@ -467,6 +508,20 @@ const EditSettlementDialog = memo(function EditSettlementDialog({
     await onSubmit(record.id, payloadData.value);
   };
 
+  const handleAmountTypeChange = (
+    _event: MouseEvent<HTMLElement>,
+    value: SettlementAmountType | null,
+  ) => {
+    if (!value) {
+      return;
+    }
+
+    setForm((previous) => ({
+      ...previous,
+      amountType: value,
+    }));
+  };
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Edit Settlement</DialogTitle>
@@ -489,12 +544,30 @@ const EditSettlementDialog = memo(function EditSettlementDialog({
           value={form.item}
           onChange={handleChange}
         />
+        <Box sx={{ mt: 1.5 }}>
+          <Typography variant="body2" sx={{ mb: 0.75, color: '#374151', fontWeight: 600 }}>
+            금액 구분
+          </Typography>
+          <ToggleButtonGroup
+            exclusive
+            fullWidth
+            size="small"
+            color="primary"
+            value={form.amountType}
+            onChange={handleAmountTypeChange}
+            aria-label="amount type"
+          >
+            <ToggleButton value="deposit">입금</ToggleButton>
+            <ToggleButton value="withdraw">출금</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
         <TextField
           margin="dense"
           type="number"
           label="Amount"
           name="amount"
           fullWidth
+          inputProps={{ min: 0, step: 1 }}
           value={form.amount}
           onChange={handleChange}
         />
