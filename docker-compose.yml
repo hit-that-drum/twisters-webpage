@@ -37,6 +37,7 @@ services:
 
   frontend:
     build: ./frontend
+    command: sh -c "npm install && npm run dev -- --host"
     env_file:
       - .env.development
     volumes:
