@@ -11,6 +11,23 @@ CREATE TABLE IF NOT EXISTS users (
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS members (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE,
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+    phone VARCHAR(30),
+    role VARCHAR(100),
+    department VARCHAR(100),
+    joined_at DATE,
+    bio TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_members_email (email),
+    INDEX idx_members_role (role),
+    INDEX idx_members_department (department)
+);
+
 CREATE TABLE IF NOT EXISTS notice (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
