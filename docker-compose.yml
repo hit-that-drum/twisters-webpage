@@ -12,7 +12,7 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./supabase/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
   backend:
     build: ./backend
@@ -37,6 +37,7 @@ services:
 
   frontend:
     build: ./frontend
+    command: sh -c "npm install && npm run dev -- --host"
     env_file:
       - .env.development
     volumes:

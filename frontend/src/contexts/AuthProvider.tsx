@@ -49,6 +49,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [meInfo, setMeInfo] = useState<MeInfo | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
+  const sendHeartbeat = useCallback(async () => {
+    const token = getAccessToken();
+    if (!token || typeof document === 'undefined' || document.visibilityState !== 'visible') {
+      return;
+    }
+
+    try {
+      const response = await apiFetch('/authentication/heartbeat', {
+        method: 'POST',
+      });
+
+      if (response.status === 401) {
+        clearAccessToken();
+        setMeInfo(null);
+      }
+    } catch (error) {
+      console.error('Heartbeat request failed:', error);
+    }
+  }, []);
+
   const refreshMeInfo = useCallback(async () => {
     const token = getAccessToken();
     if (!token) {
@@ -86,7 +106,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refreshMeInfo();
   }, [refreshMeInfo]);
 
+  useEffect(() => {
+    if (!meInfo) {
+      return;
+    }
+
+    const heartbeatInterval = window.setInterval(() => {
+      void sendHeartbeat();
+    }, 5 * 60 * 1000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void sendHeartbeat();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(heartbeatInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [meInfo, sendHeartbeat]);
+
   const logout = useCallback(() => {
+    const token = getAccessToken();
+    if (token) {
+      void apiFetch('/authentication/logout', {
+        method: 'POST',
+        skipAuthRefresh: true,
+      });
+    }
+
     clearAccessToken();
     setMeInfo(null);
   }, []);
