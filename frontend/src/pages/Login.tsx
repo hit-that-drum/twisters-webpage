@@ -419,7 +419,7 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
                       value={formData.name}
                       onChange={handleChange}
                       placeholder="Enter your name"
-                      className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-green-700 focus:outline-none"
+                      className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
                       required
                     />
                   </div>
@@ -437,7 +437,7 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="Enter your email"
-                    className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-green-700 focus:outline-none"
+                    className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
                     required
                   />
                 </div>
@@ -457,7 +457,7 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="Password"
-                    className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-green-700 focus:outline-none"
+                    className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
                     required
                   />
                 </div>
@@ -479,7 +479,7 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
                         id="remember"
                         checked={rememberFor30Days}
                         onChange={(event) => setRememberFor30Days(event.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 accent-[#3D5A2D] cursor-pointer"
+                        className="h-4 w-4 rounded border-gray-300 accent-blue-700 cursor-pointer"
                       />
                       <label
                         htmlFor="remember"
@@ -490,7 +490,7 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
                     </div>
                     <button
                       type="button"
-                      className="text-xs font-bold text-[#1a73e8] hover:underline"
+                      className="text-xs font-bold text-blue-600 hover:underline"
                       onClick={handleForgotPassword}
                     >
                       Forgot password
@@ -501,7 +501,7 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-[#3D5A2D] py-4 text-sm font-bold text-white transition-all hover:bg-[#2d4321] active:scale-[0.98]"
+                  className="w-full rounded-xl bg-blue-700 py-4 text-sm font-bold text-white transition-all hover:bg-blue-800 active:scale-[0.98]"
                 >
                   {isLogin ? 'Sign In' : 'Signup'}
                 </button>
@@ -541,7 +541,7 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
                 <button
                   type="button"
                   onClick={() => navigate(isLogin ? '/signup' : '/signin')}
-                  className="font-bold text-[#1a73e8] hover:underline"
+                  className="font-bold text-blue-600 hover:underline"
                 >
                   {isLogin ? 'Sign Up' : 'Sign In'}
                 </button>
@@ -555,7 +555,7 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
               className="h-full w-full rounded-[48px] bg-cover bg-center transition-all duration-500"
               style={{
                 backgroundImage: `url(${loginPageRightImage})`,
-                backgroundColor: '#f3f4f6',
+                backgroundColor: 'var(--twister-grey-100)',
               }}
             >
               <div className="h-full w-full rounded-[48px] bg-black/5"></div>
@@ -588,7 +588,7 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
               value={resetFormData.resetEmail}
               onChange={handleResetChange}
               placeholder="Enter your email"
-              className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-green-700 focus:outline-none"
+              className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
               required
             />
           </div>
@@ -606,14 +606,14 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
               value={resetFormData.resetPassword}
               onChange={handleResetChange}
               placeholder="Enter your new password"
-              className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-green-700 focus:outline-none"
+              className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
               required
             />
           </div>
           <button
             type="button"
             disabled={isResetSubmitting}
-            className="mt-4 w-full rounded-xl bg-[#3D5A2D] py-4 text-sm font-bold text-white transition-all hover:bg-[#2d4321] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-4 w-full rounded-xl bg-blue-700 py-4 text-sm font-bold text-white transition-all hover:bg-blue-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             onClick={handleResetPassword}
           >
             {isResetSubmitting ? '처리 중...' : '비밀번호 재설정'}

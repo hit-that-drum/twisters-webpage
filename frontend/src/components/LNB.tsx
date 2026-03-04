@@ -12,12 +12,12 @@ export default function LNB({ onNavigate }: { onNavigate?: () => void }) {
 
   const homePath = meInfo ? `/${meInfo.id}` : '/home';
   const menuItems: LnbMenuItem[] = [
-    { to: homePath, label: 'Home' },
-    { to: '/member', label: 'Member' },
-    { to: '/notice', label: 'Notice' },
-    { to: '/settlement', label: 'Settlement' },
-    { to: '/mypage', label: 'My Page' },
-    { to: '/admin', label: 'Admin', adminOnly: true },
+    { to: homePath, label: '🏠 Home' },
+    { to: '/member', label: '👥 Member' },
+    { to: '/notice', label: '📢 Notice' },
+    { to: '/settlement', label: '💰 Settlement' },
+    { to: '/mypage', label: '📝 My Page' },
+    { to: '/admin', label: '👑 Admin', adminOnly: true },
   ];
 
   const visibleMenuItems = menuItems.filter((item) => {
@@ -42,7 +42,7 @@ export default function LNB({ onNavigate }: { onNavigate?: () => void }) {
             className={({ isActive }) =>
               `whitespace-nowrap rounded-lg px-3 py-2 text-2xl font-light transition ${
                 isActive
-                  ? 'bg-[#3D5A2D] text-white shadow-sm'
+                  ? 'bg-blue-700 text-white shadow-sm'
                   : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
               }`
             }

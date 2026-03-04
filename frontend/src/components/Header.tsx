@@ -26,7 +26,7 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
         <button
           type="button"
           onClick={handleLogout}
-          className="shrink-0 rounded-lg bg-[#3D5A2D] px-4 py-2 text-xl font-light text-white transition hover:bg-[#2d4321]"
+          className="shrink-0 rounded-lg bg-blue-700 px-4 py-2 text-xl font-light text-white transition hover:bg-blue-800"
         >
           Logout
         </button>
