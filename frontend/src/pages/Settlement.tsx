@@ -1,4 +1,12 @@
-import { memo, type ChangeEvent, type MouseEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  memo,
+  type ChangeEvent,
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -134,7 +142,8 @@ const buildSettlementPayload = (form: SettlementFormState) => {
     return { error: 'Relation 값을 입력해주세요.' };
   }
 
-  const signedAmount = form.amountType === 'withdraw' ? -Math.abs(parsedAmount) : Math.abs(parsedAmount);
+  const signedAmount =
+    form.amountType === 'withdraw' ? -Math.abs(parsedAmount) : Math.abs(parsedAmount);
 
   return {
     value: {
@@ -897,13 +906,8 @@ export default function Settlement() {
       >
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-            🐝 정산
+            정산
           </Typography>
-          {meInfo && (
-            <Typography variant="body2" sx={{ mt: 0.5, color: 'text.secondary' }}>
-              {meInfo.name} ({meInfo.email})
-            </Typography>
-          )}
         </Box>
 
         {canManageSettlements && (

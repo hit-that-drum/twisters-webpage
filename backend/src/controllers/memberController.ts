@@ -28,7 +28,23 @@ interface MemberLookupRow {
   id: number;
 }
 
+interface MemberNameRow {
+  id: number;
+  name: string;
+}
+
+interface SettlementDuesRow {
+  item: string;
+  year: number | string;
+}
+
+type MemberDuesStatus = {
+  memberId: number;
+  name: string;
+} & Record<`deposit${number}`, boolean>;
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DUES_BASE_YEAR = 2024;
 
 let ensureMembersSchemaPromise: Promise<void> | null = null;
 
@@ -254,6 +270,10 @@ const isAdminUser = (authenticatedUser: AuthenticatedUser) => {
   return normalizeBoolean(authenticatedUser.isAdmin, false);
 };
 
+const normalizeKoreanSearchText = (value: string) => {
+  return value.normalize('NFC').replace(/\s+/g, '').trim();
+};
+
 const assertAdminUser = (authenticatedUser: AuthenticatedUser | undefined, res: Response) => {
   if (!authenticatedUser) {
     res.status(401).json({ error: '인증된 사용자 정보가 없습니다.' });
@@ -298,6 +318,97 @@ export const getMembers = async (_req: Request, res: Response) => {
   } catch (error) {
     console.error('Member list fetch error:', error);
     return res.status(500).json({ error: '회원 정보 조회 중 오류가 발생했습니다.' });
+  }
+};
+
+export const getMemberDuesDepositStatus = async (_req: Request, res: Response) => {
+  try {
+    await ensureMembersSchema();
+
+    const [membersResult, settlementResult] = await Promise.all([
+      pool.query<MemberNameRow>(
+        `
+          SELECT id, name
+          FROM members
+          ORDER BY name COLLATE "ko-KR-x-icu" ASC, id ASC
+        `,
+      ),
+      pool.query<SettlementDuesRow>(
+        `
+          SELECT
+            item,
+            EXTRACT(YEAR FROM settlement_date)::int AS year
+          FROM settlement
+          WHERE settlement_date >= DATE '${DUES_BASE_YEAR}-01-01'
+            AND item LIKE '%회비%'
+            AND amount > 0
+          ORDER BY settlement_date ASC, id ASC
+        `,
+      ),
+    ]);
+
+    const members = membersResult.rows
+      .map((row) => ({
+        id: row.id,
+        name: row.name.trim(),
+      }))
+      .filter((row) => row.name.length > 0);
+
+    const normalizedMembers = members.map((member) => ({
+      ...member,
+      normalizedName: normalizeKoreanSearchText(member.name),
+    }));
+
+    const paidYearsByMember = new Map<number, Set<number>>();
+    normalizedMembers.forEach((member) => {
+      paidYearsByMember.set(member.id, new Set<number>());
+    });
+
+    const currentYear = new Date().getFullYear();
+    let maxYear = Math.max(DUES_BASE_YEAR, currentYear);
+
+    settlementResult.rows.forEach((row) => {
+      const year = Number(row.year);
+      if (!Number.isInteger(year) || year < DUES_BASE_YEAR) {
+        return;
+      }
+
+      maxYear = Math.max(maxYear, year);
+
+      const normalizedItem = normalizeKoreanSearchText(row.item);
+      normalizedMembers.forEach((member) => {
+        if (!member.normalizedName || !normalizedItem.includes(member.normalizedName)) {
+          return;
+        }
+
+        paidYearsByMember.get(member.id)?.add(year);
+      });
+    });
+
+    const years = Array.from(
+      { length: maxYear - DUES_BASE_YEAR + 1 },
+      (_, index) => DUES_BASE_YEAR + index,
+    );
+
+    const response: MemberDuesStatus[] = members.map((member) => {
+      const row = {
+        memberId: member.id,
+        name: member.name,
+      } as MemberDuesStatus;
+      const paidYears = paidYearsByMember.get(member.id) ?? new Set<number>();
+
+      years.forEach((year) => {
+        const key = `deposit${year}` as `deposit${number}`;
+        row[key] = paidYears.has(year);
+      });
+
+      return row;
+    });
+
+    return res.json(response);
+  } catch (error) {
+    console.error('Member dues status fetch error:', error);
+    return res.status(500).json({ error: '회원 회비 입금 현황 조회 중 오류가 발생했습니다.' });
   }
 };
 

@@ -38,6 +38,13 @@ interface MemberFormState {
   bio: string;
 }
 
+interface ParsedMemberDuesStatus {
+  years: number[];
+  byMemberId: Record<number, Record<number, boolean>>;
+}
+
+const DEPOSIT_KEY_PATTERN = /^deposit(\d{4})$/;
+
 const createDefaultMemberForm = (): MemberFormState => ({
   name: '',
   email: '',
@@ -125,6 +132,52 @@ const parseMembers = (payload: unknown): MemberUser[] => {
     .filter((item): item is MemberUser => item !== null);
 };
 
+const parseMemberDuesStatus = (payload: unknown): ParsedMemberDuesStatus => {
+  if (!Array.isArray(payload)) {
+    return { years: [], byMemberId: {} };
+  }
+
+  const years = new Set<number>();
+  const byMemberId: Record<number, Record<number, boolean>> = {};
+
+  payload.forEach((item) => {
+    if (!item || typeof item !== 'object') {
+      return;
+    }
+
+    const row = item as Record<string, unknown>;
+    const memberId =
+      typeof row.memberId === 'number' && Number.isInteger(row.memberId) ? row.memberId : null;
+    if (!memberId) {
+      return;
+    }
+
+    if (!byMemberId[memberId]) {
+      byMemberId[memberId] = {};
+    }
+
+    Object.entries(row).forEach(([key, value]) => {
+      const matched = DEPOSIT_KEY_PATTERN.exec(key);
+      if (!matched) {
+        return;
+      }
+
+      const year = Number(matched[1]);
+      if (!Number.isInteger(year)) {
+        return;
+      }
+
+      years.add(year);
+      byMemberId[memberId][year] = parseBoolean(value);
+    });
+  });
+
+  return {
+    years: [...years].sort((a, b) => a - b),
+    byMemberId,
+  };
+};
+
 const toEditForm = (member: MemberUser): MemberFormState => ({
   name: member.name,
   email: member.email ?? '',
@@ -184,6 +237,10 @@ export default function Member() {
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [addMemberForm, setAddMemberForm] = useState<MemberFormState>(() => createDefaultMemberForm());
   const [editMemberForm, setEditMemberForm] = useState<MemberFormState>(() => createDefaultMemberForm());
+  const [duesYears, setDuesYears] = useState<number[]>([]);
+  const [duesStatusByMemberId, setDuesStatusByMemberId] = useState<
+    Record<number, Record<number, boolean>>
+  >({});
 
   const canManageMembers = meInfo?.isAdmin === true;
 
@@ -237,6 +294,37 @@ export default function Member() {
     }
   }, [handleExpiredSession]);
 
+  const loadMemberDuesStatus = useCallback(async () => {
+    try {
+      const response = await apiFetch('/member/dues/deposit-status');
+      const payload = await parseApiResponse(response);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          handleExpiredSession();
+          return;
+        }
+
+        enqueueSnackbar(
+          `회원 회비 현황을 불러오지 못했습니다: ${getApiMessage(payload, '알 수 없는 에러')}`,
+          {
+            variant: 'error',
+          },
+        );
+        setDuesYears([]);
+        setDuesStatusByMemberId({});
+        return;
+      }
+
+      const parsedDuesStatus = parseMemberDuesStatus(payload);
+      setDuesYears(parsedDuesStatus.years);
+      setDuesStatusByMemberId(parsedDuesStatus.byMemberId);
+    } catch (error) {
+      console.error('Member dues status fetch error:', error);
+      enqueueSnackbar('회원 회비 현황 조회 중 오류가 발생했습니다.', { variant: 'error' });
+    }
+  }, [handleExpiredSession]);
+
   useEffect(() => {
     if (isAuthLoading) {
       return;
@@ -247,13 +335,21 @@ export default function Member() {
       return;
     }
 
-    void loadMembers();
-  }, [handleExpiredSession, isAuthLoading, loadMembers, meInfo]);
+    void Promise.all([loadMembers(), loadMemberDuesStatus()]);
+  }, [handleExpiredSession, isAuthLoading, loadMemberDuesStatus, loadMembers, meInfo]);
 
   const selectedUser = useMemo(
     () => users.find((user) => user.id === selectedUserId) ?? null,
     [selectedUserId, users],
   );
+
+  const selectedUserDuesStatus = useMemo(() => {
+    if (!selectedUser) {
+      return {} as Record<number, boolean>;
+    }
+
+    return duesStatusByMemberId[selectedUser.id] ?? ({} as Record<number, boolean>);
+  }, [duesStatusByMemberId, selectedUser]);
 
   const subLnbItems = useMemo(
     () =>
@@ -362,7 +458,7 @@ export default function Member() {
 
       enqueueSnackbar(getApiMessage(payload, '회원이 등록되었습니다.'), { variant: 'success' });
       setOpenAddDialog(false);
-      await loadMembers();
+      await Promise.all([loadMembers(), loadMemberDuesStatus()]);
     } catch (error) {
       console.error('Member create error:', error);
       enqueueSnackbar('회원 등록 중 오류가 발생했습니다.', { variant: 'error' });
@@ -404,7 +500,7 @@ export default function Member() {
 
       enqueueSnackbar(getApiMessage(payload, '회원 정보가 수정되었습니다.'), { variant: 'success' });
       setOpenEditDialog(false);
-      await loadMembers();
+      await Promise.all([loadMembers(), loadMemberDuesStatus()]);
     } catch (error) {
       console.error('Member update error:', error);
       enqueueSnackbar('회원 수정 중 오류가 발생했습니다.', { variant: 'error' });
@@ -450,7 +546,7 @@ export default function Member() {
 
       enqueueSnackbar(getApiMessage(payload, '회원이 삭제되었습니다.'), { variant: 'success' });
       setOpenEditDialog(false);
-      await loadMembers();
+      await Promise.all([loadMembers(), loadMemberDuesStatus()]);
     } catch (error) {
       console.error('Member delete error:', error);
       enqueueSnackbar('회원 삭제 중 오류가 발생했습니다.', { variant: 'error' });
@@ -547,6 +643,37 @@ export default function Member() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Department</p>
                   <p className="mt-1 text-base text-gray-700">{renderDetailValue(selectedUser.department)}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">회비 입금 여부</p>
+                <div className="mt-2 overflow-hidden rounded-lg border border-gray-200">
+                  {duesYears.length > 0 ? (
+                    duesYears.map((year) => {
+                      const isPaid = selectedUserDuesStatus[year] === true;
+                      return (
+                        <div
+                          key={`dues-${year}`}
+                          className="grid grid-cols-2 items-center border-b border-gray-200 px-3 py-2 last:border-b-0"
+                        >
+                          <span className="text-sm text-gray-700">{year} 회비</span>
+                          <span
+                            className={`text-right text-base font-bold ${
+                              isPaid ? 'text-emerald-700' : 'text-gray-500'
+                            }`}
+                          >
+                            {isPaid ? '⭕' : '❌'}
+                          </span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="grid grid-cols-2 items-center px-3 py-2">
+                      <span className="text-sm text-gray-500">회비 데이터 없음</span>
+                      <span className="text-right text-base font-bold text-gray-400">-</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
