@@ -1,7 +1,15 @@
+## FRONT-END
+
 ### DESIGN
 
 - **(2026.03.04)**
-  - ✅ 프로젝트 글로벌 컬러 스타일 파일 생성 *`**TwistersTheme.ts`***
+  - ✅ 프로젝트 글로벌 컬러 스타일 파일 생성 \*`**TwistersTheme.ts`\*\*\*
+
+---
+
+### LOGIN
+
+- ☑️✅ Google OAuth 로그인
 
 ---
 
@@ -19,7 +27,7 @@
 ### FOOTER
 
 - FOOTER에 들어가야 하는 정보  
-[https://blog.duda.co/website-footer-design-best-practices-examples](https://blog.duda.co/website-footer-design-best-practices-examples)
+  [https://blog.duda.co/website-footer-design-best-practices-examples](https://blog.duda.co/website-footer-design-best-practices-examples)
 
 ---
 
@@ -54,3 +62,10 @@
 
 - ☑️✅ 세부 디자인 필요
 
+---
+
+## BACK-END
+
+- ☑️✅ DB 호스팅
+- ☑️✅ 도메인 설정
+- ☑️✅ 이미지 호스팅 할 곳 찾아보기
