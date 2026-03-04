@@ -29,23 +29,28 @@ export default function LNB({ onNavigate }: { onNavigate?: () => void }) {
   });
 
   return (
-    <nav aria-label="Main navigation" className="flex items-center gap-1 overflow-x-auto">
-      {visibleMenuItems.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            `whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition ${
-              isActive
-                ? 'bg-[#3D5A2D] text-white shadow-sm'
-                : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-            }`
-          }
-        >
-          {item.label}
-        </NavLink>
-      ))}
-    </nav>
+    <div className="mx-auto max-w-5xl">
+      <nav
+        aria-label="Main navigation"
+        className="flex items-center justify-around gap-1 overflow-x-auto"
+      >
+        {visibleMenuItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            onClick={onNavigate}
+            className={({ isActive }) =>
+              `whitespace-nowrap rounded-lg px-3 py-2 text-2xl font-light transition ${
+                isActive
+                  ? 'bg-[#3D5A2D] text-white shadow-sm'
+                  : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+              }`
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+    </div>
   );
 }
