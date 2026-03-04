@@ -7,7 +7,7 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
   return (
     <header className="mb-4 rounded-2xl border border-gray-200 bg-white px-4 py-3">
       <div className="flex items-center gap-3">
-        <h1 className="shrink-0 text-2xl font-bold">TWISTERS</h1>
+        <img src="/src/assets/twisters_logo_260304.svg" alt="TWISTERS" className="h-15 w-35" />
 
         <div className="hidden min-w-0 flex-1 md:block">
           <LNB />
