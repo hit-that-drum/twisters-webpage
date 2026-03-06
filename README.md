@@ -1,71 +1,11 @@
-## FRONT-END
+# README.md
 
-### DESIGN
+## 💻 프로젝트 개요 Project Overview
 
-- **(2026.03.04)**
-  - ✅ 프로젝트 글로벌 컬러 스타일 파일 생성 \*`**TwistersTheme.ts`\*\*\*
+멤버들을 기반으로 한 커뮤니티 웹사이트입니다.<br>
+사용자는 회원가입/로그인을 통해 사이트의 내부에 접근할 수 있으며 이는 관리자의 승인으로 인해 접근 가능합니다.<br>
+관리자와 일반유저 간의 Role 기반 접근 제어를 통해 권한 관리가 이루어지며, 관리자의 공지 및 멤버 간의 상호작용이 이루어집니다.<br>
 
----
-
-### LOGIN
-
-- ☑️✅ Google OAuth 로그인
-
----
-
-### HEADER
-
-- **(2026.03.04)**
-  - ✅ 탭 정보에 들어가는 로고 및 헤더 로고 변경
-  - ✅ 글씨체 바꾸기
-  - ✅ 헤더 스타일링 다시 하기
-- ☑️✅ 지금은 Logout 버튼으로 되어 있는데 이걸 프로필 사진 동그라미로 바꾸고 그걸 클릭하면 로그아웃이랑 나오게 바꾸기
-- ☑️✅ 저렇게 바꾸고 나면 My Page랑 Admin랑 Logout이랑 이렇게 세 개가 그 안으로 들어가면 될 듯
-
----
-
-### FOOTER
-
-- FOOTER에 들어가야 하는 정보  
-  [https://blog.duda.co/website-footer-design-best-practices-examples](https://blog.duda.co/website-footer-design-best-practices-examples)
-
----
-
-### HOME
-
-- ☑️✅ 뭐가 들어가야 하는지 컨텐츠 정하기
-- ☑️✅ 와이어 프레임 및 디자인 필요
-
----
-
-### MEMBER
-
-- **(2026.03.04)**
-  - ✅ settlement 에서 전체를 불러와서 "회비"라는 것만 떼어내어갖고 만드는 API 가 필요함
-
----
-
-### NOTICE
-
-- ☑️✅ 세부 디자인 필요
-
----
-
-### MY PAGE
-
-- ☑️✅ 뭐가 들어가야 하는지 컨텐츠 정하기
-- ☑️✅ 와이어 프레임 및 디자인 필요
-
----
-
-### SETTLEMENT
-
-- ☑️✅ 세부 디자인 필요
-
----
-
-## BACK-END
-
-- ☑️✅ DB 호스팅
-- ☑️✅ 도메인 설정
-- ☑️✅ 이미지 호스팅 할 곳 찾아보기
+This is a community website based on registered members.<br>
+Users can access the internal site through singup/login, and access is granted upon administrator approval.<br>
+Role-based access control between administrators a nd regular users is implemented to manage permissions, enabling administrative announcements and interactions among members.<br>
