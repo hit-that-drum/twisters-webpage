@@ -5,6 +5,11 @@ import * as memberController from '../controllers/memberController.js';
 const router = express.Router();
 
 router.get('/', passport.authenticate('jwt', { session: false }), memberController.getMembers);
+router.get(
+  '/dues/deposit-status',
+  passport.authenticate('jwt', { session: false }),
+  memberController.getMemberDuesDepositStatus,
+);
 router.post('/', passport.authenticate('jwt', { session: false }), memberController.createMember);
 router.put('/:memberId', passport.authenticate('jwt', { session: false }), memberController.updateMember);
 router.delete('/:memberId', passport.authenticate('jwt', { session: false }), memberController.deleteMember);

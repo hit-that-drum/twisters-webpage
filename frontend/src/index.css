@@ -4,6 +4,7 @@
 
 /* 2. Tailwind 엔진 및 설정 로드 */
 @import 'tailwindcss';
+@import url('https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap');
 @config "../tailwind.config.js";
 @reference "../tailwind.config.js";
 
@@ -31,6 +32,12 @@
   svg {
     display: block;
     max-width: 100%;
+  }
+}
+
+@layer utilities {
+  .font-grand-hotel {
+    font-family: 'Grand Hotel', cursive;
   }
 }
 

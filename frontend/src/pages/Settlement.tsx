@@ -1,4 +1,12 @@
-import { memo, type ChangeEvent, type MouseEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  memo,
+  type ChangeEvent,
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -134,7 +142,8 @@ const buildSettlementPayload = (form: SettlementFormState) => {
     return { error: 'Relation 값을 입력해주세요.' };
   }
 
-  const signedAmount = form.amountType === 'withdraw' ? -Math.abs(parsedAmount) : Math.abs(parsedAmount);
+  const signedAmount =
+    form.amountType === 'withdraw' ? -Math.abs(parsedAmount) : Math.abs(parsedAmount);
 
   return {
     value: {
@@ -211,7 +220,7 @@ const SettlementGrid = memo(function SettlementGrid({
             sx={{
               width: '100%',
               textAlign: 'right',
-              color: params.value < 0 ? '#DC2626' : '#111827',
+              color: params.value < 0 ? 'error.main' : 'text.primary',
             }}
           >
             {formatAmount(params.value as number)}
@@ -225,7 +234,7 @@ const SettlementGrid = memo(function SettlementGrid({
         flex: 0.95,
         sortable: false,
         renderCell: (params) => (
-          <Typography variant="body2" sx={{ fontWeight: 600, color: '#166534' }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.dark' }}>
             {params.value}
           </Typography>
         ),
@@ -268,10 +277,11 @@ const SettlementGrid = memo(function SettlementGrid({
       <Box
         sx={{
           height: { xs: 560, md: 920 },
-          border: '1px solid #D1D5DB',
+          border: 1,
+          borderColor: 'grey.300',
           borderRadius: 2,
           overflow: 'hidden',
-          bgcolor: '#FFFFFF',
+          bgcolor: 'background.paper',
         }}
       >
         <DataGrid
@@ -294,35 +304,39 @@ const SettlementGrid = memo(function SettlementGrid({
           }}
           sx={{
             border: 'none',
-            color: '#111827',
+            color: 'text.primary',
             '& .MuiDataGrid-columnHeaders': {
-              bgcolor: '#F9FAFB',
-              borderBottom: '1px solid #E5E7EB',
+              bgcolor: 'grey.50',
+              borderBottom: '1px solid',
+              borderBottomColor: 'grey.200',
             },
             '& .MuiDataGrid-columnHeader, & .MuiDataGrid-cell': {
-              borderRight: '1px solid #E5E7EB',
+              borderRight: '1px solid',
+              borderRightColor: 'grey.200',
             },
             '& .MuiDataGrid-row': {
-              bgcolor: '#FFFFFF',
+              bgcolor: 'background.paper',
             },
             '& .MuiDataGrid-row:hover': {
-              bgcolor: '#F3F4F6',
+              bgcolor: 'grey.100',
             },
             '& .MuiDataGrid-cell': {
-              borderBottom: '1px solid #E5E7EB',
+              borderBottom: '1px solid',
+              borderBottomColor: 'grey.200',
             },
             '& .MuiDataGrid-footerContainer': {
-              bgcolor: '#F9FAFB',
-              borderTop: '1px solid #E5E7EB',
+              bgcolor: 'grey.50',
+              borderTop: '1px solid',
+              borderTopColor: 'grey.200',
             },
             '& .MuiDataGrid-columnSeparator': {
-              color: '#D1D5DB',
+              color: 'grey.300',
             },
             '& .MuiDataGrid-iconButtonContainer button, & .MuiDataGrid-menuIconButton': {
-              color: '#6B7280',
+              color: 'text.secondary',
             },
             '& .MuiDataGrid-sortIcon': {
-              color: '#6B7280',
+              color: 'text.secondary',
             },
             '& .MuiDataGrid-cell:focus, & .MuiDataGrid-columnHeader:focus': {
               outline: 'none',
@@ -337,7 +351,7 @@ const SettlementGrid = memo(function SettlementGrid({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          color: '#6B7280',
+          color: 'text.secondary',
         }}
       >
         <Typography variant="caption">↓ 더 불러오기</Typography>
@@ -419,7 +433,7 @@ const AddSettlementDialog = memo(function AddSettlementDialog({
           onChange={handleChange}
         />
         <Box sx={{ mt: 1.5 }}>
-          <Typography variant="body2" sx={{ mb: 0.75, color: '#374151', fontWeight: 600 }}>
+          <Typography variant="body2" sx={{ mb: 0.75, color: 'text.secondary', fontWeight: 600 }}>
             금액 구분
           </Typography>
           <ToggleButtonGroup
@@ -545,7 +559,7 @@ const EditSettlementDialog = memo(function EditSettlementDialog({
           onChange={handleChange}
         />
         <Box sx={{ mt: 1.5 }}>
-          <Typography variant="body2" sx={{ mb: 0.75, color: '#374151', fontWeight: 600 }}>
+          <Typography variant="body2" sx={{ mb: 0.75, color: 'text.secondary', fontWeight: 600 }}>
             금액 구분
           </Typography>
           <ToggleButtonGroup
@@ -891,14 +905,9 @@ export default function Settlement() {
         }}
       >
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: '#111827' }}>
-            🐝 정산
+          <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
+            정산
           </Typography>
-          {meInfo && (
-            <Typography variant="body2" sx={{ mt: 0.5, color: '#6B7280' }}>
-              {meInfo.name} ({meInfo.email})
-            </Typography>
-          )}
         </Box>
 
         {canManageSettlements && (

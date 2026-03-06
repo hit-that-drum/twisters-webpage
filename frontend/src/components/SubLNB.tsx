@@ -44,13 +44,13 @@ export default function SubLNB({
                 }}
                 className={`flex w-full flex-col items-start rounded-lg px-3 py-2 text-left transition ${
                   isActive
-                    ? 'bg-[#3D5A2D] text-white shadow-sm'
+                    ? 'bg-blue-700 text-white shadow-sm'
                     : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
                 }`}
               >
                 <span className="text-sm font-semibold">{item.label}</span>
                 {item.meta ? (
-                  <span className={`text-xs ${isActive ? 'text-green-100' : 'text-gray-500'}`}>
+                  <span className={`text-xs ${isActive ? 'text-blue-100' : 'text-gray-500'}`}>
                     {item.meta}
                   </span>
                 ) : null}
