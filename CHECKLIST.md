@@ -35,6 +35,9 @@
   - ✅ singup 로직 변경하며 데이터베이스 구조에도 변경이 들어가야 함 (isAllowed 같은 column 추가)
 - ☑️✅ Google OAuth 로그인
 - ☑️✅ KakaoTalk OAuth 로그인
+- 배포 이후
+  - ☑️✅ 이메일 인증
+  - ☑️✅ 회원가입 승인이 완료되면 이메일로 알림 보내기
 
 ---
 
