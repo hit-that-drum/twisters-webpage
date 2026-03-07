@@ -4,6 +4,7 @@ import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
 import bcrypt from 'bcrypt';
 import { query } from '../db.js';
 import { getJwtSecret } from '../authUtils.js';
+import { HttpError } from '../errors/httpError.js';
 import { getAuthenticatedUserBySession, touchSessionActivity } from '../sessionService.js';
 
 interface AccessJwtPayload {
@@ -32,6 +33,7 @@ interface PassportUserRow {
   email: string;
   password: string | null;
   isAdmin: boolean | null;
+  isAllowed: boolean | null;
   sessionId?: number;
 }
 
@@ -45,7 +47,7 @@ passport.use(
     async (email, password, done) => {
       try {
         const result = await query<PassportUserRow>(
-          'SELECT id, name, email, password, "isAdmin" FROM users WHERE email = $1',
+          'SELECT id, name, email, password, "isAdmin", "isAllowed" FROM users WHERE email = $1',
           [email],
         );
         const user = result.rows[0];
@@ -57,6 +59,10 @@ passport.use(
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return done(null, false, { message: 'Incorrect password.' });
+
+        if (user.isAllowed !== true) {
+          return done(new HttpError(403, '관리자 승인 대기 중입니다.', 'ACCOUNT_PENDING_APPROVAL'));
+        }
 
         return done(null, user);
       } catch (err) {

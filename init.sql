@@ -225,6 +225,7 @@ CREATE TABLE public.users (
     password character varying(255),
     google_id character varying(255),
     "isAdmin" boolean DEFAULT false NOT NULL,
+    "isAllowed" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -360,8 +361,8 @@ INSERT INTO public.user_sessions (id, user_id, refresh_token_hash, remember_me, 
 -- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-INSERT INTO public.users (id, name, email, password, google_id, "isAdmin", "createdAt") OVERRIDING SYSTEM VALUE VALUES (1, 'HYE', 'hyeyoungkim3530@gmail.com', '$2b$10$IUXITc0rnVK6mT9IfuW.m.ySSkMKnUuKdBlgY/LjX/y/nyWfn60OK', NULL, true, '2026-02-14 04:27:51.063878+00');
-INSERT INTO public.users (id, name, email, password, google_id, "isAdmin", "createdAt") OVERRIDING SYSTEM VALUE VALUES (2, '얍얍', 'velvetrevelvet91@gmail.com', '$2b$10$BfTFcvkSzk0rZPqzR.KQMepM5vRwsiN.1KbMI33THjfoyqwbubB0.', NULL, false, '2026-02-14 04:30:24.581582+00');
+INSERT INTO public.users (id, name, email, password, google_id, "isAdmin", "isAllowed", "createdAt") OVERRIDING SYSTEM VALUE VALUES (1, 'HYE', 'hyeyoungkim3530@gmail.com', '$2b$10$IUXITc0rnVK6mT9IfuW.m.ySSkMKnUuKdBlgY/LjX/y/nyWfn60OK', NULL, true, true, '2026-02-14 04:27:51.063878+00');
+INSERT INTO public.users (id, name, email, password, google_id, "isAdmin", "isAllowed", "createdAt") OVERRIDING SYSTEM VALUE VALUES (2, '얍얍', 'velvetrevelvet91@gmail.com', '$2b$10$BfTFcvkSzk0rZPqzR.KQMepM5vRwsiN.1KbMI33THjfoyqwbubB0.', NULL, false, true, '2026-02-14 04:30:24.581582+00');
 
 
 --
@@ -569,4 +570,3 @@ ALTER TABLE ONLY public.user_sessions
 --
 
 \unrestrict 2YF2hPpYRfOmyG5vXyT5vCv3dOMymx1KIbLZ22UIedYMGETfDSN7kJZPavie2gC
-

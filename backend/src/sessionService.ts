@@ -13,6 +13,7 @@ interface SessionLookupRow {
   name: string;
   email: string;
   isAdmin: boolean;
+  isAllowed: boolean;
   remember_me: boolean;
   idle_expires_at: Date;
   absolute_expires_at: Date;
@@ -160,12 +161,13 @@ export const refreshSessionAuthResponse = async (refreshToken: string) => {
         u.name,
         u.email,
         u."isAdmin",
+        u."isAllowed",
         s.remember_me,
         s.idle_expires_at,
         s.absolute_expires_at
       FROM user_sessions s
       JOIN users u ON u.id = s.user_id
-      WHERE s.refresh_token_hash = $1 AND s.revoked_at IS NULL
+      WHERE s.refresh_token_hash = $1 AND s.revoked_at IS NULL AND u."isAllowed" = TRUE
       LIMIT 1
     `,
     [refreshTokenHash],
@@ -229,6 +231,7 @@ export const getAuthenticatedUserBySession = async (userId: number, sessionId: n
         AND s.revoked_at IS NULL
         AND s.idle_expires_at > NOW()
         AND s.absolute_expires_at > NOW()
+        AND u."isAllowed" = TRUE
       LIMIT 1
     `,
     [userId, sessionId],

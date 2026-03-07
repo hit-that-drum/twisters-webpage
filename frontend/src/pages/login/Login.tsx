@@ -293,12 +293,24 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
         const data = await response.json();
 
         if (response.ok) {
+          if (data?.status === 'pending') {
+            enqueueSnackbar(
+              data.message || '회원가입이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.',
+              { variant: 'success' },
+            );
+            navigate('/signin');
+            return;
+          }
+
           if (typeof data.token === 'string' && typeof data.refreshToken === 'string') {
             setAuthTokens(data.token, data.refreshToken, true);
             await refreshMeInfo();
           } else if (typeof data.token === 'string') {
             setAccessToken(data.token, true);
             await refreshMeInfo();
+          } else {
+            enqueueSnackbar('회원가입 성공 응답에 인증 토큰이 없습니다.', { variant: 'error' });
+            return;
           }
 
           const userIdx = data.user?.id ?? data.userId;
@@ -358,6 +370,13 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
           enqueueSnackbar('로그인 성공!', { variant: 'success' });
           navigate(`/${userIdx}`);
         } else {
+          if (data?.code === 'ACCOUNT_PENDING_APPROVAL') {
+            enqueueSnackbar('관리자 승인 대기 중입니다. 승인 후 로그인해주세요.', {
+              variant: 'warning',
+            });
+            return;
+          }
+
           const errorMessage = data.error || '알 수 없는 에러';
           enqueueSnackbar(`로그인 실패: ${errorMessage}`, { variant: 'error' });
 

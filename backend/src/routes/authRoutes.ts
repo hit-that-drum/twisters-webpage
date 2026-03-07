@@ -1,6 +1,7 @@
 import * as authController from '../controllers/authController.js';
 import express from 'express';
 import passport from '../config/passport.js';
+import { requireAdmin } from '../utils/requireAdmin.js';
 
 const router = express.Router();
 
@@ -16,5 +17,23 @@ router.post('/request-reset', authController.requestReset);
 router.post('/verify-reset-token', authController.verifyResetToken);
 router.post('/reset-password', authController.resetPassword);
 router.post('/auth/google', authController.googleAuth);
+router.get(
+  '/admin/pending-users',
+  passport.authenticate('jwt', { session: false }),
+  requireAdmin,
+  authController.getPendingUsers,
+);
+router.get(
+  '/admin/users',
+  passport.authenticate('jwt', { session: false }),
+  requireAdmin,
+  authController.getAdminUsers,
+);
+router.patch(
+  '/admin/users/:id/approve',
+  passport.authenticate('jwt', { session: false }),
+  requireAdmin,
+  authController.approveUser,
+);
 
 export default router;

@@ -8,7 +8,9 @@ export const handleControllerError = (
   logPrefix: string,
 ) => {
   if (isHttpError(error)) {
-    return res.status(error.statusCode).json({ error: error.message });
+    return res
+      .status(error.statusCode)
+      .json(error.code ? { error: error.message, code: error.code } : { error: error.message });
   }
 
   console.error(`${logPrefix}:`, error);

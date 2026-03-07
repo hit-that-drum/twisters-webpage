@@ -4,6 +4,12 @@ export interface LocalAuthUser {
   email: string;
 }
 
+export interface PendingSignUpResponse {
+  message: string;
+  status: 'pending';
+  userId: number;
+}
+
 export interface SignUpDTO {
   name?: string;
   email?: string;
@@ -28,6 +34,34 @@ export interface MeUserRow {
   name: string;
   email: string;
   isAdmin: boolean | number;
+}
+
+export interface ApprovalUserRow {
+  id: number;
+  name: string;
+  email: string;
+  isAllowed: boolean | number;
+}
+
+export interface PendingUserRow {
+  id: number;
+  name: string;
+  email: string;
+  createdAt: Date;
+}
+
+export interface UserApprovalRow {
+  id: number;
+  isAllowed: boolean | number;
+}
+
+export interface AdminUserRow {
+  id: number;
+  name: string;
+  email: string;
+  isAdmin: boolean | number;
+  isAllowed: boolean | number;
+  createdAt: Date;
 }
 
 export interface UserEmailRow {

@@ -14,6 +14,7 @@ import {
   type GoogleAuthDTO,
   type LocalAuthUser,
   type MeUser,
+  type PendingSignUpResponse,
   type RefreshSessionDTO,
   type RequestResetDTO,
   type ResetPasswordDTO,
@@ -33,6 +34,29 @@ const requireAuthenticatedUser = (authenticatedUser: AuthenticatedUser | undefin
   }
 
   return authenticatedUser;
+};
+
+const normalizeBoolean = (rawValue: unknown, fallbackValue = false) => {
+  if (typeof rawValue === 'boolean') {
+    return rawValue;
+  }
+
+  if (typeof rawValue === 'number') {
+    return rawValue === 1;
+  }
+
+  if (typeof rawValue === 'string') {
+    const normalized = rawValue.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') {
+      return true;
+    }
+
+    if (normalized === 'false' || normalized === '0') {
+      return false;
+    }
+  }
+
+  return fallbackValue;
 };
 
 const requirePasswordResetLookup = (
@@ -69,7 +93,7 @@ class AuthService {
     return createSessionAuthResponse(user, 'Logged in successfully!', rememberMe);
   }
 
-  async signUp(payload: SignUpDTO) {
+  async signUp(payload: SignUpDTO): Promise<PendingSignUpResponse> {
     const name = payload.name?.trim();
     const email = payload.email?.trim().toLowerCase();
     const password = payload.password;
@@ -86,11 +110,11 @@ class AuthService {
         throw new HttpError(500, '회원가입 처리 중 사용자 ID를 확인하지 못했습니다.');
       }
 
-      return createSessionAuthResponse(
-        { id: userId, name, email },
-        '회원가입 성공!',
-        true,
-      );
+      return {
+        message: '가입이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.',
+        status: 'pending',
+        userId,
+      };
     } catch (error: unknown) {
       const pgError = error as { code?: string };
       if (pgError.code === '23505') {
@@ -241,18 +265,59 @@ class AuthService {
     }
 
     const normalizedEmail = email.toLowerCase();
-    let user = await authRepository.findPublicUserByEmail(normalizedEmail);
+    let user = await authRepository.findApprovalUserByEmail(normalizedEmail);
 
     if (!user) {
       await authRepository.createGoogleUser(normalizedEmail, name, googleId);
-      user = await authRepository.findPublicUserByEmail(normalizedEmail);
+      user = await authRepository.findApprovalUserByEmail(normalizedEmail);
     }
 
     if (!user) {
       throw new HttpError(500, '구글 로그인 사용자 생성에 실패했습니다.');
     }
 
+    if (!normalizeBoolean(user.isAllowed, false)) {
+      throw new HttpError(403, '관리자 승인 대기 중입니다.', 'ACCOUNT_PENDING_APPROVAL');
+    }
+
     return createSessionAuthResponse(user, '구글 로그인 성공', true);
+  }
+
+  async getPendingUsers() {
+    return authRepository.findPendingUsers();
+  }
+
+  async getAdminUsers() {
+    const rows = await authRepository.findAllAdminUsers();
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      isAdmin: normalizeBoolean(row.isAdmin, false),
+      isAllowed: normalizeBoolean(row.isAllowed, false),
+      createdAt: row.createdAt,
+    }));
+  }
+
+  async approveUser(rawUserId: unknown) {
+    const userId = Number(rawUserId);
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      throw new HttpError(400, '유효한 사용자 ID가 필요합니다.');
+    }
+
+    const user = await authRepository.findUserApprovalById(userId);
+    if (!user) {
+      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
+    }
+
+    await authRepository.approveUserById(userId);
+
+    return {
+      message: 'approved',
+      userId,
+    };
   }
 
   async refreshSession(payload: RefreshSessionDTO) {
