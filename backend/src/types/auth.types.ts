@@ -96,6 +96,11 @@ export interface GoogleAuthDTO {
   token?: string;
 }
 
+export interface KakaoAuthDTO {
+  code?: string;
+  redirectUri?: string;
+}
+
 export interface RefreshSessionDTO {
   refreshToken?: unknown;
 }

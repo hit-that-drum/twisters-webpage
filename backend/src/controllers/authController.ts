@@ -3,6 +3,7 @@ import passport from '../config/passport.js';
 import { authService } from '../services/authService.js';
 import { type AuthenticatedRequest } from '../types/common.types.js';
 import {
+  type KakaoAuthDTO,
   type GoogleAuthDTO,
   type LocalAuthUser,
   type RefreshSessionDTO,
@@ -114,6 +115,16 @@ export const googleAuth = async (req: Request, res: Response) => {
     return res.json(result);
   } catch (error) {
     return handleControllerError(res, error, '구글 인증 실패', 'Google auth error');
+  }
+};
+
+export const kakaoAuth = async (req: Request, res: Response) => {
+  try {
+    const payload = req.body as KakaoAuthDTO;
+    const result = await authService.kakaoAuth(payload);
+    return res.json(result);
+  } catch (error) {
+    return handleControllerError(res, error, '카카오 인증 실패', 'Kakao auth error');
   }
 };
 

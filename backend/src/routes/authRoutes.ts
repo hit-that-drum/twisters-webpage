@@ -17,6 +17,7 @@ router.post('/request-reset', authController.requestReset);
 router.post('/verify-reset-token', authController.verifyResetToken);
 router.post('/reset-password', authController.resetPassword);
 router.post('/auth/google', authController.googleAuth);
+router.post('/auth/kakao', authController.kakaoAuth);
 router.get(
   '/admin/pending-users',
   passport.authenticate('jwt', { session: false }),

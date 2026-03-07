@@ -31,6 +31,7 @@ export default function AppRouter() {
         <Route path="/" element={<RootRedirect />} />
         <Route path="/signup" element={<Login isLogin={false} />} />
         <Route path="/signin" element={<Login isLogin />} />
+        <Route path="/auth/kakao/callback" element={<Login isLogin />} />
 
         <Route element={<AppLayout />}>
           <Route path="/:userId" element={<Home />} />
