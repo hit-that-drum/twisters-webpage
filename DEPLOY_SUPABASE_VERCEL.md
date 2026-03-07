@@ -47,6 +47,9 @@ Deploy the `backend` directory as a separate Vercel project.
 - `JWT_SECRET`
 - `FRONTEND_BASE_URL` (your deployed frontend URL)
 - `VITE_GOOGLE_CLIENT_ID` (if Google login is enabled)
+- `KAKAO_REST_API_KEY` (if Kakao login is enabled)
+- `KAKAO_CLIENT_SECRET` (recommended for Kakao code exchange)
+- `KAKAO_REDIRECT_URI` (backend Kakao redirect URI)
 - `DB_SSL=true` (default behavior is SSL enabled)
 
 #### Backend env validation checklist
@@ -55,6 +58,8 @@ Deploy the `backend` directory as a separate Vercel project.
 - `JWT_SECRET` is a new production-only random secret
 - `FRONTEND_BASE_URL` exactly matches frontend production URL (no trailing slash)
 - `VITE_GOOGLE_CLIENT_ID` matches Google OAuth web app config
+- `KAKAO_REST_API_KEY` matches Kakao Developers REST API key
+- `KAKAO_REDIRECT_URI` exactly matches Kakao Developers redirect URI entry
 - `DB_SSL` set to `true` on Vercel
 
 The backend uses:
@@ -80,11 +85,15 @@ Deploy the `frontend` directory as another Vercel project.
 
 - `VITE_API_BASE_URL=https://your-backend.vercel.app`
 - `VITE_GOOGLE_CLIENT_ID=...`
+- `VITE_KAKAO_REST_API_KEY=...`
+- `VITE_KAKAO_REDIRECT_URI=https://your-frontend.vercel.app/signin`
 
 #### Frontend env validation checklist
 
 - `VITE_API_BASE_URL` points to backend Vercel domain
 - `VITE_GOOGLE_CLIENT_ID` equals backend value and Google console value
+- `VITE_KAKAO_REST_API_KEY` equals Kakao REST API key
+- `VITE_KAKAO_REDIRECT_URI` equals Kakao Developers redirect URI value
 - Frontend and backend are both set to Production environment in Vercel
 
 ## 4) Release verification checklist

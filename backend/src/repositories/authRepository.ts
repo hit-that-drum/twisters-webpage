@@ -53,8 +53,42 @@ class AuthRepository {
     return result.rows[0] ?? null;
   }
 
-  async createGoogleUser(email: string, name: string, googleId: string) {
-    await pool.query('INSERT INTO users (email, name, google_id) VALUES ($1, $2, $3)', [email, name, googleId]);
+  async findApprovalUserByKakaoId(kakaoId: string) {
+    const result = await pool.query<ApprovalUserRow>(
+      'SELECT id, name, email, "isAllowed" FROM users WHERE kakao_id = $1 LIMIT 1',
+      [kakaoId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async createGoogleUser(email: string, name: string, googleId: string, profileImage: string | null) {
+    await pool.query(
+      'INSERT INTO users (email, name, google_id, "profileImage") VALUES ($1, $2, $3, $4)',
+      [email, name, googleId, profileImage],
+    );
+  }
+
+  async updateGoogleProfileByUserId(userId: number, googleId: string, profileImage: string | null) {
+    await pool.query('UPDATE users SET google_id = $2, "profileImage" = $3 WHERE id = $1', [
+      userId,
+      googleId,
+      profileImage,
+    ]);
+  }
+
+  async createKakaoUser(email: string, name: string, kakaoId: string, profileImage: string | null) {
+    await pool.query(
+      'INSERT INTO users (email, name, kakao_id, "profileImage") VALUES ($1, $2, $3, $4)',
+      [email, name, kakaoId, profileImage],
+    );
+  }
+
+  async updateKakaoProfileByUserId(userId: number, kakaoId: string, profileImage: string | null) {
+    await pool.query('UPDATE users SET kakao_id = $2, "profileImage" = $3 WHERE id = $1', [
+      userId,
+      kakaoId,
+      profileImage,
+    ]);
   }
 
   async findUserEmailByEmail(email: string) {

@@ -224,6 +224,8 @@ CREATE TABLE public.users (
     email character varying(100) NOT NULL,
     password character varying(255),
     google_id character varying(255),
+    kakao_id character varying(255),
+    "profileImage" character varying(512),
     "isAdmin" boolean DEFAULT false NOT NULL,
     "isAllowed" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp with time zone DEFAULT now() NOT NULL
