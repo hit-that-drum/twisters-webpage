@@ -1,227 +1,51 @@
 import { type Request, type Response } from 'express';
-import pool from '../db.js';
-
-interface AuthenticatedUser {
-  id: number;
-  name: string;
-  email: string;
-  isAdmin?: boolean | number | string;
-}
-
-type AuthenticatedRequest = Request & {
-  user?: AuthenticatedUser;
-};
-
-interface NoticeRow {
-  id: number;
-  title: string;
-  createUser: string;
-  createDate: Date;
-  updateUser: string;
-  updateDate: Date;
-  content: string;
-  pinned: boolean | number;
-}
-
-const parseNoticeId = (rawNoticeId?: string) => {
-  const noticeId = Number(rawNoticeId);
-  if (!Number.isInteger(noticeId) || noticeId <= 0) {
-    return null;
-  }
-
-  return noticeId;
-};
-
-const parsePinned = (rawPinned: unknown, defaultValue = false) => {
-  if (typeof rawPinned === 'boolean') {
-    return rawPinned;
-  }
-
-  if (typeof rawPinned === 'number') {
-    return rawPinned === 1;
-  }
-
-  if (typeof rawPinned === 'string') {
-    const normalized = rawPinned.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') {
-      return true;
-    }
-
-    if (normalized === 'false' || normalized === '0') {
-      return false;
-    }
-  }
-
-  return defaultValue;
-};
-
-const resolveAuditUser = (authenticatedUser: AuthenticatedUser) => {
-  const normalizedName = authenticatedUser.name?.trim();
-  if (normalizedName) {
-    return normalizedName;
-  }
-
-  return authenticatedUser.email;
-};
-
-const isAdminUser = (authenticatedUser: AuthenticatedUser) => {
-  const rawIsAdmin = authenticatedUser.isAdmin;
-
-  if (typeof rawIsAdmin === 'boolean') {
-    return rawIsAdmin;
-  }
-
-  if (typeof rawIsAdmin === 'number') {
-    return rawIsAdmin === 1;
-  }
-
-  if (typeof rawIsAdmin === 'string') {
-    const normalized = rawIsAdmin.trim().toLowerCase();
-    return normalized === '1' || normalized === 'true';
-  }
-
-  return false;
-};
+import { noticeService } from '../services/noticeService.js';
+import { type AuthenticatedRequest } from '../types/common.types.js';
+import { type CreateNoticeDTO, type UpdateNoticeDTO } from '../types/notice.types.js';
+import { handleControllerError } from '../utils/controllerErrorHandler.js';
 
 export const getNotices = async (_req: Request, res: Response) => {
   try {
-    const result = await pool.query<NoticeRow>(
-      'SELECT id, title, "createUser", "createDate", "updateUser", "updateDate", content, pinned FROM notice ORDER BY pinned DESC, "createDate" DESC',
-    );
-
-    return res.json(
-      result.rows.map((row: NoticeRow) => ({
-        ...row,
-        pinned: Boolean(row.pinned),
-      })),
-    );
+    const notices = await noticeService.getNotices();
+    return res.json(notices);
   } catch (error) {
-    console.error('Notice list fetch error:', error);
-    return res.status(500).json({ error: '공지사항 조회 중 오류가 발생했습니다.' });
+    return handleControllerError(res, error, '공지사항 조회 중 오류가 발생했습니다.', 'Notice list fetch error');
   }
 };
 
 export const createNotice = async (req: Request, res: Response) => {
-  const authenticatedUser = (req as AuthenticatedRequest).user;
-  const { title, content, pinned } = req.body as {
-    title?: string;
-    content?: string;
-    pinned?: unknown;
-  };
-
-  if (!authenticatedUser) {
-    return res.status(401).json({ error: '인증된 사용자 정보가 없습니다.' });
-  }
-
-  if (!isAdminUser(authenticatedUser)) {
-    return res.status(403).json({ error: '관리자만 공지사항을 등록할 수 있습니다.' });
-  }
-
-  if (!title || !content) {
-    return res.status(400).json({ error: '제목과 내용을 모두 입력해주세요.' });
-  }
-
-  const trimmedTitle = title.trim();
-  const trimmedContent = content.trim();
-
-  if (!trimmedTitle || !trimmedContent) {
-    return res.status(400).json({ error: '제목과 내용을 모두 입력해주세요.' });
-  }
-
   try {
-    const auditUser = resolveAuditUser(authenticatedUser);
-    const normalizedPinned = parsePinned(pinned, false);
-
-    await pool.query(
-      'INSERT INTO notice (title, "createUser", "updateUser", content, pinned) VALUES ($1, $2, $3, $4, $5)',
-      [trimmedTitle, auditUser, auditUser, trimmedContent, normalizedPinned],
-    );
-
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const payload = req.body as CreateNoticeDTO;
+    await noticeService.createNotice(authenticatedUser, payload);
     return res.status(201).json({ message: '공지사항이 등록되었습니다.' });
   } catch (error) {
-    console.error('Notice creation error:', error);
-    return res.status(500).json({ error: '공지사항 등록 중 오류가 발생했습니다.' });
+    return handleControllerError(
+      res,
+      error,
+      '공지사항 등록 중 오류가 발생했습니다.',
+      'Notice creation error',
+    );
   }
 };
 
 export const updateNotice = async (req: Request, res: Response) => {
-  const authenticatedUser = (req as AuthenticatedRequest).user;
-  const parsedNoticeId = parseNoticeId(req.params.id);
-  const { title, content, pinned } = req.body as {
-    title?: string;
-    content?: string;
-    pinned?: unknown;
-  };
-
-  if (!authenticatedUser) {
-    return res.status(401).json({ error: '인증된 사용자 정보가 없습니다.' });
-  }
-
-  if (!isAdminUser(authenticatedUser)) {
-    return res.status(403).json({ error: '관리자만 공지사항을 수정할 수 있습니다.' });
-  }
-
-  if (!parsedNoticeId) {
-    return res.status(400).json({ error: '유효한 공지사항 ID가 필요합니다.' });
-  }
-
-  if (!title || !content) {
-    return res.status(400).json({ error: '제목과 내용을 모두 입력해주세요.' });
-  }
-
-  const trimmedTitle = title.trim();
-  const trimmedContent = content.trim();
-
-  if (!trimmedTitle || !trimmedContent) {
-    return res.status(400).json({ error: '제목과 내용을 모두 입력해주세요.' });
-  }
-
   try {
-    const auditUser = resolveAuditUser(authenticatedUser);
-    const normalizedPinned = parsePinned(pinned, false);
-
-    const result = await pool.query(
-      'UPDATE notice SET title = $1, "updateUser" = $2, content = $3, pinned = $4 WHERE id = $5',
-      [trimmedTitle, auditUser, trimmedContent, normalizedPinned, parsedNoticeId],
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: '해당 공지사항을 찾을 수 없습니다.' });
-    }
-
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const payload = req.body as UpdateNoticeDTO;
+    await noticeService.updateNotice(authenticatedUser, req.params.id, payload);
     return res.json({ message: '공지사항이 수정되었습니다.' });
   } catch (error) {
-    console.error('Notice update error:', error);
-    return res.status(500).json({ error: '공지사항 수정 중 오류가 발생했습니다.' });
+    return handleControllerError(res, error, '공지사항 수정 중 오류가 발생했습니다.', 'Notice update error');
   }
 };
 
 export const deleteNotice = async (req: Request, res: Response) => {
-  const authenticatedUser = (req as AuthenticatedRequest).user;
-  const parsedNoticeId = parseNoticeId(req.params.id);
-
-  if (!authenticatedUser) {
-    return res.status(401).json({ error: '인증된 사용자 정보가 없습니다.' });
-  }
-
-  if (!isAdminUser(authenticatedUser)) {
-    return res.status(403).json({ error: '관리자만 공지사항을 삭제할 수 있습니다.' });
-  }
-
-  if (!parsedNoticeId) {
-    return res.status(400).json({ error: '유효한 공지사항 ID가 필요합니다.' });
-  }
-
   try {
-    const result = await pool.query('DELETE FROM notice WHERE id = $1', [parsedNoticeId]);
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: '해당 공지사항을 찾을 수 없습니다.' });
-    }
-
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    await noticeService.deleteNotice(authenticatedUser, req.params.id);
     return res.json({ message: '공지사항이 삭제되었습니다.' });
   } catch (error) {
-    console.error('Notice delete error:', error);
-    return res.status(500).json({ error: '공지사항 삭제 중 오류가 발생했습니다.' });
+    return handleControllerError(res, error, '공지사항 삭제 중 오류가 발생했습니다.', 'Notice delete error');
   }
 };

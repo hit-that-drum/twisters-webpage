@@ -1,0 +1,298 @@
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
+import { HttpError } from '../errors/httpError.js';
+import { authRepository } from '../repositories/authRepository.js';
+import {
+  createSessionAuthResponse,
+  refreshSessionAuthResponse,
+  revokeSessionById,
+  touchSessionActivity,
+} from '../sessionService.js';
+import { type AuthenticatedUser } from '../types/common.types.js';
+import {
+  type GoogleAuthDTO,
+  type LocalAuthUser,
+  type MeUser,
+  type RefreshSessionDTO,
+  type RequestResetDTO,
+  type ResetPasswordDTO,
+  type SignUpDTO,
+  type VerifyResetTokenDTO,
+} from '../types/auth.types.js';
+
+const SALT_ROUNDS = 10;
+const RESET_TOKEN_TTL_MINUTES = 30;
+const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || 'http://localhost:5173';
+const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID;
+const oauth2Client = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+const requireAuthenticatedUser = (authenticatedUser: AuthenticatedUser | undefined) => {
+  if (!authenticatedUser) {
+    throw new HttpError(401, '인증된 사용자 정보가 없습니다.');
+  }
+
+  return authenticatedUser;
+};
+
+const requirePasswordResetLookup = (
+  lookup: {
+    id: number;
+    user_id: number;
+    expires_at: Date;
+    used_at: Date | null;
+    email: string;
+  } | null,
+  normalizedEmail: string,
+) => {
+  if (!lookup) {
+    throw new HttpError(400, '유효하지 않은 비밀번호 재설정 토큰입니다.');
+  }
+
+  if (lookup.used_at) {
+    throw new HttpError(400, '이미 사용된 비밀번호 재설정 토큰입니다.');
+  }
+
+  if (new Date(lookup.expires_at).getTime() < Date.now()) {
+    throw new HttpError(400, '만료된 비밀번호 재설정 토큰입니다.');
+  }
+
+  if (lookup.email.toLowerCase() !== normalizedEmail) {
+    throw new HttpError(400, '토큰과 이메일이 일치하지 않습니다.');
+  }
+
+  return lookup;
+};
+
+class AuthService {
+  async createSignInSession(user: LocalAuthUser, rememberMe: boolean) {
+    return createSessionAuthResponse(user, 'Logged in successfully!', rememberMe);
+  }
+
+  async signUp(payload: SignUpDTO) {
+    const name = payload.name?.trim();
+    const email = payload.email?.trim().toLowerCase();
+    const password = payload.password;
+
+    if (!name || !email || !password) {
+      throw new HttpError(400, '모든 필드를 입력해주세요.');
+    }
+
+    try {
+      const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+      const userId = await authRepository.createUser(name, email, hashedPassword);
+
+      if (!userId) {
+        throw new HttpError(500, '회원가입 처리 중 사용자 ID를 확인하지 못했습니다.');
+      }
+
+      return createSessionAuthResponse(
+        { id: userId, name, email },
+        '회원가입 성공!',
+        true,
+      );
+    } catch (error: unknown) {
+      const pgError = error as { code?: string };
+      if (pgError.code === '23505') {
+        throw new HttpError(400, '이미 사용 중인 이메일입니다.');
+      }
+
+      throw error;
+    }
+  }
+
+  async getMe(authenticatedUser: AuthenticatedUser | undefined): Promise<MeUser> {
+    const currentUser = requireAuthenticatedUser(authenticatedUser);
+    const me = await authRepository.findMeById(currentUser.id);
+
+    if (!me) {
+      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
+    }
+
+    return {
+      id: me.id,
+      name: me.name,
+      email: me.email,
+      isAdmin: Boolean(me.isAdmin),
+    };
+  }
+
+  async getUsers(authenticatedUser: AuthenticatedUser | undefined, rawUserId: unknown) {
+    const currentUser = requireAuthenticatedUser(authenticatedUser);
+
+    if (rawUserId) {
+      const requestedUserId = Number(rawUserId);
+      if (!Number.isInteger(requestedUserId)) {
+        throw new HttpError(400, '유효한 userId가 필요합니다.');
+      }
+
+      if (requestedUserId !== currentUser.id) {
+        throw new HttpError(403, '본인 정보만 조회할 수 있습니다.');
+      }
+
+      const user = await authRepository.findPublicUserById(requestedUserId);
+      if (!user) {
+        throw new HttpError(404, '해당 ID의 사용자를 찾을 수 없습니다.');
+      }
+
+      return user;
+    }
+
+    return authRepository.findAllPublicUsers();
+  }
+
+  async resetPassword(payload: ResetPasswordDTO) {
+    const { email, newPassword, token } = payload;
+
+    if (!email || !newPassword || !token) {
+      throw new HttpError(400, '이메일, 새 비밀번호, 토큰을 모두 입력해주세요.');
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const lookup = await authRepository.findPasswordResetLookupByTokenHash(tokenHash);
+    const resetLookup = requirePasswordResetLookup(lookup, normalizedEmail);
+
+    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    const resetResult = await authRepository.resetPasswordByToken(
+      resetLookup.id,
+      resetLookup.user_id,
+      hashedPassword,
+    );
+
+    if (resetResult === 'already_used') {
+      throw new HttpError(400, '이미 사용된 비밀번호 재설정 토큰입니다.');
+    }
+
+    if (resetResult === 'user_not_found') {
+      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
+    }
+
+    return { message: '비밀번호가 성공적으로 변경되었습니다.' };
+  }
+
+  async requestReset(payload: RequestResetDTO) {
+    const { email } = payload;
+
+    if (!email) {
+      throw new HttpError(400, '이메일을 입력해주세요.');
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await authRepository.findUserEmailByEmail(normalizedEmail);
+    const genericMessage = '입력한 이메일로 비밀번호 재설정 링크를 전송했습니다.';
+
+    if (!user) {
+      return { message: genericMessage };
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    await authRepository.markUnusedResetTokensAsUsed(user.id);
+    await authRepository.createPasswordResetToken(user.id, tokenHash, RESET_TOKEN_TTL_MINUTES);
+
+    const resetLink = `${FRONTEND_BASE_URL.replace(/\/+$/, '')}/signin?resetToken=${encodeURIComponent(rawToken)}&email=${encodeURIComponent(normalizedEmail)}`;
+
+    if (process.env.NODE_ENV === 'production') {
+      return { message: genericMessage };
+    }
+
+    return { message: genericMessage, devResetLink: resetLink };
+  }
+
+  async verifyResetToken(payload: VerifyResetTokenDTO) {
+    const { email, token } = payload;
+
+    if (!email || !token) {
+      throw new HttpError(400, '이메일과 토큰을 입력해주세요.');
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const lookup = await authRepository.findPasswordResetLookupByTokenHash(tokenHash);
+
+    requirePasswordResetLookup(lookup, normalizedEmail);
+    return { message: '유효한 비밀번호 재설정 토큰입니다.' };
+  }
+
+  async googleAuth(payload: GoogleAuthDTO) {
+    const token = payload.token;
+
+    if (!token) {
+      throw new HttpError(400, '구글 토큰이 필요합니다.');
+    }
+
+    const ticket = await oauth2Client.verifyIdToken({
+      idToken: token,
+      audience: GOOGLE_CLIENT_ID as string,
+    });
+
+    const ticketPayload = ticket.getPayload();
+
+    if (!ticketPayload) {
+      throw new HttpError(400, '잘못된 토큰입니다.');
+    }
+
+    const { email, name, sub: googleId } = ticketPayload;
+    if (!email || !name || !googleId) {
+      throw new HttpError(400, '구글 사용자 정보를 가져오지 못했습니다.');
+    }
+
+    const normalizedEmail = email.toLowerCase();
+    let user = await authRepository.findPublicUserByEmail(normalizedEmail);
+
+    if (!user) {
+      await authRepository.createGoogleUser(normalizedEmail, name, googleId);
+      user = await authRepository.findPublicUserByEmail(normalizedEmail);
+    }
+
+    if (!user) {
+      throw new HttpError(500, '구글 로그인 사용자 생성에 실패했습니다.');
+    }
+
+    return createSessionAuthResponse(user, '구글 로그인 성공', true);
+  }
+
+  async refreshSession(payload: RefreshSessionDTO) {
+    const refreshToken = payload.refreshToken;
+
+    if (typeof refreshToken !== 'string' || !refreshToken.trim()) {
+      throw new HttpError(400, 'refreshToken이 필요합니다.');
+    }
+
+    const refreshedAuth = await refreshSessionAuthResponse(refreshToken.trim());
+    if (!refreshedAuth) {
+      throw new HttpError(401, '세션이 만료되었습니다. 다시 로그인해주세요.');
+    }
+
+    return refreshedAuth;
+  }
+
+  async heartbeat(authenticatedUser: AuthenticatedUser | undefined) {
+    const currentUser = requireAuthenticatedUser(authenticatedUser);
+    const sessionId = currentUser.sessionId;
+
+    if (typeof sessionId !== 'number') {
+      throw new HttpError(401, '인증된 세션 정보가 없습니다.');
+    }
+
+    await touchSessionActivity(sessionId, true);
+    return { message: '세션 활동 시간이 갱신되었습니다.' };
+  }
+
+  async logout(authenticatedUser: AuthenticatedUser | undefined) {
+    const currentUser = requireAuthenticatedUser(authenticatedUser);
+    const sessionId = currentUser.sessionId;
+
+    if (typeof sessionId !== 'number') {
+      throw new HttpError(401, '인증된 세션 정보가 없습니다.');
+    }
+
+    await revokeSessionById(sessionId);
+    return { message: '로그아웃되었습니다.' };
+  }
+}
+
+export const authService = new AuthService();

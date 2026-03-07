@@ -1,0 +1,67 @@
+export interface LocalAuthUser {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export interface SignUpDTO {
+  name?: string;
+  email?: string;
+  password?: string;
+}
+
+export interface MeUser {
+  id: number;
+  name: string;
+  email: string;
+  isAdmin: boolean;
+}
+
+export interface PublicUserRow {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export interface MeUserRow {
+  id: number;
+  name: string;
+  email: string;
+  isAdmin: boolean | number;
+}
+
+export interface UserEmailRow {
+  id: number;
+  email: string;
+}
+
+export interface PasswordResetLookupRow {
+  id: number;
+  user_id: number;
+  expires_at: Date;
+  used_at: Date | null;
+  email: string;
+}
+
+export interface ResetPasswordDTO {
+  email?: string;
+  newPassword?: string;
+  token?: string;
+}
+
+export interface RequestResetDTO {
+  email?: string;
+}
+
+export interface VerifyResetTokenDTO {
+  email?: string;
+  token?: string;
+}
+
+export interface GoogleAuthDTO {
+  token?: string;
+}
+
+export interface RefreshSessionDTO {
+  refreshToken?: unknown;
+}
