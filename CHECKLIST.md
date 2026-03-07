@@ -34,7 +34,7 @@
 - **(2026.03.07)**
   - ✅ 유저가 signup을 했을 때 바로 가입이 되는 게 아니라 허가하면 가입을 할 수 있게 변경
   - ✅ singup 로직 변경하며 데이터베이스 구조에도 변경이 들어가야 함 (isAllowed 같은 column 추가)
-- ☑️✅ Google OAuth 로그인
+  - ✅ Google OAuth 로그인
 - ☑️✅ KakaoTalk OAuth 로그인
 - 배포 이후
   - ☑️✅ 이메일 인증
