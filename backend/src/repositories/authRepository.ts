@@ -1,8 +1,12 @@
 import pool from '../db.js';
 import {
+  type AdminUserRow,
+  type ApprovalUserRow,
   type MeUserRow,
   type PasswordResetLookupRow,
+  type PendingUserRow,
   type PublicUserRow,
+  type UserApprovalRow,
   type UserEmailRow,
 } from '../types/auth.types.js';
 
@@ -41,6 +45,14 @@ class AuthRepository {
     return result.rows[0] ?? null;
   }
 
+  async findApprovalUserByEmail(email: string) {
+    const result = await pool.query<ApprovalUserRow>(
+      'SELECT id, name, email, "isAllowed" FROM users WHERE email = $1 LIMIT 1',
+      [email],
+    );
+    return result.rows[0] ?? null;
+  }
+
   async createGoogleUser(email: string, name: string, googleId: string) {
     await pool.query('INSERT INTO users (email, name, google_id) VALUES ($1, $2, $3)', [email, name, googleId]);
   }
@@ -48,6 +60,32 @@ class AuthRepository {
   async findUserEmailByEmail(email: string) {
     const result = await pool.query<UserEmailRow>('SELECT id, email FROM users WHERE email = $1 LIMIT 1', [email]);
     return result.rows[0] ?? null;
+  }
+
+  async findPendingUsers() {
+    const result = await pool.query<PendingUserRow>(
+      'SELECT id, name, email, "createdAt" FROM users WHERE "isAllowed" = FALSE ORDER BY "createdAt" ASC, id ASC',
+    );
+    return result.rows;
+  }
+
+  async findAllAdminUsers() {
+    const result = await pool.query<AdminUserRow>(
+      'SELECT id, name, email, "isAdmin", "isAllowed", "createdAt" FROM users ORDER BY "createdAt" DESC, id DESC',
+    );
+    return result.rows;
+  }
+
+  async findUserApprovalById(userId: number) {
+    const result = await pool.query<UserApprovalRow>('SELECT id, "isAllowed" FROM users WHERE id = $1 LIMIT 1', [
+      userId,
+    ]);
+    return result.rows[0] ?? null;
+  }
+
+  async approveUserById(userId: number) {
+    const result = await pool.query('UPDATE users SET "isAllowed" = TRUE WHERE id = $1', [userId]);
+    return (result.rowCount ?? 0) > 0;
   }
 
   async markUnusedResetTokensAsUsed(userId: number) {

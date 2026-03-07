@@ -40,7 +40,7 @@ export default function AppRouter() {
           <Route path="/settlement" element={<Settlement />} />
           <Route path="/board" element={<Board />} />
           <Route path="/mypage" element={<MyPage />} />
-          <Route path="/adminpage" element={<AdminPage />} />
+          <Route path="/admin" element={<AdminPage />} />
         </Route>
       </Routes>
     </Router>

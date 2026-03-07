@@ -25,7 +25,7 @@ export const signIn = async (req: Request, res: Response, next: NextFunction) =>
     { session: false },
     async (err: Error | null, user: LocalAuthUser | false, info: LocalAuthInfo) => {
       if (err) {
-        return res.status(500).json({ error: err.message });
+        return handleControllerError(res, err, '로그인 중 오류가 발생했습니다.', 'Sign in error');
       }
 
       if (!user) {
@@ -144,5 +144,42 @@ export const logout = async (req: Request, res: Response) => {
     return res.json(result);
   } catch (error) {
     return handleControllerError(res, error, '로그아웃 처리 중 오류가 발생했습니다.', 'Logout error');
+  }
+};
+
+export const getPendingUsers = async (_req: Request, res: Response) => {
+  try {
+    const pendingUsers = await authService.getPendingUsers();
+    return res.json(pendingUsers);
+  } catch (error) {
+    return handleControllerError(
+      res,
+      error,
+      '승인 대기 사용자 조회 중 오류가 발생했습니다.',
+      'Pending users fetch error',
+    );
+  }
+};
+
+export const getAdminUsers = async (_req: Request, res: Response) => {
+  try {
+    const users = await authService.getAdminUsers();
+    return res.json(users);
+  } catch (error) {
+    return handleControllerError(
+      res,
+      error,
+      '전체 사용자 조회 중 오류가 발생했습니다.',
+      'Admin users fetch error',
+    );
+  }
+};
+
+export const approveUser = async (req: Request, res: Response) => {
+  try {
+    const result = await authService.approveUser(req.params.id);
+    return res.json(result);
+  } catch (error) {
+    return handleControllerError(res, error, '사용자 승인 처리 중 오류가 발생했습니다.', 'User approve error');
   }
 };
