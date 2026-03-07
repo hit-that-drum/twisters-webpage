@@ -2,12 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 // import { FcGoogle } from 'react-icons/fc';
 // import { SiKakaotalk } from 'react-icons/si';
-import loginPageRightImage from '../../public/login_page_right_image.png';
+import loginPageRightImage from '/login_page_right_image.png';
 import { Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
-import { apiFetch } from '../utils/api';
-import { clearAccessToken, getAccessToken, setAccessToken, setAuthTokens } from '../utils/authStorage';
-import { useAuth } from '../contexts/AuthContext';
+import { apiFetch } from '@/common/lib/api/apiClient';
+import {
+  clearAccessToken,
+  getAccessToken,
+  setAccessToken,
+  setAuthTokens,
+} from '@/common/lib/auth/authStorage';
+import { useAuth } from '@/features';
 
 const WRONG_PASSWORD_ATTEMPTS_KEY = 'wrongPasswordAttemptsByEmail';
 const MAX_WRONG_PASSWORD_ATTEMPTS = 5;
@@ -67,7 +72,7 @@ const getWrongPasswordAttempt = (email: string) => {
   return attempts[email] || 0;
 };
 
-export const Login = ({ isLogin }: { isLogin: boolean }) => {
+export default function Login({ isLogin }: { isLogin: boolean }) {
   const navigate = useNavigate();
   const { refreshMeInfo } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -94,8 +99,8 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
     wrongPasswordAttemptCount >= MAX_WRONG_PASSWORD_ATTEMPTS - 1
       ? 'text-red-700'
       : wrongPasswordAttemptCount >= 3
-      ? 'text-amber-700'
-      : 'text-emerald-700';
+        ? 'text-amber-700'
+        : 'text-emerald-700';
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -622,4 +627,4 @@ export const Login = ({ isLogin }: { isLogin: boolean }) => {
       </Dialog>
     </>
   );
-};
+}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import LNB from './LNB';
+import LNB from '@/common/components/LNB';
 
 export default function Header({ handleLogout }: { handleLogout: () => void }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

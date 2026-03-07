@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { apiFetch } from '../utils/api';
-import { clearAccessToken } from '../utils/authStorage';
-import { type MeInfo, useAuth } from '../contexts/AuthContext';
+import { type MeInfo } from '@/entities/user/types';
+import { useAuth } from '@/features';
+import { apiFetch } from '@/common/lib/api/apiClient';
+import { clearAccessToken } from '@/common/lib/auth/authStorage';
 
 export default function Home() {
   const navigate = useNavigate();

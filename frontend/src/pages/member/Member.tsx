@@ -11,9 +11,9 @@ import {
   TextField,
 } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
-import SubLNB from '../components/SubLNB';
-import { useAuth } from '../contexts/AuthContext';
-import { apiFetch } from '../utils/api';
+import SubLNB from '@/common/components/SubLNB';
+import { useAuth } from '@/features';
+import { apiFetch } from '@/common/lib/api/apiClient';
 
 interface MemberUser {
   id: number;
@@ -235,8 +235,12 @@ export default function Member() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [addMemberForm, setAddMemberForm] = useState<MemberFormState>(() => createDefaultMemberForm());
-  const [editMemberForm, setEditMemberForm] = useState<MemberFormState>(() => createDefaultMemberForm());
+  const [addMemberForm, setAddMemberForm] = useState<MemberFormState>(() =>
+    createDefaultMemberForm(),
+  );
+  const [editMemberForm, setEditMemberForm] = useState<MemberFormState>(() =>
+    createDefaultMemberForm(),
+  );
   const [duesYears, setDuesYears] = useState<number[]>([]);
   const [duesStatusByMemberId, setDuesStatusByMemberId] = useState<
     Record<number, Record<number, boolean>>
@@ -263,9 +267,12 @@ export default function Member() {
           return;
         }
 
-        enqueueSnackbar(`회원 목록을 불러오지 못했습니다: ${getApiMessage(payload, '알 수 없는 에러')}`, {
-          variant: 'error',
-        });
+        enqueueSnackbar(
+          `회원 목록을 불러오지 못했습니다: ${getApiMessage(payload, '알 수 없는 에러')}`,
+          {
+            variant: 'error',
+          },
+        );
         setUsers([]);
         setSelectedUserId(null);
         return;
@@ -498,7 +505,9 @@ export default function Member() {
         return;
       }
 
-      enqueueSnackbar(getApiMessage(payload, '회원 정보가 수정되었습니다.'), { variant: 'success' });
+      enqueueSnackbar(getApiMessage(payload, '회원 정보가 수정되었습니다.'), {
+        variant: 'success',
+      });
       setOpenEditDialog(false);
       await Promise.all([loadMembers(), loadMemberDuesStatus()]);
     } catch (error) {
@@ -603,7 +612,9 @@ export default function Member() {
             <div className="space-y-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Name</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Name
+                  </p>
                   <p className="mt-1 text-xl font-bold text-gray-900">{selectedUser.name}</p>
                 </div>
 
@@ -616,38 +627,64 @@ export default function Member() {
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Email</p>
-                  <p className="mt-1 text-base text-gray-700">{renderDetailValue(selectedUser.email)}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Email
+                  </p>
+                  <p className="mt-1 text-base text-gray-700">
+                    {renderDetailValue(selectedUser.email)}
+                  </p>
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Admin</p>
-                  <p className="mt-1 text-base text-gray-700">{selectedUser.isAdmin ? 'Yes' : 'No'}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Admin
+                  </p>
+                  <p className="mt-1 text-base text-gray-700">
+                    {selectedUser.isAdmin ? 'Yes' : 'No'}
+                  </p>
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Phone</p>
-                  <p className="mt-1 text-base text-gray-700">{renderDetailValue(selectedUser.phone)}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Phone
+                  </p>
+                  <p className="mt-1 text-base text-gray-700">
+                    {renderDetailValue(selectedUser.phone)}
+                  </p>
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Joined At</p>
-                  <p className="mt-1 text-base text-gray-700">{renderDetailValue(selectedUser.joinedAt)}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Joined At
+                  </p>
+                  <p className="mt-1 text-base text-gray-700">
+                    {renderDetailValue(selectedUser.joinedAt)}
+                  </p>
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Role</p>
-                  <p className="mt-1 text-base text-gray-700">{renderDetailValue(selectedUser.role)}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Role
+                  </p>
+                  <p className="mt-1 text-base text-gray-700">
+                    {renderDetailValue(selectedUser.role)}
+                  </p>
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Department</p>
-                  <p className="mt-1 text-base text-gray-700">{renderDetailValue(selectedUser.department)}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Department
+                  </p>
+                  <p className="mt-1 text-base text-gray-700">
+                    {renderDetailValue(selectedUser.department)}
+                  </p>
                 </div>
               </div>
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">회비 입금 여부</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  회비 입금 여부
+                </p>
                 <div className="mt-2 overflow-hidden rounded-lg border border-gray-200">
                   {duesYears.length > 0 ? (
                     duesYears.map((year) => {
@@ -693,7 +730,14 @@ export default function Member() {
       <Dialog open={openAddDialog} onClose={handleCloseAddDialog} fullWidth maxWidth="sm">
         <DialogTitle>Add Member</DialogTitle>
         <DialogContent>
-          <TextField margin="dense" label="Name" name="name" fullWidth value={addMemberForm.name} onChange={handleChangeAddForm} />
+          <TextField
+            margin="dense"
+            label="Name"
+            name="name"
+            fullWidth
+            value={addMemberForm.name}
+            onChange={handleChangeAddForm}
+          />
           <TextField
             margin="dense"
             label="Email (Optional)"
@@ -717,8 +761,22 @@ export default function Member() {
             }
             label="Admin Member"
           />
-          <TextField margin="dense" label="Phone" name="phone" fullWidth value={addMemberForm.phone} onChange={handleChangeAddForm} />
-          <TextField margin="dense" label="Role" name="role" fullWidth value={addMemberForm.role} onChange={handleChangeAddForm} />
+          <TextField
+            margin="dense"
+            label="Phone"
+            name="phone"
+            fullWidth
+            value={addMemberForm.phone}
+            onChange={handleChangeAddForm}
+          />
+          <TextField
+            margin="dense"
+            label="Role"
+            name="role"
+            fullWidth
+            value={addMemberForm.role}
+            onChange={handleChangeAddForm}
+          />
           <TextField
             margin="dense"
             label="Department"
@@ -752,7 +810,11 @@ export default function Member() {
           <Button onClick={handleCloseAddDialog} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button onClick={() => void handleCreateMember()} variant="contained" disabled={isSubmitting}>
+          <Button
+            onClick={() => void handleCreateMember()}
+            variant="contained"
+            disabled={isSubmitting}
+          >
             {isSubmitting ? 'Saving...' : 'Save'}
           </Button>
         </DialogActions>
@@ -844,7 +906,11 @@ export default function Member() {
           <Button onClick={handleCloseEditDialog} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button onClick={() => void handleUpdateMember()} variant="contained" disabled={isSubmitting}>
+          <Button
+            onClick={() => void handleUpdateMember()}
+            variant="contained"
+            disabled={isSubmitting}
+          >
             {isSubmitting ? 'Updating...' : 'Update'}
           </Button>
         </DialogActions>

@@ -16,8 +16,8 @@ import {
   Typography,
 } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
-import { apiFetch } from '../utils/api';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/features';
+import { apiFetch } from '@/common/lib/api/apiClient';
 
 interface NoticeItem {
   id: number;

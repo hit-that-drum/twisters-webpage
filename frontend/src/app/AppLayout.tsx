@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { Navigate, Outlet, useNavigate } from 'react-router-dom';
-import Footer from './Footer';
-import Header from './Header';
-import { useAuth } from '../contexts/AuthContext';
-import { getAccessToken } from '../utils/authStorage';
+import Footer from '@/common/components/Footer';
+import Header from '@/common/components/Header';
+import { useAuth } from '@/features';
+import { getAccessToken } from '@/common/lib/auth/authStorage';
 
 export default function AppLayout() {
   const navigate = useNavigate();
@@ -24,7 +24,9 @@ export default function AppLayout() {
   if (isAuthLoading || (accessToken && !isAuthenticated)) {
     return (
       <div className="px-6 py-8">
-        <p className="text-sm font-semibold tracking-wide text-gray-600">Checking your session...</p>
+        <p className="text-sm font-semibold tracking-wide text-gray-600">
+          Checking your session...
+        </p>
       </div>
     );
   }

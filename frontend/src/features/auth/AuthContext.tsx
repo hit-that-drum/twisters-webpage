@@ -1,19 +1,5 @@
 import { createContext, useContext } from 'react';
-
-export interface MeInfo {
-  id: number;
-  name: string;
-  email: string;
-  isAdmin: boolean;
-}
-
-export interface AuthContextValue {
-  meInfo: MeInfo | null;
-  isAuthLoading: boolean;
-  isAuthenticated: boolean;
-  refreshMeInfo: () => Promise<MeInfo | null>;
-  logout: () => void;
-}
+import { type AuthContextValue } from './types';
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 

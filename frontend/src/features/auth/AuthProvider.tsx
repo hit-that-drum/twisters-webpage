@@ -1,13 +1,9 @@
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import { apiFetch } from '../utils/api';
-import { clearAccessToken, getAccessToken } from '../utils/authStorage';
-import { AuthContext, type AuthContextValue, type MeInfo } from './AuthContext';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { apiFetch } from '@/common/lib/api/apiClient';
+import { clearAccessToken, getAccessToken } from '@/common/lib/auth/authStorage';
+import { type MeInfo } from '@/entities/user/types';
+import { type AuthContextValue } from './types';
+import { AuthContext } from './AuthContext';
 
 const parseMeInfo = (payload: unknown): MeInfo | null => {
   if (!payload || typeof payload !== 'object') {
@@ -111,9 +107,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const heartbeatInterval = window.setInterval(() => {
-      void sendHeartbeat();
-    }, 5 * 60 * 1000);
+    const heartbeatInterval = window.setInterval(
+      () => {
+        void sendHeartbeat();
+      },
+      5 * 60 * 1000,
+    );
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {

@@ -22,8 +22,8 @@ import {
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { enqueueSnackbar } from 'notistack';
-import { useAuth } from '../contexts/AuthContext';
-import { apiFetch } from '../utils/api';
+import { useAuth } from '@/features';
+import { apiFetch } from '@/common/lib/api/apiClient';
 
 interface SettlementRecord {
   id: number;
@@ -680,8 +680,8 @@ export default function Settlement() {
             typeof record.amount === 'number'
               ? record.amount
               : typeof record.amount === 'string'
-              ? Number(record.amount)
-              : NaN;
+                ? Number(record.amount)
+                : NaN;
 
           if (
             typeof record.id !== 'number' ||

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/features';
 
 interface LnbMenuItem {
   to: string;
@@ -16,6 +16,7 @@ export default function LNB({ onNavigate }: { onNavigate?: () => void }) {
     { to: '/member', label: '👥 Member' },
     { to: '/notice', label: '📢 Notice' },
     { to: '/settlement', label: '💰 Settlement' },
+    { to: '/board', label: '🎲 Board' },
     { to: '/mypage', label: '📝 My Page' },
     { to: '/admin', label: '👑 Admin', adminOnly: true },
   ];

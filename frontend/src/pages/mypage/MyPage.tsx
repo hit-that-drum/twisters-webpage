@@ -1,4 +1,4 @@
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/features';
 
 export default function Mypage() {
   const { meInfo } = useAuth();
