@@ -259,17 +259,20 @@ class AuthService {
       throw new HttpError(400, '잘못된 토큰입니다.');
     }
 
-    const { email, name, sub: googleId } = ticketPayload;
+    const { email, name, picture, sub: googleId } = ticketPayload;
     if (!email || !name || !googleId) {
       throw new HttpError(400, '구글 사용자 정보를 가져오지 못했습니다.');
     }
 
     const normalizedEmail = email.toLowerCase();
+    const profileImage = typeof picture === 'string' && picture.trim() ? picture.trim() : null;
     let user = await authRepository.findApprovalUserByEmail(normalizedEmail);
 
     if (!user) {
-      await authRepository.createGoogleUser(normalizedEmail, name, googleId);
+      await authRepository.createGoogleUser(normalizedEmail, name, googleId, profileImage);
       user = await authRepository.findApprovalUserByEmail(normalizedEmail);
+    } else {
+      await authRepository.updateGoogleProfileByUserId(user.id, googleId, profileImage);
     }
 
     if (!user) {

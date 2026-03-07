@@ -11,15 +11,21 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 applyTwisterThemeCssVariables();
 
 export function AppProviders({ children }: { children: ReactNode }) {
+  const appContent = (
+    <SnackbarProvider maxSnack={3} autoHideDuration={3000}>
+      <AuthProvider>{children}</AuthProvider>
+    </SnackbarProvider>
+  );
+
   return (
     <StyledEngineProvider injectFirst>
       <ThemeProvider theme={twisterMuiTheme}>
         <CssBaseline />
-        <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-          <SnackbarProvider maxSnack={3} autoHideDuration={3000}>
-            <AuthProvider>{children}</AuthProvider>
-          </SnackbarProvider>
-        </GoogleOAuthProvider>
+        {GOOGLE_CLIENT_ID ? (
+          <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>{appContent}</GoogleOAuthProvider>
+        ) : (
+          appContent
+        )}
       </ThemeProvider>
     </StyledEngineProvider>
   );

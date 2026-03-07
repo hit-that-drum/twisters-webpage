@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-// import { FcGoogle } from 'react-icons/fc';
-// import { SiKakaotalk } from 'react-icons/si';
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import loginPageRightImage from '/login_page_right_image.png';
 import { Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
@@ -18,6 +17,29 @@ const WRONG_PASSWORD_ATTEMPTS_KEY = 'wrongPasswordAttemptsByEmail';
 const MAX_WRONG_PASSWORD_ATTEMPTS = 5;
 
 type WrongPasswordAttemptsByEmail = Record<string, number>;
+
+const decodeGoogleCredentialPayload = (credentialToken: string) => {
+  const payloadToken = credentialToken.split('.')[1];
+  if (!payloadToken) {
+    return null;
+  }
+
+  try {
+    const base64 = payloadToken.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedBase64 = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const decoded = atob(paddedBase64);
+    return JSON.parse(decoded) as Record<string, unknown>;
+  } catch (error) {
+    console.error('Failed to decode Google credential payload:', error);
+    return null;
+  }
+};
+
+const logGoogleOAuthDebug = (...args: unknown[]) => {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+};
 
 const readWrongPasswordAttempts = (): WrongPasswordAttemptsByEmail => {
   try {
@@ -75,6 +97,7 @@ const getWrongPasswordAttempt = (email: string) => {
 export default function Login({ isLogin }: { isLogin: boolean }) {
   const navigate = useNavigate();
   const { refreshMeInfo } = useAuth();
+  const isGoogleOAuthEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
   const [searchParams, setSearchParams] = useSearchParams();
   const resetToken = searchParams.get('resetToken')?.trim() || '';
   const resetEmailFromLink = searchParams.get('email')?.trim() || '';
@@ -415,6 +438,82 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    const googleToken = credentialResponse.credential;
+
+    logGoogleOAuthDebug('[Google OAuth] Raw success response:', credentialResponse);
+
+    if (!googleToken) {
+      enqueueSnackbar('Google 토큰을 받지 못했습니다. 다시 시도해주세요.', { variant: 'error' });
+      return;
+    }
+
+    const decodedCredentialPayload = decodeGoogleCredentialPayload(googleToken);
+    logGoogleOAuthDebug('[Google OAuth] Decoded credential payload:', decodedCredentialPayload);
+
+    try {
+      const response = await apiFetch('/authentication/auth/google', {
+        method: 'POST',
+        body: JSON.stringify({ token: googleToken }),
+      });
+
+      const data = (await response.json().catch(() => ({}))) as {
+        token?: unknown;
+        refreshToken?: unknown;
+        user?: { id?: unknown };
+        userId?: unknown;
+        message?: unknown;
+        error?: unknown;
+        code?: unknown;
+      };
+
+      logGoogleOAuthDebug('[Google OAuth] Backend auth response:', data);
+
+      if (!response.ok) {
+        if (data.code === 'ACCOUNT_PENDING_APPROVAL') {
+          enqueueSnackbar('관리자 승인 대기 중입니다. 승인 후 로그인해주세요.', {
+            variant: 'warning',
+          });
+          navigate('/signin');
+          return;
+        }
+
+        const errorMessage = typeof data.error === 'string' ? data.error : '알 수 없는 에러';
+        enqueueSnackbar(`구글 로그인 실패: ${errorMessage}`, { variant: 'error' });
+        return;
+      }
+
+      if (typeof data.token === 'string' && typeof data.refreshToken === 'string') {
+        setAuthTokens(data.token, data.refreshToken, true);
+        await refreshMeInfo();
+      } else if (typeof data.token === 'string') {
+        setAccessToken(data.token, true);
+        await refreshMeInfo();
+      } else {
+        enqueueSnackbar('구글 로그인 성공 응답에 인증 토큰이 없습니다.', { variant: 'error' });
+        return;
+      }
+
+      const userIdx = data.user?.id ?? data.userId;
+      if (!userIdx) {
+        enqueueSnackbar('구글 로그인 성공 응답에 사용자 ID가 없습니다.', { variant: 'error' });
+        return;
+      }
+
+      enqueueSnackbar('구글 로그인 성공!', { variant: 'success' });
+      navigate(`/${userIdx}`);
+    } catch (error) {
+      console.error('Google auth error:', error);
+      enqueueSnackbar('서버와 연결할 수 없습니다. 잠시 후 다시 시도해주세요.', {
+        variant: 'error',
+      });
+    }
+  };
+
+  const handleGoogleError = () => {
+    enqueueSnackbar('Google 로그인에 실패했습니다. 다시 시도해주세요.', { variant: 'error' });
+  };
+
   return (
     <>
       <div className="flex min-h-screen w-full items-center justify-center bg-white p-4 md:p-8">
@@ -537,27 +636,15 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
               </div>
 
               {/* Social Buttons */}
-              {/* <div className="flex flex-col space-y-3 sm:flex-row sm:space-x-4 sm:space-y-0">
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => console.log('Google Login Error')}
-                  containerProps={{
-                    className:
-                      'flex w-full items-center justify-center space-x-2 rounded-xl border border-gray-200 py-3 text-sm font-semibold transition hover:bg-gray-50',
-                  }}
-                /> */}
-              {/* <button className="flex w-full items-center justify-center space-x-2 rounded-xl border border-gray-200 py-3 text-sm font-semibold transition hover:bg-gray-50">
-                  <FcGoogle size={22} />
-                  <span>Sign in with Google</span>
-                </button> */}
-              {/* <button
-                  type="button"
-                  className="flex w-full items-center justify-center space-x-2 rounded-xl bg-[#FEE500] py-3 text-sm font-semibold text-[#191919] transition hover:bg-[#fada0a]"
-                >
-                  <SiKakaotalk size={22} />
-                  <span>Sign in with Kakao</span>
-                </button>
-              </div> */}
+              <div className="flex justify-center">
+                {isGoogleOAuthEnabled ? (
+                  <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
+                ) : (
+                  <p className="text-xs text-gray-400">
+                    Google 로그인을 사용하려면 `VITE_GOOGLE_CLIENT_ID` 설정이 필요합니다.
+                  </p>
+                )}
+              </div>
 
               {/* Footer: 클릭 시 모드 전환 */}
               <p className="mt-10 text-center text-sm text-gray-600">
