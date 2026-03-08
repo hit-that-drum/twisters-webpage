@@ -3,6 +3,7 @@ export interface MeInfo {
   name: string;
   email: string;
   isAdmin: boolean;
+  isTest: boolean;
 }
 
 export interface UserSummary {

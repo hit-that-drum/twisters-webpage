@@ -7,11 +7,26 @@ CREATE TABLE IF NOT EXISTS users (
   kakao_id VARCHAR(255),
   "profileImage" VARCHAR(512),
   "isAdmin" BOOLEAN NOT NULL DEFAULT FALSE,
+  "isTest" BOOLEAN NOT NULL DEFAULT FALSE,
   "isAllowed" BOOLEAN NOT NULL DEFAULT FALSE,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS members (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  email VARCHAR(100) UNIQUE,
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+  phone VARCHAR(30),
+  role VARCHAR(100),
+  department VARCHAR(100),
+  joined_at DATE,
+  bio TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS test_members (
   id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(100) UNIQUE,
@@ -36,7 +51,26 @@ CREATE TABLE IF NOT EXISTS notice (
   pinned BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+CREATE TABLE IF NOT EXISTS test_notice (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  "createUser" VARCHAR(100) NOT NULL,
+  "createDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updateUser" VARCHAR(100) NOT NULL,
+  "updateDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  content TEXT NOT NULL,
+  pinned BOOLEAN NOT NULL DEFAULT FALSE
+);
+
 CREATE TABLE IF NOT EXISTS settlement (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  settlement_date DATE NOT NULL,
+  item VARCHAR(255) NOT NULL,
+  amount INTEGER NOT NULL,
+  relation VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS test_settlement (
   id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   settlement_date DATE NOT NULL,
   item VARCHAR(255) NOT NULL,
@@ -71,10 +105,15 @@ CREATE INDEX IF NOT EXISTS idx_password_reset_expires ON password_reset_tokens (
 CREATE INDEX IF NOT EXISTS idx_members_email ON members (email);
 CREATE INDEX IF NOT EXISTS idx_members_role ON members (role);
 CREATE INDEX IF NOT EXISTS idx_members_department ON members (department);
+CREATE INDEX IF NOT EXISTS idx_test_members_email ON test_members (email);
+CREATE INDEX IF NOT EXISTS idx_test_members_role ON test_members (role);
+CREATE INDEX IF NOT EXISTS idx_test_members_department ON test_members (department);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions (user_id);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_idle_expires_at ON user_sessions (idle_expires_at);
 CREATE INDEX IF NOT EXISTS idx_settlement_date ON settlement (settlement_date DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_settlement_unique_entry ON settlement (settlement_date, item, amount, relation);
+CREATE INDEX IF NOT EXISTS idx_test_settlement_date ON test_settlement (settlement_date DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_test_settlement_unique_entry ON test_settlement (settlement_date, item, amount, relation);
 
 CREATE OR REPLACE FUNCTION update_notice_updated_at()
 RETURNS TRIGGER AS $$
@@ -88,5 +127,12 @@ DROP TRIGGER IF EXISTS trg_notice_update_date ON notice;
 
 CREATE TRIGGER trg_notice_update_date
 BEFORE UPDATE ON notice
+FOR EACH ROW
+EXECUTE FUNCTION update_notice_updated_at();
+
+DROP TRIGGER IF EXISTS trg_test_notice_update_date ON test_notice;
+
+CREATE TRIGGER trg_test_notice_update_date
+BEFORE UPDATE ON test_notice
 FOR EACH ROW
 EXECUTE FUNCTION update_notice_updated_at();

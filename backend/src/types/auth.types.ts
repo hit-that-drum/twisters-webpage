@@ -21,6 +21,7 @@ export interface MeUser {
   name: string;
   email: string;
   isAdmin: boolean;
+  isTest: boolean;
 }
 
 export interface PublicUserRow {
@@ -34,6 +35,7 @@ export interface MeUserRow {
   name: string;
   email: string;
   isAdmin: boolean | number;
+  isTest: boolean | number;
 }
 
 export interface ApprovalUserRow {

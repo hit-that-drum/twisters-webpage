@@ -12,20 +12,38 @@ import {
 
 type ResetPasswordMutationResult = 'success' | 'already_used' | 'user_not_found';
 
+let ensureUsersSchemaPromise: Promise<void> | null = null;
+
 class AuthRepository {
-  async createUser(name: string, email: string, hashedPassword: string) {
+  private async ensureUsersSchema() {
+    if (!ensureUsersSchemaPromise) {
+      ensureUsersSchemaPromise = (async () => {
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isTest" BOOLEAN NOT NULL DEFAULT FALSE');
+      })().catch((error) => {
+        ensureUsersSchemaPromise = null;
+        throw error;
+      });
+    }
+
+    await ensureUsersSchemaPromise;
+  }
+
+  async createUser(name: string, email: string, hashedPassword: string, isTest: boolean) {
+    await this.ensureUsersSchema();
     const result = await pool.query<{ id: number }>(
-      'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id',
-      [name, email, hashedPassword],
+      'INSERT INTO users (name, email, password, "isTest") VALUES ($1, $2, $3, $4) RETURNING id',
+      [name, email, hashedPassword, isTest],
     );
 
     return result.rows[0]?.id ?? null;
   }
 
   async findMeById(userId: number) {
-    const result = await pool.query<MeUserRow>('SELECT id, name, email, "isAdmin" FROM users WHERE id = $1', [
-      userId,
-    ]);
+    await this.ensureUsersSchema();
+    const result = await pool.query<MeUserRow>(
+      'SELECT id, name, email, "isAdmin", "isTest" FROM users WHERE id = $1',
+      [userId],
+    );
 
     return result.rows[0] ?? null;
   }
@@ -61,10 +79,17 @@ class AuthRepository {
     return result.rows[0] ?? null;
   }
 
-  async createGoogleUser(email: string, name: string, googleId: string, profileImage: string | null) {
+  async createGoogleUser(
+    email: string,
+    name: string,
+    googleId: string,
+    profileImage: string | null,
+    isTest: boolean,
+  ) {
+    await this.ensureUsersSchema();
     await pool.query(
-      'INSERT INTO users (email, name, google_id, "profileImage") VALUES ($1, $2, $3, $4)',
-      [email, name, googleId, profileImage],
+      'INSERT INTO users (email, name, google_id, "profileImage", "isTest") VALUES ($1, $2, $3, $4, $5)',
+      [email, name, googleId, profileImage, isTest],
     );
   }
 
@@ -76,10 +101,17 @@ class AuthRepository {
     ]);
   }
 
-  async createKakaoUser(email: string, name: string, kakaoId: string, profileImage: string | null) {
+  async createKakaoUser(
+    email: string,
+    name: string,
+    kakaoId: string,
+    profileImage: string | null,
+    isTest: boolean,
+  ) {
+    await this.ensureUsersSchema();
     await pool.query(
-      'INSERT INTO users (email, name, kakao_id, "profileImage") VALUES ($1, $2, $3, $4)',
-      [email, name, kakaoId, profileImage],
+      'INSERT INTO users (email, name, kakao_id, "profileImage", "isTest") VALUES ($1, $2, $3, $4, $5)',
+      [email, name, kakaoId, profileImage, isTest],
     );
   }
 

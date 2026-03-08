@@ -5,6 +5,7 @@ export interface AuthenticatedUser {
   name: string;
   email: string;
   isAdmin?: boolean | number | string;
+  isTest?: boolean | number | string;
   sessionId?: number;
 }
 

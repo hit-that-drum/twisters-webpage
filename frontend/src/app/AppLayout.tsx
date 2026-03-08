@@ -7,7 +7,7 @@ import { getAccessToken } from '@/common/lib/auth/authStorage';
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { isAuthLoading, isAuthenticated, logout, refreshMeInfo } = useAuth();
+  const { meInfo, isAuthLoading, isAuthenticated, logout, refreshMeInfo } = useAuth();
   const accessToken = getAccessToken();
 
   useEffect(() => {
@@ -40,6 +40,14 @@ export default function AppLayout() {
       <div className="px-6 pt-6">
         <Header handleLogout={handleLogout} />
       </div>
+
+      {meInfo?.isTest && (
+        <div className="px-6 pb-4 pt-1">
+          <div className="mx-auto w-full max-w-7xl rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold tracking-wide text-amber-900">
+            TEST MODE: Showing isolated TEST data for notice, member, and settlement.
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 px-6 pb-6">
         <div className="mx-auto w-full max-w-7xl rounded-2xl border border-gray-200 bg-white">

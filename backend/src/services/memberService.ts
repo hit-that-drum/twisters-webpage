@@ -7,6 +7,7 @@ import {
   type MemberMutationDTO,
   type MemberMutationPayload,
 } from '../types/member.types.js';
+import { resolveDataScopeByUser } from '../utils/dataScope.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DUES_BASE_YEAR = 2024;
@@ -179,9 +180,10 @@ const normalizeMemberMutationPayload = (payload: MemberMutationDTO): MemberMutat
 };
 
 class MemberService {
-  async getMembers(): Promise<Member[]> {
+  async getMembers(authenticatedUser: AuthenticatedUser | undefined): Promise<Member[]> {
+    const scope = resolveDataScopeByUser(authenticatedUser);
     await memberRepository.ensureMembersSchema();
-    const rows = await memberRepository.findAllMembers();
+    const rows = await memberRepository.findAllMembers(scope);
 
     return rows.map((row) => ({
       ...row,
@@ -189,12 +191,13 @@ class MemberService {
     }));
   }
 
-  async getMemberDuesDepositStatus(): Promise<MemberDuesStatus[]> {
+  async getMemberDuesDepositStatus(authenticatedUser: AuthenticatedUser | undefined): Promise<MemberDuesStatus[]> {
+    const scope = resolveDataScopeByUser(authenticatedUser);
     await memberRepository.ensureMembersSchema();
 
     const [membersRows, settlementRows] = await Promise.all([
-      memberRepository.findAllMemberNames(),
-      memberRepository.findSettlementDuesRows(DUES_BASE_YEAR),
+      memberRepository.findAllMemberNames(scope),
+      memberRepository.findSettlementDuesRows(scope, DUES_BASE_YEAR),
     ]);
 
     const members = membersRows
@@ -257,19 +260,20 @@ class MemberService {
   }
 
   async createMember(authenticatedUser: AuthenticatedUser | undefined, payload: MemberMutationDTO) {
-    requireAdminUser(authenticatedUser);
+    const adminUser = requireAdminUser(authenticatedUser);
     const normalizedPayload = normalizeMemberMutationPayload(payload);
+    const scope = resolveDataScopeByUser(adminUser);
 
     await memberRepository.ensureMembersSchema();
 
     if (normalizedPayload.email) {
-      const existingMember = await memberRepository.findMemberByEmail(normalizedPayload.email);
+      const existingMember = await memberRepository.findMemberByEmail(scope, normalizedPayload.email);
       if (existingMember) {
         throw new HttpError(400, '이미 등록된 이메일입니다.');
       }
     }
 
-    await memberRepository.createMember(normalizedPayload);
+    await memberRepository.createMember(scope, normalizedPayload);
   }
 
   async updateMember(
@@ -277,7 +281,8 @@ class MemberService {
     rawMemberId: string | undefined,
     payload: MemberMutationDTO,
   ) {
-    requireAdminUser(authenticatedUser);
+    const adminUser = requireAdminUser(authenticatedUser);
+    const scope = resolveDataScopeByUser(adminUser);
 
     const memberId = parseMemberId(rawMemberId);
     if (!memberId) {
@@ -290,6 +295,7 @@ class MemberService {
 
     if (normalizedPayload.email) {
       const existingMember = await memberRepository.findMemberByEmailExcludingId(
+        scope,
         normalizedPayload.email,
         memberId,
       );
@@ -298,14 +304,15 @@ class MemberService {
       }
     }
 
-    const updatedCount = await memberRepository.updateMember(memberId, normalizedPayload);
+    const updatedCount = await memberRepository.updateMember(scope, memberId, normalizedPayload);
     if (updatedCount === 0) {
       throw new HttpError(404, '해당 회원을 찾을 수 없습니다.');
     }
   }
 
   async deleteMember(authenticatedUser: AuthenticatedUser | undefined, rawMemberId: string | undefined) {
-    requireAdminUser(authenticatedUser);
+    const adminUser = requireAdminUser(authenticatedUser);
+    const scope = resolveDataScopeByUser(adminUser);
 
     const memberId = parseMemberId(rawMemberId);
     if (!memberId) {
@@ -313,7 +320,7 @@ class MemberService {
     }
 
     await memberRepository.ensureMembersSchema();
-    const deletedCount = await memberRepository.deleteMember(memberId);
+    const deletedCount = await memberRepository.deleteMember(scope, memberId);
 
     if (deletedCount === 0) {
       throw new HttpError(404, '해당 회원을 찾을 수 없습니다.');

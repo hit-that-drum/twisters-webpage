@@ -6,6 +6,7 @@ import {
   type SettlementMutationDTO,
   type SettlementMutationPayload,
 } from '../types/settlement.types.js';
+import { resolveDataScopeByUser } from '../utils/dataScope.js';
 
 const parseSettlementId = (rawSettlementId?: string) => {
   const settlementId = Number(rawSettlementId);
@@ -123,8 +124,9 @@ const normalizeSettlementPayload = (payload: SettlementMutationDTO): SettlementM
 };
 
 class SettlementService {
-  async getSettlements(): Promise<Settlement[]> {
-    const rows = await settlementRepository.findAll();
+  async getSettlements(authenticatedUser: AuthenticatedUser | undefined): Promise<Settlement[]> {
+    const scope = resolveDataScopeByUser(authenticatedUser);
+    const rows = await settlementRepository.findAll(scope);
     return rows.map((row) => ({
       ...row,
       amount: Number(row.amount),
@@ -132,9 +134,10 @@ class SettlementService {
   }
 
   async createSettlement(authenticatedUser: AuthenticatedUser | undefined, payload: SettlementMutationDTO) {
-    requireAdminUser(authenticatedUser, '관리자만 정산 내역을 등록할 수 있습니다.');
+    const adminUser = requireAdminUser(authenticatedUser, '관리자만 정산 내역을 등록할 수 있습니다.');
     const normalizedPayload = normalizeSettlementPayload(payload);
-    await settlementRepository.create(normalizedPayload);
+    const scope = resolveDataScopeByUser(adminUser);
+    await settlementRepository.create(scope, normalizedPayload);
   }
 
   async updateSettlement(
@@ -142,7 +145,8 @@ class SettlementService {
     rawSettlementId: string | undefined,
     payload: SettlementMutationDTO,
   ) {
-    requireAdminUser(authenticatedUser, '관리자만 정산 내역을 수정할 수 있습니다.');
+    const adminUser = requireAdminUser(authenticatedUser, '관리자만 정산 내역을 수정할 수 있습니다.');
+    const scope = resolveDataScopeByUser(adminUser);
 
     const settlementId = parseSettlementId(rawSettlementId);
     if (!settlementId) {
@@ -150,7 +154,7 @@ class SettlementService {
     }
 
     const normalizedPayload = normalizeSettlementPayload(payload);
-    const updatedCount = await settlementRepository.updateById(settlementId, normalizedPayload);
+    const updatedCount = await settlementRepository.updateById(scope, settlementId, normalizedPayload);
 
     if (updatedCount === 0) {
       throw new HttpError(404, '해당 정산 내역을 찾을 수 없습니다.');
@@ -158,14 +162,15 @@ class SettlementService {
   }
 
   async deleteSettlement(authenticatedUser: AuthenticatedUser | undefined, rawSettlementId: string | undefined) {
-    requireAdminUser(authenticatedUser, '관리자만 정산 내역을 삭제할 수 있습니다.');
+    const adminUser = requireAdminUser(authenticatedUser, '관리자만 정산 내역을 삭제할 수 있습니다.');
+    const scope = resolveDataScopeByUser(adminUser);
 
     const settlementId = parseSettlementId(rawSettlementId);
     if (!settlementId) {
       throw new HttpError(400, '유효한 정산 ID가 필요합니다.');
     }
 
-    const deletedCount = await settlementRepository.deleteById(settlementId);
+    const deletedCount = await settlementRepository.deleteById(scope, settlementId);
     if (deletedCount === 0) {
       throw new HttpError(404, '해당 정산 내역을 찾을 수 없습니다.');
     }

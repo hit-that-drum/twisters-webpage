@@ -14,6 +14,7 @@ const parseMeInfo = (payload: unknown): MeInfo | null => {
   const name = (payload as { name?: unknown }).name;
   const email = (payload as { email?: unknown }).email;
   const rawIsAdmin = (payload as { isAdmin?: unknown }).isAdmin;
+  const rawIsTest = (payload as { isTest?: unknown }).isTest;
 
   const normalizedIsAdmin =
     typeof rawIsAdmin === 'boolean'
@@ -24,11 +25,23 @@ const parseMeInfo = (payload: unknown): MeInfo | null => {
           ? rawIsAdmin === '1' || rawIsAdmin.toLowerCase() === 'true'
           : null;
 
+  const normalizedIsTest =
+    typeof rawIsTest === 'boolean'
+      ? rawIsTest
+      : typeof rawIsTest === 'number'
+        ? rawIsTest === 1
+        : typeof rawIsTest === 'string'
+          ? rawIsTest === '1' || rawIsTest.toLowerCase() === 'true'
+          : typeof rawIsTest === 'undefined'
+            ? false
+            : null;
+
   if (
     typeof id !== 'number' ||
     typeof name !== 'string' ||
     typeof email !== 'string' ||
-    normalizedIsAdmin === null
+    normalizedIsAdmin === null ||
+    normalizedIsTest === null
   ) {
     return null;
   }
@@ -38,6 +51,7 @@ const parseMeInfo = (payload: unknown): MeInfo | null => {
     name,
     email,
     isAdmin: normalizedIsAdmin,
+    isTest: normalizedIsTest,
   };
 };
 

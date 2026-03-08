@@ -4,9 +4,10 @@ import { type AuthenticatedRequest } from '../types/common.types.js';
 import { type CreateNoticeDTO, type UpdateNoticeDTO } from '../types/notice.types.js';
 import { handleControllerError } from '../utils/controllerErrorHandler.js';
 
-export const getNotices = async (_req: Request, res: Response) => {
+export const getNotices = async (req: Request, res: Response) => {
   try {
-    const notices = await noticeService.getNotices();
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const notices = await noticeService.getNotices(authenticatedUser);
     return res.json(notices);
   } catch (error) {
     return handleControllerError(res, error, '공지사항 조회 중 오류가 발생했습니다.', 'Notice list fetch error');

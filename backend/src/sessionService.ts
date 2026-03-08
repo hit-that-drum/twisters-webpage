@@ -13,6 +13,7 @@ interface SessionLookupRow {
   name: string;
   email: string;
   isAdmin: boolean;
+  isTest: boolean;
   isAllowed: boolean;
   remember_me: boolean;
   idle_expires_at: Date;
@@ -24,6 +25,7 @@ interface SessionValidationRow {
   name: string;
   email: string;
   isAdmin: boolean;
+  isTest: boolean;
 }
 
 interface CreatedSessionRow {
@@ -73,6 +75,8 @@ const isSessionExpired = (idleExpiresAt: Date, absoluteExpiresAt: Date) => {
 const ensureSessionSchema = async () => {
   if (!ensureSessionSchemaPromise) {
     ensureSessionSchemaPromise = (async () => {
+      await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isTest" BOOLEAN NOT NULL DEFAULT FALSE');
+
       await query(`
         CREATE TABLE IF NOT EXISTS user_sessions (
           id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -161,6 +165,7 @@ export const refreshSessionAuthResponse = async (refreshToken: string) => {
         u.name,
         u.email,
         u."isAdmin",
+        u."isTest",
         u."isAllowed",
         s.remember_me,
         s.idle_expires_at,
@@ -222,7 +227,8 @@ export const getAuthenticatedUserBySession = async (userId: number, sessionId: n
         u.id,
         u.name,
         u.email,
-        u."isAdmin"
+        u."isAdmin",
+        u."isTest"
       FROM users u
       JOIN user_sessions s ON s.user_id = u.id
       WHERE
@@ -242,14 +248,15 @@ export const getAuthenticatedUserBySession = async (userId: number, sessionId: n
     return null;
   }
 
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    isAdmin: Boolean(user.isAdmin),
-    sessionId,
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      isAdmin: Boolean(user.isAdmin),
+      isTest: Boolean(user.isTest),
+      sessionId,
+    };
   };
-};
 
 export const touchSessionActivity = async (sessionId: number, force = false) => {
   await ensureSessionSchema();
