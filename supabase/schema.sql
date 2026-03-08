@@ -62,6 +62,26 @@ CREATE TABLE IF NOT EXISTS test_notice (
   pinned BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+CREATE TABLE IF NOT EXISTS board (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  "createUser" VARCHAR(100) NOT NULL,
+  "createDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updateUser" VARCHAR(100) NOT NULL,
+  "updateDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  content TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS test_board (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  "createUser" VARCHAR(100) NOT NULL,
+  "createDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updateUser" VARCHAR(100) NOT NULL,
+  "updateDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  content TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS settlement (
   id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   settlement_date DATE NOT NULL,
@@ -123,6 +143,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION update_board_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW."updateDate" = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 DROP TRIGGER IF EXISTS trg_notice_update_date ON notice;
 
 CREATE TRIGGER trg_notice_update_date
@@ -136,3 +164,17 @@ CREATE TRIGGER trg_test_notice_update_date
 BEFORE UPDATE ON test_notice
 FOR EACH ROW
 EXECUTE FUNCTION update_notice_updated_at();
+
+DROP TRIGGER IF EXISTS trg_board_update_date ON board;
+
+CREATE TRIGGER trg_board_update_date
+BEFORE UPDATE ON board
+FOR EACH ROW
+EXECUTE FUNCTION update_board_updated_at();
+
+DROP TRIGGER IF EXISTS trg_test_board_update_date ON test_board;
+
+CREATE TRIGGER trg_test_board_update_date
+BEFORE UPDATE ON test_board
+FOR EACH ROW
+EXECUTE FUNCTION update_board_updated_at();

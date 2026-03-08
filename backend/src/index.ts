@@ -1,5 +1,6 @@
 import app from './app.js';
 import { query } from './db.js';
+import { boardRepository } from './repositories/boardRepository.js';
 import { memberRepository } from './repositories/memberRepository.js';
 import { noticeRepository } from './repositories/noticeRepository.js';
 import { settlementRepository } from './repositories/settlementRepository.js';
@@ -10,6 +11,7 @@ const startServer = async () => {
   await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isTest" BOOLEAN NOT NULL DEFAULT FALSE');
 
   await Promise.all([
+    boardRepository.initializeSchema(),
     memberRepository.ensureMembersSchema(),
     noticeRepository.initializeSchema(),
     settlementRepository.initializeSchema(),
