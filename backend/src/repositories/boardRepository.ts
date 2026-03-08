@@ -1,103 +1,104 @@
 import pool from '../db.js';
-import { type BoardMutationPayload, type BoardRow } from '../types/board.types.js';
-import { getScopedTableNames, type DataScope } from '../utils/dataScope.js';
+import {
+  type BoardCommentLookupRow,
+  type BoardCommentMutationPayload,
+  type BoardCommentRow,
+  type BoardListFilters,
+  type BoardLookupRow,
+  type BoardMutationPayload,
+  type BoardRow,
+  type BoardSortOption,
+} from '../types/board.types.js';
 
-let ensureBoardSchemaPromise: Promise<void> | null = null;
+const BOARD_ORDER_BY: Record<BoardSortOption, string> = {
+  latest: 'pinned DESC, "createDate" DESC, id DESC',
+  oldest: 'pinned DESC, "createDate" ASC, id ASC',
+  updated: 'pinned DESC, "updateDate" DESC, id DESC',
+  pinned: 'pinned DESC, "createDate" DESC, id DESC',
+};
 
 class BoardRepository {
-  private async ensureBoardSchema() {
-    if (!ensureBoardSchemaPromise) {
-      ensureBoardSchemaPromise = (async () => {
-        await pool.query(`
-          CREATE TABLE IF NOT EXISTS board (
-            id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-            title VARCHAR(255) NOT NULL,
-            "createUser" VARCHAR(100) NOT NULL,
-            "createDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            "updateUser" VARCHAR(100) NOT NULL,
-            "updateDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            content TEXT NOT NULL
-          )
-        `);
+  async findAll(filters: BoardListFilters) {
+    const orderBy = BOARD_ORDER_BY[filters.sort] ?? BOARD_ORDER_BY.latest;
 
-        await pool.query(`
-          CREATE TABLE IF NOT EXISTS test_board (
-            id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-            title VARCHAR(255) NOT NULL,
-            "createUser" VARCHAR(100) NOT NULL,
-            "createDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            "updateUser" VARCHAR(100) NOT NULL,
-            "updateDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            content TEXT NOT NULL
-          )
-        `);
+    const values: string[] = [];
+    let whereClause = '';
 
-        await pool.query(`
-          CREATE OR REPLACE FUNCTION update_board_updated_at()
-          RETURNS TRIGGER AS $$
-          BEGIN
-            NEW."updateDate" = NOW();
-            RETURN NEW;
-          END;
-          $$ LANGUAGE plpgsql;
-        `);
-
-        await pool.query('DROP TRIGGER IF EXISTS trg_board_update_date ON board');
-        await pool.query(`
-          CREATE TRIGGER trg_board_update_date
-          BEFORE UPDATE ON board
-          FOR EACH ROW
-          EXECUTE FUNCTION update_board_updated_at()
-        `);
-
-        await pool.query('DROP TRIGGER IF EXISTS trg_test_board_update_date ON test_board');
-        await pool.query(`
-          CREATE TRIGGER trg_test_board_update_date
-          BEFORE UPDATE ON test_board
-          FOR EACH ROW
-          EXECUTE FUNCTION update_board_updated_at()
-        `);
-      })().catch((error) => {
-        ensureBoardSchemaPromise = null;
-        throw error;
-      });
+    if (filters.search) {
+      values.push(`%${filters.search}%`);
+      whereClause = 'WHERE title ILIKE $1 OR content ILIKE $1 OR "createUser" ILIKE $1';
     }
 
-    await ensureBoardSchemaPromise;
-  }
-
-  async initializeSchema() {
-    await this.ensureBoardSchema();
-  }
-
-  async findAll(scope: DataScope) {
-    const tableName = getScopedTableNames(scope).board;
     const result = await pool.query<BoardRow>(
-      `SELECT id, title, "createUser", "createDate", "updateUser", "updateDate", content FROM ${tableName} ORDER BY "createDate" DESC, id DESC`,
+      `SELECT id, "authorId", title, "createUser", "createDate", "updateUser", "updateDate", content, pinned FROM board ${whereClause} ORDER BY ${orderBy} LIMIT 200`,
+      values,
     );
     return result.rows;
   }
 
-  async create(scope: DataScope, payload: BoardMutationPayload) {
-    const tableName = getScopedTableNames(scope).board;
+  async findById(boardId: number) {
+    const result = await pool.query<BoardLookupRow>(
+      'SELECT id, "authorId", pinned FROM board WHERE id = $1 LIMIT 1',
+      [boardId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async create(payload: BoardMutationPayload) {
     await pool.query(
-      `INSERT INTO ${tableName} (title, "createUser", "updateUser", content) VALUES ($1, $2, $3, $4)`,
-      [payload.title, payload.auditUser, payload.auditUser, payload.content],
+      'INSERT INTO board ("authorId", title, "createUser", "updateUser", content, pinned) VALUES ($1, $2, $3, $4, $5, $6)',
+      [
+        payload.authorId,
+        payload.title,
+        payload.auditUser,
+        payload.auditUser,
+        payload.content,
+        payload.pinned,
+      ],
     );
   }
 
-  async updateById(scope: DataScope, boardId: number, payload: BoardMutationPayload) {
-    const tableName = getScopedTableNames(scope).board;
+  async updateById(boardId: number, payload: BoardMutationPayload) {
     const result = await pool.query(
-      `UPDATE ${tableName} SET title = $1, "updateUser" = $2, content = $3 WHERE id = $4`,
-      [payload.title, payload.auditUser, payload.content, boardId],
+      'UPDATE board SET title = $1, "updateUser" = $2, content = $3, pinned = $4 WHERE id = $5',
+      [payload.title, payload.auditUser, payload.content, payload.pinned, boardId],
     );
     return result.rowCount ?? 0;
   }
 
-  async deleteById(scope: DataScope, boardId: number) {
-    const tableName = getScopedTableNames(scope).board;
-    const result = await pool.query(`DELETE FROM ${tableName} WHERE id = $1`, [boardId]);
+  async deleteById(boardId: number) {
+    const result = await pool.query('DELETE FROM board WHERE id = $1', [boardId]);
+    return result.rowCount ?? 0;
+  }
+
+  async findCommentsByBoardId(boardId: number) {
+    const result = await pool.query<BoardCommentRow>(
+      'SELECT id, "boardId", "authorId", "authorName", content, "createdAt", "updatedAt" FROM board_comments WHERE "boardId" = $1 ORDER BY "createdAt" ASC, id ASC',
+      [boardId],
+    );
+    return result.rows;
+  }
+
+  async findCommentById(boardId: number, commentId: number) {
+    const result = await pool.query<BoardCommentLookupRow>(
+      'SELECT id, "boardId", "authorId" FROM board_comments WHERE "boardId" = $1 AND id = $2 LIMIT 1',
+      [boardId, commentId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async createComment(payload: BoardCommentMutationPayload) {
+    await pool.query(
+      'INSERT INTO board_comments ("boardId", "authorId", "authorName", content) VALUES ($1, $2, $3, $4)',
+      [payload.boardId, payload.authorId, payload.authorName, payload.content],
+    );
+  }
+
+  async deleteCommentById(boardId: number, commentId: number) {
+    const result = await pool.query('DELETE FROM board_comments WHERE "boardId" = $1 AND id = $2', [
+      boardId,
+      commentId,
+    ]);
     return result.rowCount ?? 0;
   }
 }

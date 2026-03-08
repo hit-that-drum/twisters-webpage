@@ -1,10 +1,6 @@
-import { type ChangeEvent, useCallback, useEffect, useState } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
-  Box,
   Button,
   Checkbox,
   Dialog,
@@ -13,7 +9,6 @@ import {
   DialogTitle,
   FormControlLabel,
   TextField,
-  Typography,
 } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
@@ -29,6 +24,151 @@ interface NoticeItem {
   content: string;
   pinned: boolean;
 }
+
+const DEFAULT_VISIBLE_NOTICES = 3;
+
+const NOTICE_IMAGE_PRESETS = [
+  {
+    alt: 'Community meeting visual',
+    gradient:
+      'linear-gradient(135deg, rgba(26,54,93,0.95) 0%, rgba(60,114,178,0.82) 55%, rgba(178,214,242,0.75) 100%)',
+    symbol: '🏛',
+  },
+  {
+    alt: 'Parking zone visual',
+    gradient:
+      'linear-gradient(135deg, rgba(26,49,66,0.96) 0%, rgba(74,104,129,0.86) 55%, rgba(191,211,230,0.75) 100%)',
+    symbol: '🅿',
+  },
+  {
+    alt: 'Maintenance and tools visual',
+    gradient:
+      'linear-gradient(135deg, rgba(59,62,82,0.95) 0%, rgba(109,130,171,0.84) 54%, rgba(236,223,170,0.76) 100%)',
+    symbol: '🛠',
+  },
+];
+
+const formatRelativeTime = (rawDate: string) => {
+  const parsedDate = new Date(rawDate);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return 'unknown';
+  }
+
+  const elapsedMs = Date.now() - parsedDate.getTime();
+  if (elapsedMs < 60_000) {
+    return 'just now';
+  }
+
+  const minutes = Math.floor(elapsedMs / 60_000);
+  if (minutes < 60) {
+    return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) {
+    return `${days} day${days === 1 ? '' : 's'} ago`;
+  }
+
+  return parsedDate.toLocaleDateString();
+};
+
+const formatDateTime = (rawDate: string) => {
+  const parsedDate = new Date(rawDate);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return '-';
+  }
+
+  return parsedDate.toLocaleString();
+};
+
+const extractPreviewLines = (content: string, maxLines = 3) => {
+  const byLine = content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  if (byLine.length > 0) {
+    return byLine.slice(0, maxLines);
+  }
+
+  const bySentence = (content.match(/[^.!?]+[.!?]?/g) ?? [])
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  if (bySentence.length > 0) {
+    return bySentence.slice(0, maxLines);
+  }
+
+  const trimmed = content.trim();
+  return trimmed ? [trimmed] : [];
+};
+
+const parseNoticeList = (payload: unknown): NoticeItem[] => {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return null;
+      }
+
+      const row = item as {
+        id?: unknown;
+        title?: unknown;
+        createUser?: unknown;
+        createDate?: unknown;
+        updateUser?: unknown;
+        updateDate?: unknown;
+        content?: unknown;
+        pinned?: unknown;
+      };
+
+      if (
+        typeof row.id !== 'number' ||
+        typeof row.title !== 'string' ||
+        typeof row.createUser !== 'string' ||
+        typeof row.createDate !== 'string' ||
+        typeof row.content !== 'string'
+      ) {
+        return null;
+      }
+
+      const normalizedPinned =
+        row.pinned === true ||
+        row.pinned === 1 ||
+        row.pinned === '1' ||
+        row.pinned === 'true';
+
+      const normalizedUpdateUser =
+        typeof row.updateUser === 'string' && row.updateUser.trim().length > 0
+          ? row.updateUser
+          : row.createUser;
+
+      const normalizedUpdateDate =
+        typeof row.updateDate === 'string' && row.updateDate.trim().length > 0
+          ? row.updateDate
+          : row.createDate;
+
+      return {
+        id: row.id,
+        title: row.title,
+        createUser: row.createUser,
+        createDate: row.createDate,
+        updateUser: normalizedUpdateUser,
+        updateDate: normalizedUpdateDate,
+        content: row.content,
+        pinned: normalizedPinned,
+      } satisfies NoticeItem;
+    })
+    .filter((item): item is NoticeItem => item !== null);
+};
 
 const parseApiResponse = async (response: Response): Promise<unknown> => {
   const contentType = response.headers.get('content-type') || '';
@@ -69,6 +209,8 @@ export default function Notice() {
   const navigate = useNavigate();
   const { meInfo, logout } = useAuth();
   const [noticeList, setNoticeList] = useState<NoticeItem[]>([]);
+  const [visibleNoticeCount, setVisibleNoticeCount] = useState(DEFAULT_VISIBLE_NOTICES);
+  const [expandedNoticeIds, setExpandedNoticeIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingNoticeId, setDeletingNoticeId] = useState<number | null>(null);
@@ -86,8 +228,6 @@ export default function Notice() {
     pinned: false,
   });
 
-  console.log(meInfo);
-
   const loadNotices = useCallback(async () => {
     setIsLoading(true);
 
@@ -102,59 +242,10 @@ export default function Notice() {
         return;
       }
 
-      if (Array.isArray(payload)) {
-        const normalizedList = payload
-          .map((item) => {
-            if (!item || typeof item !== 'object') {
-              return null;
-            }
-
-            const row = item as {
-              id?: unknown;
-              title?: unknown;
-              createUser?: unknown;
-              createDate?: unknown;
-              updateUser?: unknown;
-              updateDate?: unknown;
-              content?: unknown;
-              pinned?: unknown;
-            };
-            if (
-              typeof row.id !== 'number' ||
-              typeof row.title !== 'string' ||
-              typeof row.createUser !== 'string' ||
-              typeof row.createDate !== 'string' ||
-              typeof row.updateUser !== 'string' ||
-              typeof row.updateDate !== 'string' ||
-              typeof row.content !== 'string'
-            ) {
-              return null;
-            }
-
-            const normalizedPinned =
-              row.pinned === true ||
-              row.pinned === 1 ||
-              row.pinned === '1' ||
-              row.pinned === 'true';
-
-            return {
-              id: row.id,
-              title: row.title,
-              createUser: row.createUser,
-              createDate: row.createDate,
-              updateUser: row.updateUser,
-              updateDate: row.updateDate,
-              content: row.content,
-              pinned: normalizedPinned,
-            } satisfies NoticeItem;
-          })
-          .filter((item): item is NoticeItem => item !== null);
-
-        setNoticeList(normalizedList);
-        return;
-      }
-
-      setNoticeList([]);
+      const normalizedList = parseNoticeList(payload);
+      setNoticeList(normalizedList);
+      setVisibleNoticeCount(DEFAULT_VISIBLE_NOTICES);
+      setExpandedNoticeIds([]);
     } catch (error) {
       console.error('Notice list fetch error:', error);
       enqueueSnackbar('공지사항을 불러오는 중 오류가 발생했습니다.', { variant: 'error' });
@@ -168,6 +259,11 @@ export default function Notice() {
   }, [loadNotices]);
 
   const canManageNotices = meInfo?.isAdmin === true;
+  const displayedNotices = useMemo(
+    () => noticeList.slice(0, visibleNoticeCount),
+    [noticeList, visibleNoticeCount],
+  );
+  const hasMoreNotices = noticeList.length > visibleNoticeCount;
 
   const requireAuthForMutation = () => {
     if (!meInfo) {
@@ -220,6 +316,7 @@ export default function Notice() {
     }
 
     setOpenEditDialog(false);
+    setEditingNoticeId(null);
   };
 
   const handleChangeNewNotice = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -295,7 +392,7 @@ export default function Notice() {
       return;
     }
 
-    if (!editingNoticeId) {
+    if (editingNoticeId === null) {
       enqueueSnackbar('수정할 공지사항을 찾을 수 없습니다.', { variant: 'error' });
       return;
     }
@@ -389,82 +486,189 @@ export default function Notice() {
     }
   };
 
+  const handleLoadMoreNotices = () => {
+    setVisibleNoticeCount((previous) => previous + DEFAULT_VISIBLE_NOTICES);
+  };
+
+  const toggleNoticeExpand = (noticeId: number) => {
+    setExpandedNoticeIds((previous) => {
+      if (previous.includes(noticeId)) {
+        return previous.filter((id) => id !== noticeId);
+      }
+
+      return [...previous, noticeId];
+    });
+  };
+
   return (
-    <Box sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>
-            Notice
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {meInfo
-              ? `Logged in as ${meInfo.name}${meInfo.isAdmin ? ' (Admin)' : ''}`
-              : '로그인 후 공지사항을 작성/수정/삭제할 수 있습니다.'}
-          </Typography>
-        </Box>
-        {canManageNotices && (
-          <Button variant="contained" onClick={handleOpenAddDialog}>
-            ADD NOTICE
-          </Button>
+    <main className="flex flex-1 flex-col items-center px-4 py-8 lg:px-20">
+      <div className="layout-content-container flex w-full max-w-[1024px] flex-col gap-6">
+        <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-4 md:flex-row md:items-end">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900">Notices</h1>
+            <p className="text-base font-normal text-slate-500">
+              Important updates and announcements for the community
+            </p>
+          </div>
+
+          {canManageNotices && (
+            <button
+              type="button"
+              onClick={handleOpenAddDialog}
+              className="flex h-12 min-w-[140px] items-center justify-center gap-2 rounded-xl bg-amber-300 px-6 text-sm font-black uppercase tracking-wider text-slate-900 shadow-lg shadow-amber-200 transition-all hover:bg-amber-200"
+            >
+              <span aria-hidden="true">⊕</span>
+              <span>Add Notice</span>
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {isLoading ? (
+            <div className="rounded-xl border border-slate-200 bg-white px-6 py-8 text-sm font-medium text-slate-500">
+              공지사항을 불러오는 중입니다.
+            </div>
+          ) : displayedNotices.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white px-6 py-8 text-sm font-medium text-slate-500">
+              등록된 공지사항이 없습니다.
+            </div>
+          ) : (
+            displayedNotices.map((notice, index) => {
+              const previewLines = extractPreviewLines(notice.content, 3);
+              const imagePreset = NOTICE_IMAGE_PRESETS[index % NOTICE_IMAGE_PRESETS.length];
+              const isExpanded = expandedNoticeIds.includes(notice.id);
+
+              return (
+                <article key={notice.id} className="group">
+                  <div
+                    className={`flex flex-col items-stretch justify-start overflow-hidden rounded-xl bg-white transition-all xl:flex-row ${
+                      notice.pinned
+                        ? 'border-2 border-amber-300 shadow-md hover:shadow-lg'
+                        : 'border border-slate-200 shadow-sm hover:shadow-md'
+                    }`}
+                  >
+                    <div
+                      role="img"
+                      aria-label={imagePreset.alt}
+                      className="relative aspect-video w-full overflow-hidden bg-center bg-no-repeat xl:w-72 xl:flex-shrink-0"
+                      style={{ background: imagePreset.gradient }}
+                    >
+                      <div className="flex h-full w-full items-end bg-black/5 p-4">
+                        <span className="text-4xl drop-shadow-sm" aria-hidden="true">
+                          {imagePreset.symbol}
+                        </span>
+                      </div>
+
+                      {notice.pinned && (
+                        <div className="absolute left-4 top-4">
+                          <span className="flex items-center gap-1 rounded bg-amber-300 px-2 py-1 text-[10px] font-black uppercase text-slate-900 shadow-sm">
+                            <span aria-hidden="true" className="text-[11px]">
+                              📌
+                            </span>
+                            Pinned
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-1 flex-col justify-between p-6">
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-start justify-between gap-4">
+                          <h3 className="text-xl font-bold leading-tight text-slate-900 transition-colors group-hover:text-blue-700">
+                            {notice.title}
+                          </h3>
+
+                          {canManageNotices && (
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                title="Edit"
+                                aria-label="Edit notice"
+                                onClick={() => handleOpenEditDialog(notice)}
+                                className="flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-blue-100 hover:text-blue-700"
+                              >
+                                <span aria-hidden="true" className="text-base">
+                                  ✎
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                title="Delete"
+                                aria-label="Delete notice"
+                                disabled={deletingNoticeId === notice.id}
+                                onClick={() => void handleDeleteNotice(notice.id)}
+                                className="flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-red-100 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                <span aria-hidden="true" className="text-base">
+                                  {deletingNoticeId === notice.id ? '…' : '🗑'}
+                                </span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-500">
+                          <span aria-hidden="true">👤</span>
+                          <span>Posted by {notice.createUser}</span>
+                          <span className="mx-1">•</span>
+                          <span aria-hidden="true">⏱</span>
+                          <span>{formatRelativeTime(notice.createDate)}</span>
+                        </div>
+
+                        <ul className="space-y-2 text-sm text-slate-600">
+                          {(previewLines.length > 0 ? previewLines : ['내용이 없습니다.']).map((line, lineIndex) => (
+                            <li key={`${notice.id}-line-${lineIndex}`} className="flex items-start gap-2">
+                              <span className="mt-1 text-amber-500" aria-hidden="true">
+                                •
+                              </span>
+                              <span>{line}</span>
+                            </li>
+                          ))}
+                        </ul>
+
+                        {notice.content.trim().length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => toggleNoticeExpand(notice.id)}
+                            className="w-fit text-sm font-semibold text-blue-700 transition-colors hover:text-blue-800"
+                            aria-expanded={isExpanded}
+                          >
+                            {isExpanded ? 'Hide full notice' : 'Read full notice'}
+                          </button>
+                        )}
+
+                        {isExpanded && (
+                          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                            <p className="whitespace-pre-wrap">{notice.content}</p>
+                          </div>
+                        )}
+
+                        <p className="text-xs font-medium text-slate-400">
+                          Updated: {notice.updateUser} · {formatDateTime(notice.updateDate)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </div>
+
+        {hasMoreNotices && !isLoading && (
+          <div className="flex justify-center py-2">
+            <button
+              type="button"
+              onClick={handleLoadMoreNotices}
+              className="flex h-11 items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-8 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50"
+            >
+              <span>Load More Notices</span>
+              <span aria-hidden="true">⌄</span>
+            </button>
+          </div>
         )}
-      </Box>
-
-      {isLoading ? (
-        <Typography variant="body2" color="text.secondary">
-          공지사항을 불러오는 중입니다.
-        </Typography>
-      ) : noticeList.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          등록된 공지사항이 없습니다.
-        </Typography>
-      ) : (
-        noticeList.map((notice) => (
-          <Accordion defaultExpanded key={notice.id}>
-            <AccordionSummary expandIcon={<span aria-hidden="true">▼</span>}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                <Typography fontWeight={700}>
-                  {notice.pinned ? '[PINNED] ' : ''}
-                  {notice.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {notice.createUser}
-                </Typography>
-              </Box>
-            </AccordionSummary>
-
-            <AccordionDetails>
-              <Typography sx={{ whiteSpace: 'pre-wrap', mb: 1.5 }}>{notice.content}</Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                Created: {new Date(notice.createDate).toLocaleString()}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                Updated: {notice.updateUser} / {new Date(notice.updateDate).toLocaleString()}
-              </Typography>
-
-              {canManageNotices && (
-                <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => handleOpenEditDialog(notice)}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    color="error"
-                    disabled={deletingNoticeId === notice.id}
-                    onClick={() => handleDeleteNotice(notice.id)}
-                  >
-                    {deletingNoticeId === notice.id ? 'Deleting...' : 'Delete'}
-                  </Button>
-                </Box>
-              )}
-            </AccordionDetails>
-          </Accordion>
-        ))
-      )}
+      </div>
 
       <Dialog open={openAddDialog} onClose={handleCloseAddDialog} fullWidth maxWidth="sm">
         <DialogTitle>Add Notice</DialogTitle>
@@ -557,6 +761,6 @@ export default function Notice() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </main>
   );
 }
