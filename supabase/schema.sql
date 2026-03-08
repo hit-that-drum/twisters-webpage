@@ -44,6 +44,28 @@ CREATE TABLE IF NOT EXISTS settlement (
   relation VARCHAR(100) NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS board (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "authorId" INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  title VARCHAR(255) NOT NULL,
+  "createUser" VARCHAR(100) NOT NULL,
+  "createDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updateUser" VARCHAR(100) NOT NULL,
+  "updateDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  content TEXT NOT NULL,
+  pinned BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS board_comments (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "boardId" INTEGER NOT NULL REFERENCES board(id) ON DELETE CASCADE,
+  "authorId" INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  "authorName" VARCHAR(100) NOT NULL,
+  content TEXT NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -75,11 +97,31 @@ CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions (user_id);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_idle_expires_at ON user_sessions (idle_expires_at);
 CREATE INDEX IF NOT EXISTS idx_settlement_date ON settlement (settlement_date DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_settlement_unique_entry ON settlement (settlement_date, item, amount, relation);
+CREATE INDEX IF NOT EXISTS idx_board_create_date ON board ("createDate" DESC);
+CREATE INDEX IF NOT EXISTS idx_board_author_id ON board ("authorId");
+CREATE INDEX IF NOT EXISTS idx_board_comments_board_id ON board_comments ("boardId", "createdAt" ASC);
+CREATE INDEX IF NOT EXISTS idx_board_comments_author_id ON board_comments ("authorId");
 
 CREATE OR REPLACE FUNCTION update_notice_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW."updateDate" = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION update_board_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW."updateDate" = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION update_board_comment_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW."updatedAt" = NOW();
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -90,3 +132,17 @@ CREATE TRIGGER trg_notice_update_date
 BEFORE UPDATE ON notice
 FOR EACH ROW
 EXECUTE FUNCTION update_notice_updated_at();
+
+DROP TRIGGER IF EXISTS trg_board_update_date ON board;
+
+CREATE TRIGGER trg_board_update_date
+BEFORE UPDATE ON board
+FOR EACH ROW
+EXECUTE FUNCTION update_board_updated_at();
+
+DROP TRIGGER IF EXISTS trg_board_comment_update_date ON board_comments;
+
+CREATE TRIGGER trg_board_comment_update_date
+BEFORE UPDATE ON board_comments
+FOR EACH ROW
+EXECUTE FUNCTION update_board_comment_updated_at();
