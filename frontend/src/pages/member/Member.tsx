@@ -11,7 +11,6 @@ import {
   TextField,
 } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
-import SubLNB from '@/common/components/SubLNB';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
 
@@ -41,6 +40,12 @@ interface MemberFormState {
 interface ParsedMemberDuesStatus {
   years: number[];
   byMemberId: Record<number, Record<number, boolean>>;
+}
+
+interface DuesDisplayMeta {
+  label: string;
+  icon: string;
+  className: string;
 }
 
 const DEPOSIT_KEY_PATTERN = /^deposit(\d{4})$/;
@@ -224,6 +229,32 @@ const getApiMessage = (payload: unknown, fallback: string) => {
   return fallback;
 };
 
+const getDuesDisplayMeta = (year: number, isPaid: boolean): DuesDisplayMeta => {
+  const currentYear = new Date().getFullYear();
+
+  if (year > currentYear) {
+    return {
+      label: '예정',
+      icon: '⌛',
+      className: 'bg-slate-100 text-slate-500',
+    };
+  }
+
+  if (isPaid) {
+    return {
+      label: '완납',
+      icon: '✓',
+      className: 'bg-emerald-50 text-emerald-700',
+    };
+  }
+
+  return {
+    label: '미납',
+    icon: '•',
+    className: 'bg-amber-50 text-amber-700',
+  };
+};
+
 export default function Member() {
   const navigate = useNavigate();
   const { meInfo, isAuthLoading, logout } = useAuth();
@@ -357,16 +388,6 @@ export default function Member() {
 
     return duesStatusByMemberId[selectedUser.id] ?? ({} as Record<number, boolean>);
   }, [duesStatusByMemberId, selectedUser]);
-
-  const subLnbItems = useMemo(
-    () =>
-      users.map((user) => ({
-        key: String(user.id),
-        label: user.name,
-        meta: user.email ?? undefined,
-      })),
-    [users],
-  );
 
   const requireAdminAction = () => {
     if (!meInfo) {
@@ -573,157 +594,217 @@ export default function Member() {
   };
 
   return (
-    <section className="p-6">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Member</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            왼쪽 사용자 이름을 클릭하면 해당 회원의 상세 정보를 확인할 수 있습니다.
-          </p>
-        </div>
+    <section className="px-3 py-6 sm:px-4 sm:py-8 lg:px-20">
+      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Members</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              왼쪽 Member Directory에서 회원을 선택하면 상세 정보를 확인할 수 있습니다.
+            </p>
+          </div>
 
-        {canManageMembers && (
-          <Button variant="contained" onClick={handleOpenAddDialog}>
-            ADD MEMBER
-          </Button>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="w-full lg:w-72 lg:shrink-0">
-          <SubLNB
-            title="Members"
-            items={subLnbItems}
-            selectedKey={selectedUserId ? String(selectedUserId) : null}
-            onSelect={(key) => {
-              const parsed = Number(key);
-              if (Number.isInteger(parsed)) {
-                setSelectedUserId(parsed);
-              }
-            }}
-            emptyMessage={isLoading ? 'Loading members...' : 'No members available.'}
-          />
-        </div>
-
-        <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          {isLoading ? (
-            <p className="text-sm font-semibold text-gray-500">Loading member detail...</p>
-          ) : selectedUser ? (
-            <div className="space-y-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Name
-                  </p>
-                  <p className="mt-1 text-xl font-bold text-gray-900">{selectedUser.name}</p>
-                </div>
-
-                {canManageMembers && (
-                  <Button variant="outlined" onClick={handleOpenEditDialog}>
-                    EDIT
-                  </Button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Email
-                  </p>
-                  <p className="mt-1 text-base text-gray-700">
-                    {renderDetailValue(selectedUser.email)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Admin
-                  </p>
-                  <p className="mt-1 text-base text-gray-700">
-                    {selectedUser.isAdmin ? 'Yes' : 'No'}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Phone
-                  </p>
-                  <p className="mt-1 text-base text-gray-700">
-                    {renderDetailValue(selectedUser.phone)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Joined At
-                  </p>
-                  <p className="mt-1 text-base text-gray-700">
-                    {renderDetailValue(selectedUser.joinedAt)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Role
-                  </p>
-                  <p className="mt-1 text-base text-gray-700">
-                    {renderDetailValue(selectedUser.role)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Department
-                  </p>
-                  <p className="mt-1 text-base text-gray-700">
-                    {renderDetailValue(selectedUser.department)}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  회비 입금 여부
-                </p>
-                <div className="mt-2 overflow-hidden rounded-lg border border-gray-200">
-                  {duesYears.length > 0 ? (
-                    duesYears.map((year) => {
-                      const isPaid = selectedUserDuesStatus[year] === true;
-                      return (
-                        <div
-                          key={`dues-${year}`}
-                          className="grid grid-cols-2 items-center border-b border-gray-200 px-3 py-2 last:border-b-0"
-                        >
-                          <span className="text-sm text-gray-700">{year} 회비</span>
-                          <span
-                            className={`text-right text-base font-bold ${
-                              isPaid ? 'text-emerald-700' : 'text-gray-500'
-                            }`}
-                          >
-                            {isPaid ? '⭕' : '❌'}
-                          </span>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="grid grid-cols-2 items-center px-3 py-2">
-                      <span className="text-sm text-gray-500">회비 데이터 없음</span>
-                      <span className="text-right text-base font-bold text-gray-400">-</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Bio</p>
-                <p className="mt-1 whitespace-pre-wrap text-base text-gray-700">
-                  {renderDetailValue(selectedUser.bio)}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">선택된 회원이 없습니다.</p>
+          {canManageMembers && (
+            <button
+              type="button"
+              onClick={handleOpenAddDialog}
+              className="flex h-11 items-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black uppercase tracking-wider text-slate-900 shadow-lg shadow-amber-200 transition-all hover:bg-amber-200 sm:h-12 sm:px-6"
+            >
+              <span aria-hidden="true" className="text-base">
+                ⊕
+              </span>
+              ADD MEMBER
+            </button>
           )}
+        </div>
+
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+          <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:col-span-3 lg:sticky lg:top-6">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
+              <h3
+                id="member-directory-heading"
+                className="text-sm font-bold uppercase tracking-wider text-slate-500"
+              >
+                Member Directory
+              </h3>
+            </div>
+
+            <div className="flex flex-col" role="listbox" aria-labelledby="member-directory-heading">
+              {isLoading ? (
+                <p className="px-4 py-5 text-sm font-medium text-slate-500">Loading members...</p>
+              ) : users.length === 0 ? (
+                <p className="px-4 py-5 text-sm font-medium text-slate-500">No members available.</p>
+              ) : (
+                users.map((user) => {
+                  const isActive = user.id === selectedUserId;
+
+                  return (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => setSelectedUserId(user.id)}
+                      role="option"
+                      aria-selected={isActive}
+                      tabIndex={isActive ? 0 : -1}
+                      className={`flex w-full items-center gap-3 border-r-4 px-4 py-3 text-left transition-all ${
+                        isActive
+                          ? 'border-amber-300 bg-amber-50/60 text-slate-900'
+                          : 'border-transparent text-slate-600 hover:bg-slate-50'
+                      } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-inset`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`inline-flex size-8 items-center justify-center rounded-full text-xs font-bold ${
+                          isActive ? 'bg-amber-200 text-amber-800' : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {user.name.trim().charAt(0) || '?'}
+                      </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span className={`block truncate text-sm ${isActive ? 'font-bold' : 'font-semibold'}`}>
+                          {user.name}
+                        </span>
+                        <span className="block truncate text-xs text-slate-400">
+                          {renderDetailValue(user.email)}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </aside>
+
+          <section className="flex flex-col gap-6 lg:col-span-9">
+            {isLoading ? (
+              <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-sm font-semibold text-slate-500 shadow-sm">
+                Loading member detail...
+              </div>
+            ) : selectedUser ? (
+              <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-200/60">
+                <div className="p-6 md:p-8">
+                  <div className="mb-8 flex flex-col gap-5 border-b border-slate-100 pb-8 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-5">
+                      <div className="inline-flex size-24 items-center justify-center rounded-full border-4 border-amber-300 bg-slate-100 text-4xl font-black text-slate-500 shadow-inner">
+                        {selectedUser.name.trim().charAt(0) || '?'}
+                      </div>
+
+                      <div>
+                        <h2 className="text-3xl font-black tracking-tight text-slate-900">
+                          {selectedUser.name}
+                        </h2>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">
+                            {selectedUser.isAdmin ? 'Administrator' : 'Member'}
+                          </span>
+                          <span className="text-sm font-medium italic text-slate-400">Active Member</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {canManageMembers && (
+                      <button
+                        type="button"
+                        onClick={handleOpenEditDialog}
+                        className="flex h-11 min-w-[120px] items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
+                      >
+                        <span aria-hidden="true">✎</span>
+                        EDIT
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-x-12 gap-y-7 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="flex flex-col gap-1">
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Email</p>
+                      <p className="text-lg font-semibold text-slate-800">
+                        {renderDetailValue(selectedUser.email)}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Admin</p>
+                      <p className="text-lg font-semibold text-slate-800">
+                        {selectedUser.isAdmin ? 'Yes' : 'No'}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Phone</p>
+                      <p className="text-lg font-semibold text-slate-800">
+                        {renderDetailValue(selectedUser.phone)}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Joined At</p>
+                      <p className="text-lg font-semibold text-slate-800">
+                        {renderDetailValue(selectedUser.joinedAt)}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Role</p>
+                      <p className="text-lg font-semibold text-slate-800">
+                        {renderDetailValue(selectedUser.role)}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Department</p>
+                      <p className="text-lg font-semibold text-slate-800">
+                        {renderDetailValue(selectedUser.department)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 bg-slate-50 px-6 py-6 md:px-8">
+                  <h3 className="mb-5 flex items-center gap-2 text-lg font-bold text-slate-900">
+                    <span aria-hidden="true" className="text-amber-500">
+                      ₩
+                    </span>
+                    회비 입금 여부 (Membership Fee Payment)
+                  </h3>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    {duesYears.length > 0 ? (
+                      duesYears.map((year) => {
+                        const isPaid = selectedUserDuesStatus[year] === true;
+                        const statusMeta = getDuesDisplayMeta(year, isPaid);
+
+                        return (
+                          <div
+                            key={`dues-${year}`}
+                            className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3"
+                          >
+                            <span className="font-bold text-slate-600">{year}년</span>
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold ${statusMeta.className}`}
+                            >
+                              <span aria-hidden="true">{statusMeta.icon}</span>
+                              {statusMeta.label}
+                            </span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-500">
+                        회비 데이터 없음
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 px-6 py-6 md:px-8">
+                  <h3 className="mb-3 text-lg font-bold uppercase tracking-tight text-slate-900">Bio</h3>
+                  <p className="whitespace-pre-wrap leading-relaxed text-slate-600">
+                    {renderDetailValue(selectedUser.bio)}
+                  </p>
+                </div>
+              </article>
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-sm font-semibold text-slate-500 shadow-sm">
+                선택된 회원이 없습니다.
+              </div>
+            )}
+          </section>
         </div>
       </div>
 
