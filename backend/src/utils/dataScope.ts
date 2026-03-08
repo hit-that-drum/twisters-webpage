@@ -7,6 +7,7 @@ interface ScopedTableNames {
   members: string;
   settlement: string;
   board: string;
+  boardComments: string;
 }
 
 const TABLE_NAMES_BY_SCOPE: Record<DataScope, ScopedTableNames> = {
@@ -15,12 +16,14 @@ const TABLE_NAMES_BY_SCOPE: Record<DataScope, ScopedTableNames> = {
     members: 'members',
     settlement: 'settlement',
     board: 'board',
+    boardComments: 'board_comments',
   },
   test: {
     notice: 'test_notice',
     members: 'test_members',
     settlement: 'test_settlement',
     board: 'test_board',
+    boardComments: 'test_board_comments',
   },
 };
 

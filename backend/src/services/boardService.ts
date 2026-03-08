@@ -13,6 +13,7 @@ import {
   type CreateBoardDTO,
   type UpdateBoardDTO,
 } from '../types/board.types.js';
+import { resolveDataScopeByUser } from '../utils/dataScope.js';
 
 const parseBoardId = (rawBoardId?: string) => {
   const boardId = Number(rawBoardId);
@@ -185,7 +186,12 @@ const normalizeBoardSearch = (rawSearch: string | undefined) => {
 };
 
 class BoardService {
-  async getBoards(query: BoardListQuery): Promise<Board[]> {
+  async getBoards(
+    authenticatedUser: AuthenticatedUser | undefined,
+    query: BoardListQuery,
+  ): Promise<Board[]> {
+    const scope = resolveDataScopeByUser(authenticatedUser);
+
     const normalizedQuery: BoardListFilters = {
       sort: normalizeBoardSort(query.sort),
     };
@@ -195,7 +201,7 @@ class BoardService {
       normalizedQuery.search = normalizedSearch;
     }
 
-    const rows = await boardRepository.findAll(normalizedQuery);
+    const rows = await boardRepository.findAll(scope, normalizedQuery);
     return rows.map((row) => ({
       ...row,
       pinned: Boolean(row.pinned),
@@ -205,7 +211,8 @@ class BoardService {
   async createBoard(authenticatedUser: AuthenticatedUser | undefined, payload: CreateBoardDTO) {
     const sessionUser = requireAuthenticatedUser(authenticatedUser);
     const normalizedPayload = normalizeBoardMutationPayload(payload, sessionUser, false);
-    await boardRepository.create(normalizedPayload);
+    const scope = resolveDataScopeByUser(sessionUser);
+    await boardRepository.create(scope, normalizedPayload);
   }
 
   async updateBoard(
@@ -214,12 +221,13 @@ class BoardService {
     payload: UpdateBoardDTO,
   ) {
     const sessionUser = requireAuthenticatedUser(authenticatedUser);
+    const scope = resolveDataScopeByUser(sessionUser);
     const boardId = parseBoardId(rawBoardId);
     if (!boardId) {
       throw new HttpError(400, '유효한 게시글 ID가 필요합니다.');
     }
 
-    const existingBoard = await boardRepository.findById(boardId);
+    const existingBoard = await boardRepository.findById(scope, boardId);
     if (!existingBoard) {
       throw new HttpError(404, '해당 게시글을 찾을 수 없습니다.');
     }
@@ -236,7 +244,7 @@ class BoardService {
       normalizedPayload.pinned = defaultPinned;
     }
 
-    const updatedCount = await boardRepository.updateById(boardId, normalizedPayload);
+    const updatedCount = await boardRepository.updateById(scope, boardId, normalizedPayload);
     if (updatedCount === 0) {
       throw new HttpError(404, '해당 게시글을 찾을 수 없습니다.');
     }
@@ -244,12 +252,13 @@ class BoardService {
 
   async deleteBoard(authenticatedUser: AuthenticatedUser | undefined, rawBoardId: string | undefined) {
     const sessionUser = requireAuthenticatedUser(authenticatedUser);
+    const scope = resolveDataScopeByUser(sessionUser);
     const boardId = parseBoardId(rawBoardId);
     if (!boardId) {
       throw new HttpError(400, '유효한 게시글 ID가 필요합니다.');
     }
 
-    const existingBoard = await boardRepository.findById(boardId);
+    const existingBoard = await boardRepository.findById(scope, boardId);
     if (!existingBoard) {
       throw new HttpError(404, '해당 게시글을 찾을 수 없습니다.');
     }
@@ -264,26 +273,27 @@ class BoardService {
       throw new HttpError(403, '상단 고정 게시글은 관리자만 삭제할 수 있습니다.');
     }
 
-    const deletedCount = await boardRepository.deleteById(boardId);
+    const deletedCount = await boardRepository.deleteById(scope, boardId);
     if (deletedCount === 0) {
       throw new HttpError(404, '해당 게시글을 찾을 수 없습니다.');
     }
   }
 
   async getBoardComments(authenticatedUser: AuthenticatedUser | undefined, rawBoardId: string | undefined) {
-    requireAuthenticatedUser(authenticatedUser);
+    const sessionUser = requireAuthenticatedUser(authenticatedUser);
+    const scope = resolveDataScopeByUser(sessionUser);
 
     const boardId = parseBoardId(rawBoardId);
     if (!boardId) {
       throw new HttpError(400, '유효한 게시글 ID가 필요합니다.');
     }
 
-    const existingBoard = await boardRepository.findById(boardId);
+    const existingBoard = await boardRepository.findById(scope, boardId);
     if (!existingBoard) {
       throw new HttpError(404, '해당 게시글을 찾을 수 없습니다.');
     }
 
-    const rows = await boardRepository.findCommentsByBoardId(boardId);
+    const rows = await boardRepository.findCommentsByBoardId(scope, boardId);
     return rows as BoardComment[];
   }
 
@@ -293,18 +303,19 @@ class BoardService {
     payload: CreateBoardCommentDTO,
   ) {
     const sessionUser = requireAuthenticatedUser(authenticatedUser);
+    const scope = resolveDataScopeByUser(sessionUser);
     const boardId = parseBoardId(rawBoardId);
     if (!boardId) {
       throw new HttpError(400, '유효한 게시글 ID가 필요합니다.');
     }
 
-    const existingBoard = await boardRepository.findById(boardId);
+    const existingBoard = await boardRepository.findById(scope, boardId);
     if (!existingBoard) {
       throw new HttpError(404, '해당 게시글을 찾을 수 없습니다.');
     }
 
     const normalizedPayload = normalizeBoardCommentPayload(payload, sessionUser, boardId);
-    await boardRepository.createComment(normalizedPayload);
+    await boardRepository.createComment(scope, normalizedPayload);
   }
 
   async deleteBoardComment(
@@ -313,13 +324,14 @@ class BoardService {
     rawCommentId: string | undefined,
   ) {
     const sessionUser = requireAuthenticatedUser(authenticatedUser);
+    const scope = resolveDataScopeByUser(sessionUser);
 
     const boardId = parseBoardId(rawBoardId);
     if (!boardId) {
       throw new HttpError(400, '유효한 게시글 ID가 필요합니다.');
     }
 
-    const existingBoard = await boardRepository.findById(boardId);
+    const existingBoard = await boardRepository.findById(scope, boardId);
     if (!existingBoard) {
       throw new HttpError(404, '해당 게시글을 찾을 수 없습니다.');
     }
@@ -329,7 +341,7 @@ class BoardService {
       throw new HttpError(400, '유효한 댓글 ID가 필요합니다.');
     }
 
-    const comment = await boardRepository.findCommentById(boardId, commentId);
+    const comment = await boardRepository.findCommentById(scope, boardId, commentId);
     if (!comment) {
       throw new HttpError(404, '해당 댓글을 찾을 수 없습니다.');
     }
@@ -340,7 +352,7 @@ class BoardService {
       throw new HttpError(403, '댓글 작성자 또는 관리자만 댓글을 삭제할 수 있습니다.');
     }
 
-    const deletedCount = await boardRepository.deleteCommentById(boardId, commentId);
+    const deletedCount = await boardRepository.deleteCommentById(scope, boardId, commentId);
     if (deletedCount === 0) {
       throw new HttpError(404, '해당 댓글을 찾을 수 없습니다.');
     }

@@ -10,6 +10,7 @@ import { handleControllerError } from '../utils/controllerErrorHandler.js';
 
 export const getBoards = async (req: Request, res: Response) => {
   try {
+    const authenticatedUser = (req as AuthenticatedRequest).user;
     const query: { search?: string; sort?: string } = {};
     if (typeof req.query.search === 'string') {
       query.search = req.query.search;
@@ -19,7 +20,7 @@ export const getBoards = async (req: Request, res: Response) => {
       query.sort = req.query.sort;
     }
 
-    const boards = await boardService.getBoards(query);
+    const boards = await boardService.getBoards(authenticatedUser, query);
     return res.json(boards);
   } catch (error) {
     return handleControllerError(res, error, '게시글 조회 중 오류가 발생했습니다.', 'Board list fetch error');
