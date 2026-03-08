@@ -6,6 +6,7 @@ import {
   type MemberNameRow,
   type SettlementDuesRow,
 } from '../types/member.types.js';
+import { getScopedTableNames, type DataScope } from '../utils/dataScope.js';
 
 let ensureMembersSchemaPromise: Promise<void> | null = null;
 
@@ -83,6 +84,52 @@ class MemberRepository {
         await pool.query('CREATE INDEX IF NOT EXISTS idx_members_email_lower ON members (LOWER(email))');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_members_role ON members (role)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_members_department ON members (department)');
+
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS test_members (
+            id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            email VARCHAR(100) UNIQUE,
+            is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+            phone VARCHAR(30),
+            role VARCHAR(100),
+            department VARCHAR(100),
+            joined_at DATE,
+            bio TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `);
+
+        await pool.query('ALTER TABLE test_members ADD COLUMN IF NOT EXISTS name VARCHAR(100)');
+        await pool.query('ALTER TABLE test_members ADD COLUMN IF NOT EXISTS email VARCHAR(100) UNIQUE');
+        await pool.query(
+          'ALTER TABLE test_members ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE',
+        );
+        await pool.query('ALTER TABLE test_members ADD COLUMN IF NOT EXISTS phone VARCHAR(30)');
+        await pool.query('ALTER TABLE test_members ADD COLUMN IF NOT EXISTS role VARCHAR(100)');
+        await pool.query('ALTER TABLE test_members ADD COLUMN IF NOT EXISTS department VARCHAR(100)');
+        await pool.query('ALTER TABLE test_members ADD COLUMN IF NOT EXISTS joined_at DATE');
+        await pool.query('ALTER TABLE test_members ADD COLUMN IF NOT EXISTS bio TEXT');
+        await pool.query(
+          'ALTER TABLE test_members ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()',
+        );
+        await pool.query(
+          'ALTER TABLE test_members ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()',
+        );
+
+        await pool.query(`
+          UPDATE test_members
+          SET name = COALESCE(NULLIF(BTRIM(name), ''), 'Member ' || id::text)
+          WHERE name IS NULL OR BTRIM(name) = ''
+        `);
+
+        await pool.query('ALTER TABLE test_members ALTER COLUMN name SET NOT NULL');
+        await pool.query('ALTER TABLE test_members ALTER COLUMN email DROP NOT NULL');
+
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_test_members_email_lower ON test_members (LOWER(email))');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_test_members_role ON test_members (role)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_test_members_department ON test_members (department)');
       })().catch((error) => {
         ensureMembersSchemaPromise = null;
         throw error;
@@ -92,7 +139,8 @@ class MemberRepository {
     await ensureMembersSchemaPromise;
   }
 
-  async findAllMembers() {
+  async findAllMembers(scope: DataScope) {
+    const membersTable = getScopedTableNames(scope).members;
     const result = await pool.query<MemberListRow>(
       `
         SELECT
@@ -105,7 +153,7 @@ class MemberRepository {
           department,
           CASE WHEN joined_at IS NULL THEN NULL ELSE TO_CHAR(joined_at, 'YYYY-MM-DD') END AS "joinedAt",
           bio
-        FROM members
+        FROM ${membersTable}
         ORDER BY name COLLATE "ko-KR-x-icu" ASC, id ASC
       `,
     );
@@ -113,11 +161,12 @@ class MemberRepository {
     return result.rows;
   }
 
-  async findAllMemberNames() {
+  async findAllMemberNames(scope: DataScope) {
+    const membersTable = getScopedTableNames(scope).members;
     const result = await pool.query<MemberNameRow>(
       `
         SELECT id, name
-        FROM members
+        FROM ${membersTable}
         ORDER BY name COLLATE "ko-KR-x-icu" ASC, id ASC
       `,
     );
@@ -125,43 +174,48 @@ class MemberRepository {
     return result.rows;
   }
 
-  async findSettlementDuesRows(duesBaseYear: number) {
+  async findSettlementDuesRows(scope: DataScope, duesBaseYear: number) {
+    const settlementTable = getScopedTableNames(scope).settlement;
     const result = await pool.query<SettlementDuesRow>(
       `
         SELECT
           item,
           EXTRACT(YEAR FROM settlement_date)::int AS year
-        FROM settlement
-        WHERE settlement_date >= DATE '${duesBaseYear}-01-01'
+        FROM ${settlementTable}
+        WHERE settlement_date >= MAKE_DATE($1, 1, 1)
           AND item LIKE '%회비%'
           AND amount > 0
         ORDER BY settlement_date ASC, id ASC
       `,
+      [duesBaseYear],
     );
 
     return result.rows;
   }
 
-  async findMemberByEmail(email: string) {
+  async findMemberByEmail(scope: DataScope, email: string) {
+    const membersTable = getScopedTableNames(scope).members;
     const result = await pool.query<MemberLookupRow>(
-      'SELECT id FROM members WHERE LOWER(email) = LOWER($1) LIMIT 1',
+      `SELECT id FROM ${membersTable} WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [email],
     );
     return result.rows[0] ?? null;
   }
 
-  async findMemberByEmailExcludingId(email: string, memberId: number) {
+  async findMemberByEmailExcludingId(scope: DataScope, email: string, memberId: number) {
+    const membersTable = getScopedTableNames(scope).members;
     const result = await pool.query<MemberLookupRow>(
-      'SELECT id FROM members WHERE LOWER(email) = LOWER($1) AND id <> $2 LIMIT 1',
+      `SELECT id FROM ${membersTable} WHERE LOWER(email) = LOWER($1) AND id <> $2 LIMIT 1`,
       [email, memberId],
     );
     return result.rows[0] ?? null;
   }
 
-  async createMember(payload: MemberMutationPayload) {
+  async createMember(scope: DataScope, payload: MemberMutationPayload) {
+    const membersTable = getScopedTableNames(scope).members;
     await pool.query(
       `
-        INSERT INTO members (name, email, is_admin, phone, role, department, joined_at, bio)
+        INSERT INTO ${membersTable} (name, email, is_admin, phone, role, department, joined_at, bio)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `,
       [
@@ -177,10 +231,11 @@ class MemberRepository {
     );
   }
 
-  async updateMember(memberId: number, payload: MemberMutationPayload) {
+  async updateMember(scope: DataScope, memberId: number, payload: MemberMutationPayload) {
+    const membersTable = getScopedTableNames(scope).members;
     const result = await pool.query(
       `
-        UPDATE members
+        UPDATE ${membersTable}
         SET
           name = $1,
           email = $2,
@@ -209,8 +264,9 @@ class MemberRepository {
     return result.rowCount ?? 0;
   }
 
-  async deleteMember(memberId: number) {
-    const result = await pool.query('DELETE FROM members WHERE id = $1', [memberId]);
+  async deleteMember(scope: DataScope, memberId: number) {
+    const membersTable = getScopedTableNames(scope).members;
+    const result = await pool.query(`DELETE FROM ${membersTable} WHERE id = $1`, [memberId]);
     return result.rowCount ?? 0;
   }
 }

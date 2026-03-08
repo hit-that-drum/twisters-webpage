@@ -6,7 +6,8 @@ import { handleControllerError } from '../utils/controllerErrorHandler.js';
 
 export const getMembers = async (_req: Request, res: Response) => {
   try {
-    const members = await memberService.getMembers();
+    const authenticatedUser = (_req as AuthenticatedRequest).user;
+    const members = await memberService.getMembers(authenticatedUser);
     return res.json(members);
   } catch (error) {
     return handleControllerError(res, error, '회원 정보 조회 중 오류가 발생했습니다.', 'Member list fetch error');
@@ -15,7 +16,8 @@ export const getMembers = async (_req: Request, res: Response) => {
 
 export const getMemberDuesDepositStatus = async (_req: Request, res: Response) => {
   try {
-    const memberDuesDepositStatus = await memberService.getMemberDuesDepositStatus();
+    const authenticatedUser = (_req as AuthenticatedRequest).user;
+    const memberDuesDepositStatus = await memberService.getMemberDuesDepositStatus(authenticatedUser);
     return res.json(memberDuesDepositStatus);
   } catch (error) {
     return handleControllerError(

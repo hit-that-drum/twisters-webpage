@@ -6,7 +6,8 @@ import { handleControllerError } from '../utils/controllerErrorHandler.js';
 
 export const getSettlements = async (_req: Request, res: Response) => {
   try {
-    const settlements = await settlementService.getSettlements();
+    const authenticatedUser = (_req as AuthenticatedRequest).user;
+    const settlements = await settlementService.getSettlements(authenticatedUser);
     return res.json(settlements);
   } catch (error) {
     return handleControllerError(res, error, '정산 내역 조회 중 오류가 발생했습니다.', 'Settlement list fetch error');

@@ -7,6 +7,7 @@ import {
   type UpdateNoticeDTO,
 } from '../types/notice.types.js';
 import { type AuthenticatedUser } from '../types/common.types.js';
+import { resolveDataScopeByUser } from '../utils/dataScope.js';
 
 const parseNoticeId = (rawNoticeId?: string) => {
   const noticeId = Number(rawNoticeId);
@@ -100,8 +101,9 @@ const normalizeNoticeMutationPayload = (
 };
 
 class NoticeService {
-  async getNotices(): Promise<Notice[]> {
-    const rows = await noticeRepository.findAll();
+  async getNotices(authenticatedUser: AuthenticatedUser | undefined): Promise<Notice[]> {
+    const scope = resolveDataScopeByUser(authenticatedUser);
+    const rows = await noticeRepository.findAll(scope);
     return rows.map((row) => ({
       ...row,
       pinned: Boolean(row.pinned),
@@ -111,7 +113,8 @@ class NoticeService {
   async createNotice(authenticatedUser: AuthenticatedUser | undefined, payload: CreateNoticeDTO) {
     const adminUser = requireAdminUser(authenticatedUser, '관리자만 공지사항을 등록할 수 있습니다.');
     const normalizedPayload = normalizeNoticeMutationPayload(payload, adminUser);
-    await noticeRepository.create(normalizedPayload);
+    const scope = resolveDataScopeByUser(adminUser);
+    await noticeRepository.create(scope, normalizedPayload);
   }
 
   async updateNotice(
@@ -126,7 +129,8 @@ class NoticeService {
     }
 
     const normalizedPayload = normalizeNoticeMutationPayload(payload, adminUser);
-    const updatedCount = await noticeRepository.updateById(noticeId, normalizedPayload);
+    const scope = resolveDataScopeByUser(adminUser);
+    const updatedCount = await noticeRepository.updateById(scope, noticeId, normalizedPayload);
 
     if (updatedCount === 0) {
       throw new HttpError(404, '해당 공지사항을 찾을 수 없습니다.');
@@ -134,14 +138,15 @@ class NoticeService {
   }
 
   async deleteNotice(authenticatedUser: AuthenticatedUser | undefined, rawNoticeId: string | undefined) {
-    requireAdminUser(authenticatedUser, '관리자만 공지사항을 삭제할 수 있습니다.');
+    const adminUser = requireAdminUser(authenticatedUser, '관리자만 공지사항을 삭제할 수 있습니다.');
 
     const noticeId = parseNoticeId(rawNoticeId);
     if (!noticeId) {
       throw new HttpError(400, '유효한 공지사항 ID가 필요합니다.');
     }
 
-    const deletedCount = await noticeRepository.deleteById(noticeId);
+    const scope = resolveDataScopeByUser(adminUser);
+    const deletedCount = await noticeRepository.deleteById(scope, noticeId);
     if (deletedCount === 0) {
       throw new HttpError(404, '해당 공지사항을 찾을 수 없습니다.');
     }

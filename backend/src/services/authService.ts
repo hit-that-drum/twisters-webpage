@@ -125,6 +125,8 @@ const normalizeBoolean = (rawValue: unknown, fallbackValue = false) => {
   return fallbackValue;
 };
 
+const isTestUserName = (name: string) => name.trim().startsWith('TEST');
+
 const requirePasswordResetLookup = (
   lookup: {
     id: number;
@@ -296,8 +298,9 @@ class AuthService {
     }
 
     try {
+      const isTest = isTestUserName(name);
       const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-      const userId = await authRepository.createUser(name, email, hashedPassword);
+      const userId = await authRepository.createUser(name, email, hashedPassword, isTest);
 
       if (!userId) {
         throw new HttpError(500, '회원가입 처리 중 사용자 ID를 확인하지 못했습니다.');
@@ -331,6 +334,7 @@ class AuthService {
       name: me.name,
       email: me.email,
       isAdmin: Boolean(me.isAdmin),
+      isTest: normalizeBoolean(me.isTest, false),
     };
   }
 
@@ -453,7 +457,9 @@ class AuthService {
     }
 
     const { email, name, picture, sub: googleId } = ticketPayload;
-    if (!email || !name || !googleId) {
+    const normalizedName = typeof name === 'string' ? name.trim() : '';
+
+    if (!email || !normalizedName || !googleId) {
       throw new HttpError(400, '구글 사용자 정보를 가져오지 못했습니다.');
     }
 
@@ -462,7 +468,13 @@ class AuthService {
     let user = await authRepository.findApprovalUserByEmail(normalizedEmail);
 
     if (!user) {
-      await authRepository.createGoogleUser(normalizedEmail, name, googleId, profileImage);
+      await authRepository.createGoogleUser(
+        normalizedEmail,
+        normalizedName,
+        googleId,
+        profileImage,
+        isTestUserName(normalizedName),
+      );
       user = await authRepository.findApprovalUserByEmail(normalizedEmail);
     } else {
       await authRepository.updateGoogleProfileByUserId(user.id, googleId, profileImage);
@@ -505,19 +517,22 @@ class AuthService {
     if (!user) {
       const fallbackEmail = `kakao-${kakaoProfile.kakaoId}@kakao.local`;
       const userEmail = kakaoProfile.email || fallbackEmail;
+      const normalizedKakaoName = kakaoProfile.name.trim();
+      const userName = normalizedKakaoName || `kakao-${kakaoProfile.kakaoId}`;
 
       logKakaoOAuthDebug('[Kakao OAuth][Backend] Creating new Kakao user:', {
         userEmail,
-        name: kakaoProfile.name,
+        name: userName,
         kakaoId: kakaoProfile.kakaoId,
         profileImage: kakaoProfile.profileImage,
       });
 
       await authRepository.createKakaoUser(
         userEmail,
-        kakaoProfile.name,
+        userName,
         kakaoProfile.kakaoId,
         kakaoProfile.profileImage,
+        isTestUserName(userName),
       );
       user = await authRepository.findApprovalUserByKakaoId(kakaoProfile.kakaoId);
       logKakaoOAuthDebug('[Kakao OAuth][Backend] Created user fetched by kakao_id:', user);
