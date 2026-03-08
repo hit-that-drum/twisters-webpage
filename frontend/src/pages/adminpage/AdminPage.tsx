@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, Typography } from '@mui/material';
-import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '@/common/lib/api/apiClient';
 import { useAuth } from '@/features';
@@ -22,46 +20,24 @@ interface AdminUserRecord {
   createdAt: string;
 }
 
-const dataGridSx = {
-  border: 'none',
-  color: 'text.primary',
-  '& .MuiDataGrid-columnHeaders': {
-    bgcolor: 'grey.50',
-    borderBottom: '1px solid',
-    borderBottomColor: 'grey.200',
-  },
-  '& .MuiDataGrid-columnHeader, & .MuiDataGrid-cell': {
-    borderRight: '1px solid',
-    borderRightColor: 'grey.200',
-  },
-  '& .MuiDataGrid-row': {
-    bgcolor: 'background.paper',
-  },
-  '& .MuiDataGrid-row:hover': {
-    bgcolor: 'grey.100',
-  },
-  '& .MuiDataGrid-cell': {
-    borderBottom: '1px solid',
-    borderBottomColor: 'grey.200',
-  },
-  '& .MuiDataGrid-footerContainer': {
-    bgcolor: 'grey.50',
-    borderTop: '1px solid',
-    borderTopColor: 'grey.200',
-  },
-  '& .MuiDataGrid-columnSeparator': {
-    color: 'grey.300',
-  },
-  '& .MuiDataGrid-iconButtonContainer button, & .MuiDataGrid-menuIconButton': {
-    color: 'text.secondary',
-  },
-  '& .MuiDataGrid-sortIcon': {
-    color: 'text.secondary',
-  },
-  '& .MuiDataGrid-cell:focus, & .MuiDataGrid-columnHeader:focus': {
-    outline: 'none',
-  },
-} as const;
+type UserStatusFilter = 'all' | 'active' | 'inactive';
+
+const USERS_PAGE_SIZE = 3;
+const USER_STATUS_FILTER_LABEL: Record<UserStatusFilter, string> = {
+  all: 'All',
+  active: 'Active',
+  inactive: 'Inactive',
+};
+
+const AVATAR_TONES = [
+  'bg-sky-100 text-sky-700',
+  'bg-emerald-100 text-emerald-700',
+  'bg-amber-100 text-amber-700',
+  'bg-violet-100 text-violet-700',
+  'bg-rose-100 text-rose-700',
+] as const;
+
+const countFormatter = new Intl.NumberFormat('en-US');
 
 const parseApiResponse = async (response: Response): Promise<unknown> => {
   const contentType = response.headers.get('content-type') || '';
@@ -218,6 +194,43 @@ const formatDateTime = (raw: string) => {
   });
 };
 
+const formatJoinedDate = (raw: string) => {
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+  });
+};
+
+const getInitials = (name: string) => {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return '?';
+  }
+
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
+  if (tokens.length === 1) {
+    return tokens[0].slice(0, 2).toUpperCase();
+  }
+
+  const first = tokens[0]?.charAt(0) ?? '';
+  const last = tokens[tokens.length - 1]?.charAt(0) ?? '';
+  return `${first}${last}`.toUpperCase();
+};
+
+const getAvatarToneClassName = (userId: number) => {
+  return AVATAR_TONES[userId % AVATAR_TONES.length] ?? AVATAR_TONES[0];
+};
+
+const formatCount = (count: number) => {
+  return countFormatter.format(count);
+};
+
 export default function AdminPage() {
   const navigate = useNavigate();
   const { meInfo, isAuthLoading, logout } = useAuth();
@@ -225,6 +238,8 @@ export default function AdminPage() {
   const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
   const [pendingUsers, setPendingUsers] = useState<PendingUserRecord[]>([]);
   const [allUsers, setAllUsers] = useState<AdminUserRecord[]>([]);
+  const [statusFilter, setStatusFilter] = useState<UserStatusFilter>('all');
+  const [usersPage, setUsersPage] = useState(0);
 
   const canManageUsers = meInfo?.isAdmin === true;
 
@@ -349,216 +364,342 @@ export default function AdminPage() {
     [canManageUsers, handleExpiredSession, loadUsers],
   );
 
-  const pendingColumns = useMemo<GridColDef<PendingUserRecord>[]>(
-    () => [
-      {
-        field: 'name',
-        headerName: 'Name',
-        minWidth: 160,
-        flex: 1,
-      },
-      {
-        field: 'email',
-        headerName: 'Email',
-        minWidth: 240,
-        flex: 1.4,
-      },
-      {
-        field: 'createdAt',
-        headerName: '가입일',
-        minWidth: 180,
-        flex: 1,
-        renderCell: (params) => (
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            {formatDateTime(params.row.createdAt)}
-          </Typography>
-        ),
-      },
-      {
-        field: 'actions',
-        headerName: '승인',
-        minWidth: 140,
-        flex: 0.8,
-        sortable: false,
-        filterable: false,
-        disableColumnMenu: true,
-        renderCell: (params) => (
-          <Button
-            variant="contained"
-            size="small"
-            disabled={approvingUserId === params.row.id}
-            onClick={() => void handleApproveUser(params.row.id)}
-          >
-            {approvingUserId === params.row.id ? 'Approving...' : 'Approve'}
-          </Button>
-        ),
-      },
-    ],
-    [approvingUserId, handleApproveUser],
+  const sortedAllUsers = useMemo(
+    () => [...allUsers].sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+    [allUsers],
   );
 
-  const allUsersColumns = useMemo<GridColDef<AdminUserRecord>[]>(
-    () => [
-      {
-        field: 'name',
-        headerName: 'Name',
-        minWidth: 160,
-        flex: 1,
-      },
-      {
-        field: 'email',
-        headerName: 'Email',
-        minWidth: 240,
-        flex: 1.4,
-      },
-      {
-        field: 'isAdmin',
-        headerName: 'Admin',
-        minWidth: 100,
-        flex: 0.6,
-        renderCell: (params) => (
-          <Typography
-            variant="body2"
-            sx={{ fontWeight: 700, color: params.row.isAdmin ? 'error.main' : 'text.secondary' }}
-          >
-            {params.row.isAdmin ? 'Yes' : 'No'}
-          </Typography>
-        ),
-      },
-      {
-        field: 'isAllowed',
-        headerName: '승인 상태',
-        minWidth: 120,
-        flex: 0.75,
-        renderCell: (params) => (
-          <Typography
-            variant="body2"
-            sx={{ fontWeight: 700, color: params.row.isAllowed ? 'success.dark' : 'warning.dark' }}
-          >
-            {params.row.isAllowed ? 'Approved' : 'Pending'}
-          </Typography>
-        ),
-      },
-      {
-        field: 'createdAt',
-        headerName: '가입일',
-        minWidth: 180,
-        flex: 1,
-        renderCell: (params) => (
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            {formatDateTime(params.row.createdAt)}
-          </Typography>
-        ),
-      },
-    ],
-    [],
-  );
+  const filteredUsers = useMemo(() => {
+    if (statusFilter === 'active') {
+      return sortedAllUsers.filter((user) => user.isAllowed);
+    }
+
+    if (statusFilter === 'inactive') {
+      return sortedAllUsers.filter((user) => !user.isAllowed);
+    }
+
+    return sortedAllUsers;
+  }, [sortedAllUsers, statusFilter]);
+
+  const maxPage = Math.max(0, Math.ceil(filteredUsers.length / USERS_PAGE_SIZE) - 1);
+
+  useEffect(() => {
+    setUsersPage((previous) => Math.min(previous, maxPage));
+  }, [maxPage]);
+
+  const pagedUsers = useMemo(() => {
+    const start = usersPage * USERS_PAGE_SIZE;
+    return filteredUsers.slice(start, start + USERS_PAGE_SIZE);
+  }, [filteredUsers, usersPage]);
+
+  const totalMembersCount = allUsers.length;
+  const pendingApprovalsCount = pendingUsers.length;
+  const activeUsersCount = allUsers.filter((user) => user.isAllowed).length;
+
+  const showingStart = filteredUsers.length === 0 ? 0 : usersPage * USERS_PAGE_SIZE + 1;
+  const showingEnd =
+    filteredUsers.length === 0 ? 0 : Math.min((usersPage + 1) * USERS_PAGE_SIZE, filteredUsers.length);
+
+  const handleToggleFilter = () => {
+    setStatusFilter((previous) => {
+      if (previous === 'all') {
+        return 'active';
+      }
+
+      if (previous === 'active') {
+        return 'inactive';
+      }
+
+      return 'all';
+    });
+    setUsersPage(0);
+  };
+
+  const handleAddNewUser = () => {
+    navigate('/member');
+  };
 
   if (isAuthLoading) {
     return (
-      <Box sx={{ px: { xs: 2, md: 3 }, py: 3 }}>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          관리자 페이지를 확인 중입니다...
-        </Typography>
-      </Box>
+      <main className="mx-auto w-full max-w-[1200px] px-4 py-8 md:px-10">
+        <p className="text-sm font-medium text-slate-500">관리자 페이지를 확인 중입니다...</p>
+      </main>
     );
   }
 
   return (
-    <Box sx={{ px: { xs: 2, md: 3 }, py: 3 }}>
-      <Box
-        sx={{
-          mb: 2,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 2,
-        }}
-      >
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-            관리자 사용자 관리
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-            회원가입 승인 대기 사용자를 승인하고 전체 사용자 정보를 조회할 수 있습니다.
-          </Typography>
-        </Box>
+    <main className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col px-4 py-8 md:px-10">
+      <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight text-slate-900">Admin Dashboard</h1>
+          <p className="mt-1 text-slate-500">
+            Manage community members and content moderation workflows.
+          </p>
+        </div>
 
-        <Button variant="outlined" onClick={() => void loadUsers()} disabled={isLoading}>
-          {isLoading ? 'Loading...' : '새로고침'}
-        </Button>
-      </Box>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={handleAddNewUser}
+            className="flex items-center gap-2 rounded-xl bg-amber-300 px-4 py-2 font-bold text-black shadow-sm transition-all hover:bg-amber-200"
+          >
+            <span aria-hidden="true" className="text-lg">
+              ＋
+            </span>
+            <span>Add New User</span>
+          </button>
+        </div>
+      </div>
 
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-          승인 대기 사용자 ({pendingUsers.length})
-        </Typography>
-        <Box
-          sx={{
-            height: { xs: 360, md: 420 },
-            border: 1,
-            borderColor: 'grey.300',
-            borderRadius: 2,
-            overflow: 'hidden',
-            bgcolor: 'background.paper',
-          }}
-        >
-          <DataGrid
-            rows={pendingUsers}
-            columns={pendingColumns}
-            loading={isLoading}
-            rowHeight={44}
-            disableRowSelectionOnClick
-            pageSizeOptions={[10, 20, 50]}
-            initialState={{
-              pagination: {
-                paginationModel: { pageSize: 10, page: 0 },
-              },
-            }}
-            localeText={{
-              noRowsLabel: '승인 대기 중인 사용자가 없습니다.',
-            }}
-            sx={dataGridSx}
-          />
-        </Box>
-      </Box>
+      <div className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="rounded-lg p-3 text-amber-400" style={{ backgroundColor: 'rgba(255, 215, 0, 0.1)' }}>
+              👥
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-500">Total Members</p>
+              <p className="text-2xl font-bold text-slate-900">{formatCount(totalMembersCount)}</p>
+            </div>
+          </div>
+        </div>
 
-      <Box>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-          전체 사용자 ({allUsers.length})
-        </Typography>
-        <Box
-          sx={{
-            height: { xs: 460, md: 620 },
-            border: 1,
-            borderColor: 'grey.300',
-            borderRadius: 2,
-            overflow: 'hidden',
-            bgcolor: 'background.paper',
-          }}
-        >
-          <DataGrid
-            rows={allUsers}
-            columns={allUsersColumns}
-            loading={isLoading}
-            rowHeight={44}
-            disableRowSelectionOnClick
-            pageSizeOptions={[20, 30, 50]}
-            initialState={{
-              sorting: {
-                sortModel: [{ field: 'createdAt', sort: 'desc' }],
-              },
-              pagination: {
-                paginationModel: { pageSize: 20, page: 0 },
-              },
-            }}
-            localeText={{
-              noRowsLabel: '등록된 사용자가 없습니다.',
-            }}
-            sx={dataGridSx}
-          />
-        </Box>
-      </Box>
-    </Box>
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="rounded-lg bg-amber-100 p-3 text-amber-600">⏳</div>
+            <div>
+              <p className="text-sm font-medium text-slate-500">Pending Approvals</p>
+              <p className="text-2xl font-bold text-slate-900">{formatCount(pendingApprovalsCount)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="rounded-lg bg-emerald-100 p-3 text-emerald-600">✓</div>
+            <div>
+              <p className="text-sm font-medium text-slate-500">Active Today</p>
+              <p className="text-2xl font-bold text-slate-900">{formatCount(activeUsersCount)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section className="mb-12">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900">
+            <span aria-hidden="true" className="text-amber-400">
+              ⌛
+            </span>
+            Pending Approvals
+          </h2>
+        </div>
+
+        {isLoading ? (
+          <div className="rounded-xl border border-slate-200 bg-white px-6 py-10 text-center text-sm font-medium text-slate-500">
+            Loading approval requests...
+          </div>
+        ) : pendingUsers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
+            <div className="mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-slate-50 text-5xl text-slate-300">
+              ☑
+            </div>
+            <h3 className="mb-1 text-lg font-bold text-slate-900">No pending approvals</h3>
+            <p className="mb-6 max-w-sm text-slate-500">
+              All community requests and content approvals have been processed. Good job!
+            </p>
+            <button
+              type="button"
+              onClick={() => void loadUsers()}
+              className="flex items-center gap-2 rounded-xl bg-slate-100 px-6 py-2 font-semibold text-slate-700 transition-colors hover:bg-slate-200"
+            >
+              <span aria-hidden="true">↻</span>
+              <span>{isLoading ? 'Refreshing...' : 'Refresh List'}</span>
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="divide-y divide-slate-100">
+              {pendingUsers.map((user) => (
+                <div key={user.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-base font-bold text-slate-900">{user.name}</p>
+                    <p className="text-sm text-slate-500">{user.email}</p>
+                    <p className="text-xs text-slate-400">Requested at {formatDateTime(user.createdAt)}</p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={approvingUserId === user.id}
+                    onClick={() => void handleApproveUser(user.id)}
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {approvingUserId === user.id ? 'Approving...' : 'Approve'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section>
+        <div className="mb-4 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+          <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900">
+            <span aria-hidden="true" className="text-amber-400">
+              ⚙
+            </span>
+            All Users
+          </h2>
+
+          <div className="flex w-full gap-2 sm:w-auto">
+            <button
+              type="button"
+              onClick={handleToggleFilter}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium transition-colors hover:bg-slate-50 sm:flex-none"
+            >
+              <span aria-hidden="true">☰</span>
+              <span>{`Filter (${USER_STATUS_FILTER_LABEL[statusFilter]})`}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50">
+                  <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Member
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Role
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Status
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Joined
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-500"
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-sm font-medium text-slate-500">
+                      Loading users...
+                    </td>
+                  </tr>
+                ) : pagedUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-sm font-medium text-slate-500">
+                      No users found for this filter.
+                    </td>
+                  </tr>
+                ) : (
+                  pagedUsers.map((user) => {
+                    const roleLabel = user.isAdmin ? 'Moderator' : 'Member';
+                    const statusLabel = user.isAllowed ? 'Active' : 'Inactive';
+                    const statusTextClassName = user.isAllowed ? 'text-emerald-600' : 'text-slate-400';
+                    const statusDotClassName = user.isAllowed ? 'bg-emerald-500' : 'bg-slate-300';
+
+                    return (
+                      <tr key={user.id} className="transition-colors hover:bg-slate-50/50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`flex size-10 items-center justify-center rounded-full text-xs font-bold ${getAvatarToneClassName(user.id)}`}
+                            >
+                              {getInitials(user.name)}
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900">{user.name}</p>
+                              <p className="text-xs text-slate-500">{user.email}</p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-sm font-medium text-slate-600">
+                            {roleLabel}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <div className={`flex items-center gap-1.5 text-sm font-medium ${statusTextClassName}`}>
+                            <span className={`size-2 rounded-full ${statusDotClassName}`} />
+                            {statusLabel}
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4 text-sm text-slate-500">{formatJoinedDate(user.createdAt)}</td>
+
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              aria-label={`Edit ${user.name}`}
+                              onClick={() => {
+                                enqueueSnackbar('사용자 편집 기능은 준비 중입니다.', { variant: 'info' });
+                              }}
+                              className="p-2 text-amber-400 transition-colors hover:text-amber-500"
+                            >
+                              ✎
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Delete ${user.name}`}
+                              onClick={() => {
+                                enqueueSnackbar('사용자 삭제 기능은 준비 중입니다.', { variant: 'info' });
+                              }}
+                              className="p-2 text-slate-400 transition-colors hover:text-red-500"
+                            >
+                              🗑
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+            <p className="text-sm text-slate-500">
+              {`Showing ${showingStart}-${showingEnd} of ${formatCount(filteredUsers.length)} members`}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setUsersPage((previous) => Math.max(0, previous - 1))}
+                disabled={usersPage === 0}
+                className="rounded border border-slate-200 p-2 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                aria-label="Previous users page"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                onClick={() => setUsersPage((previous) => Math.min(maxPage, previous + 1))}
+                disabled={usersPage >= maxPage}
+                className="rounded border border-slate-200 p-2 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                aria-label="Next users page"
+              >
+                ›
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }
