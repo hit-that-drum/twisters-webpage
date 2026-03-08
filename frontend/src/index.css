@@ -6,7 +6,6 @@
 @import 'tailwindcss';
 @import url('https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap');
 @config "../tailwind.config.js";
-@reference "../tailwind.config.js";
 
 /* 3. 커스텀 리셋 및 베이스 스타일 */
 @layer base {
@@ -20,7 +19,7 @@
 
   body {
     -webkit-font-smoothing: antialiased;
-    @apply text-gray-900 bg-white;
+    @apply text-gray-900 bg-gray-50;
     font-family: sans-serif;
   }
 

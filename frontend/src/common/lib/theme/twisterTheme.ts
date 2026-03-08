@@ -1,5 +1,16 @@
 import { createTheme } from '@mui/material/styles';
 
+/**
+ * Twister Design System – color tokens
+ *
+ * This palette is the single source of truth for:
+ * - Brand / primary color
+ * - Neutral gray scale
+ * - Semantic states (success / warning / error / info)
+ *
+ * All other systems (Tailwind CSS via CSS variables, MUI theme, custom CSS)
+ * should consume colors from here to keep the dashboard visually consistent.
+ */
 export const twisterPalette = {
   primary: {
     '100': '#bae0ff',
@@ -9,7 +20,7 @@ export const twisterPalette = {
     '900': '#001d66',
     lighter: '#e6f4ff',
     light: '#8AC0FF',
-    main: '#248AFF',
+    main: '#248AFF', // Primary brand blue
     dark: '#0058BD',
     darker: '#002c8c',
     contrastText: '#fff',
@@ -135,6 +146,16 @@ export const applyTwisterThemeCssVariables = () => {
   });
 };
 
+/**
+ * Twister MUI theme – unified B2B SaaS dashboard styling
+ *
+ * This theme encodes:
+ * - Color system (palette)
+ * - Typography scale (h1 ~ body2)
+ * - 4px spacing grid
+ * - Border radius standard
+ * - Core component styles (buttons, cards, inputs, dialogs, snackbars, tables)
+ */
 export const twisterMuiTheme = createTheme({
   palette: {
     primary: {
@@ -199,16 +220,293 @@ export const twisterMuiTheme = createTheme({
     },
     divider: twisterPalette.grey['200'],
   },
+  /**
+   * 4px spacing grid
+   * MUI spacing utilities will now map 1 → 4px, 2 → 8px, etc.
+   */
+  spacing: 4,
+  /**
+   * Border radius standard
+   * - Small controls: 10–12px
+   * - Cards / surfaces: 16px
+   */
   shape: {
     borderRadius: 12,
   },
+  /**
+   * Typography scale tuned for dashboard-style UI.
+   * These values apply to MUI Typography components and MUI-based controls.
+   */
+  typography: {
+    fontFamily:
+      "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, -system-ui, 'Segoe UI', sans-serif",
+    h1: {
+      fontSize: '2rem', // 32px
+      lineHeight: 1.25,
+      fontWeight: 700,
+      letterSpacing: '-0.03em',
+    },
+    h2: {
+      fontSize: '1.75rem', // 28px
+      lineHeight: 1.3,
+      fontWeight: 700,
+      letterSpacing: '-0.02em',
+    },
+    h3: {
+      fontSize: '1.5rem', // 24px
+      lineHeight: 1.3,
+      fontWeight: 600,
+      letterSpacing: '-0.01em',
+    },
+    h4: {
+      fontSize: '1.375rem', // 22px
+      lineHeight: 1.35,
+      fontWeight: 600,
+    },
+    h5: {
+      fontSize: '1.25rem', // 20px
+      lineHeight: 1.4,
+      fontWeight: 600,
+    },
+    h6: {
+      fontSize: '1.0625rem', // 17px
+      lineHeight: 1.4,
+      fontWeight: 600,
+    },
+    subtitle1: {
+      fontSize: '0.9375rem', // 15px
+      lineHeight: 1.5,
+      fontWeight: 500,
+    },
+    subtitle2: {
+      fontSize: '0.875rem', // 14px
+      lineHeight: 1.5,
+      fontWeight: 500,
+    },
+    body1: {
+      fontSize: '0.9375rem', // 15px
+      lineHeight: 1.6,
+      fontWeight: 400,
+    },
+    body2: {
+      fontSize: '0.875rem', // 14px
+      lineHeight: 1.6,
+      fontWeight: 400,
+    },
+    button: {
+      fontSize: '0.875rem',
+      lineHeight: 1.5,
+      fontWeight: 600,
+      textTransform: 'none',
+      letterSpacing: 0,
+    },
+    caption: {
+      fontSize: '0.75rem',
+      lineHeight: 1.4,
+      fontWeight: 500,
+    },
+    overline: {
+      fontSize: '0.6875rem',
+      lineHeight: 1.6,
+      fontWeight: 600,
+      textTransform: 'uppercase',
+      letterSpacing: '0.08em',
+    },
+  },
   components: {
+    /**
+     * Global CSS variables + base background / text color.
+     * Tailwind utilities will sit above this in the cascade,
+     * but the variables are used by both systems.
+     */
     MuiCssBaseline: {
       styleOverrides: {
         ':root': twisterCssVariables,
         body: {
           backgroundColor: twisterPalette.grey['50'],
           color: twisterPalette.secondary['800'],
+        },
+      },
+    },
+    /**
+     * Buttons – primary CTAs and secondary actions.
+     * Used across pages (Notice, Settlement, Member, Login dialogs, etc.).
+     */
+    MuiButton: {
+      defaultProps: {
+        disableElevation: true,
+      },
+      styleOverrides: {
+        root: {
+          borderRadius: 9999,
+          textTransform: 'none',
+          fontWeight: 600,
+          paddingInline: 16,
+          paddingBlock: 8,
+          letterSpacing: 0,
+        },
+        sizeSmall: {
+          paddingInline: 12,
+          paddingBlock: 6,
+          borderRadius: 9999,
+        },
+        sizeLarge: {
+          paddingInline: 20,
+          paddingBlock: 10,
+          borderRadius: 9999,
+        },
+        contained: {
+          boxShadow: 'none',
+          backgroundColor: twisterPalette.primary.main,
+          color: twisterPalette.primary.contrastText,
+          '&:hover': {
+            backgroundColor: twisterPalette.primary.dark,
+            boxShadow: 'none',
+          },
+          '&:active': {
+            backgroundColor: twisterPalette.primary.darker,
+          },
+          '&.Mui-disabled': {
+            backgroundColor: twisterPalette.grey['200'],
+            color: twisterPalette.grey['500'],
+          },
+        },
+        outlined: {
+          borderColor: twisterPalette.grey['300'],
+          backgroundColor: 'transparent',
+          '&:hover': {
+            borderColor: twisterPalette.primary['200'],
+            backgroundColor: twisterPalette.primary.lighter,
+          },
+        },
+        text: {
+          paddingInline: 8,
+          paddingBlock: 4,
+          borderRadius: 9999,
+        },
+      },
+    },
+    /**
+     * Cards / surfaces – used implicitly via Paper in dialogs and other surfaces.
+     * Gives a soft, premium SaaS feel.
+     */
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          borderRadius: 16,
+        },
+        outlined: {
+          borderColor: twisterPalette.grey['200'],
+        },
+      },
+    },
+    /**
+     * Form fields – TextField, OutlinedInput, labels.
+     * Shared by Login dialog, Member / Settlement / Notice forms, etc.
+     */
+    MuiTextField: {
+      defaultProps: {
+        variant: 'outlined',
+        size: 'small',
+        fullWidth: true,
+      },
+    },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          borderRadius: 10,
+          backgroundColor: twisterPalette.grey['0'],
+          '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: twisterPalette.grey['200'],
+          },
+          '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: twisterPalette.primary['200'],
+          },
+          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: twisterPalette.primary.main,
+            boxShadow: `0 0 0 1px ${twisterPalette.primary.lighter}`,
+          },
+        },
+        input: {
+          paddingBlock: 10,
+          paddingInline: 12,
+          fontSize: '0.875rem',
+        },
+      },
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: {
+          fontSize: '0.8125rem',
+          color: twisterPalette.grey['600'],
+        },
+      },
+    },
+    /**
+     * Dialogs / modals – login reset, Notice / Settlement / Member dialogs.
+     */
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          borderRadius: 18,
+          paddingInline: 4,
+        },
+      },
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: {
+          fontWeight: 700,
+          fontSize: '1.0625rem',
+        },
+      },
+    },
+    /**
+     * Snackbar / toast notifications – used via notistack.
+     */
+    MuiSnackbar: {
+      styleOverrides: {
+        root: {
+          '& .MuiPaper-root': {
+            borderRadius: 9999,
+            paddingInline: 16,
+          },
+        },
+      },
+    },
+    MuiAlert: {
+      styleOverrides: {
+        root: {
+          borderRadius: 9999,
+          paddingInline: 16,
+          paddingBlock: 8,
+          fontSize: '0.8125rem',
+        },
+        icon: {
+          fontSize: '1.1rem',
+        },
+      },
+    },
+    /**
+     * Tables & DataGrid – baseline visual language for tabular data.
+     * Individual pages (e.g. Settlement) can still refine via sx.
+     */
+    MuiTableHead: {
+      styleOverrides: {
+        root: {
+          backgroundColor: twisterPalette.grey['50'],
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        head: {
+          fontWeight: 600,
+          fontSize: '0.8125rem',
+          color: twisterPalette.grey['700'],
+        },
+        body: {
+          fontSize: '0.875rem',
         },
       },
     },
