@@ -9,7 +9,6 @@ import {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box,
   Button,
   Dialog,
   DialogActions,
@@ -18,9 +17,7 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Typography,
 } from '@mui/material';
-import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
@@ -115,6 +112,8 @@ const currencyFormatter = new Intl.NumberFormat('ko-KR', {
   maximumFractionDigits: 0,
 });
 
+const ROWS_PER_PAGE_OPTIONS = [10, 20, 50] as const;
+
 const formatAmount = (amount: number) => {
   const absoluteAmount = currencyFormatter.format(Math.abs(amount));
   return amount < 0 ? `-${absoluteAmount}` : absoluteAmount;
@@ -168,9 +167,22 @@ interface SettlementGridProps {
   isLoading: boolean;
   canManageSettlements: boolean;
   deletingSettlementId: number | null;
+  onOpenAddDialog: () => void;
   onEdit: (record: SettlementRecord) => void;
   onDelete: (settlementId: number) => Promise<void>;
   totalAmount: number;
+  totalIncome: number;
+  totalExpense: number;
+  carryOverAmount: number;
+  rowsPerPage: number;
+  pageStart: number;
+  pageEnd: number;
+  totalRows: number;
+  canGoPrevious: boolean;
+  canGoNext: boolean;
+  onRowsPerPageChange: (rowsPerPage: number) => void;
+  onPreviousPage: () => void;
+  onNextPage: () => void;
 }
 
 const SettlementGrid = memo(function SettlementGrid({
@@ -178,187 +190,226 @@ const SettlementGrid = memo(function SettlementGrid({
   isLoading,
   canManageSettlements,
   deletingSettlementId,
+  onOpenAddDialog,
   onEdit,
   onDelete,
   totalAmount,
+  totalIncome,
+  totalExpense,
+  carryOverAmount,
+  rowsPerPage,
+  pageStart,
+  pageEnd,
+  totalRows,
+  canGoPrevious,
+  canGoNext,
+  onRowsPerPageChange,
+  onPreviousPage,
+  onNextPage,
 }: SettlementGridProps) {
-  const settlementColumns = useMemo<GridColDef<SettlementRecord>[]>(() => {
-    const columns: GridColDef<SettlementRecord>[] = [
-      {
-        field: 'date',
-        headerName: '날짜',
-        minWidth: 130,
-        flex: 0.85,
-      },
-      {
-        field: 'item',
-        headerName: '항목',
-        minWidth: 220,
-        flex: 1.3,
-        sortable: false,
-        renderCell: (params) => (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-            <Typography
-              variant="body2"
-              sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-            >
-              {params.value}
-            </Typography>
-          </Box>
-        ),
-      },
-      {
-        field: 'amount',
-        headerName: '금액',
-        minWidth: 130,
-        flex: 0.75,
-        align: 'right',
-        headerAlign: 'right',
-        renderCell: (params) => (
-          <Typography
-            variant="body2"
-            sx={{
-              width: '100%',
-              textAlign: 'right',
-              color: params.value < 0 ? 'error.main' : 'text.primary',
-            }}
-          >
-            {formatAmount(params.value as number)}
-          </Typography>
-        ),
-      },
-      {
-        field: 'relation',
-        headerName: 'Relation',
-        minWidth: 170,
-        flex: 0.95,
-        sortable: false,
-        renderCell: (params) => (
-          <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.dark' }}>
-            {params.value}
-          </Typography>
-        ),
-      },
-    ];
-
-    if (canManageSettlements) {
-      columns.push({
-        field: 'actions',
-        headerName: '관리',
-        minWidth: 160,
-        flex: 0.8,
-        sortable: false,
-        filterable: false,
-        disableColumnMenu: true,
-        renderCell: (params) => (
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="outlined" size="small" onClick={() => onEdit(params.row)}>
-              Edit
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              color="error"
-              disabled={deletingSettlementId === params.row.id}
-              onClick={() => void onDelete(params.row.id)}
-            >
-              {deletingSettlementId === params.row.id ? 'Deleting...' : 'Delete'}
-            </Button>
-          </Box>
-        ),
-      });
-    }
-
-    return columns;
-  }, [canManageSettlements, deletingSettlementId, onDelete, onEdit]);
-
   return (
     <>
-      <Box
-        sx={{
-          height: { xs: 560, md: 920 },
-          border: 1,
-          borderColor: 'grey.300',
-          borderRadius: 2,
-          overflow: 'hidden',
-          bgcolor: 'background.paper',
-        }}
-      >
-        <DataGrid
-          rows={rows}
-          columns={settlementColumns}
-          rowHeight={42}
-          loading={isLoading}
-          disableRowSelectionOnClick
-          pageSizeOptions={[20, 30, 50]}
-          initialState={{
-            sorting: {
-              sortModel: [{ field: 'date', sort: 'desc' }],
-            },
-            pagination: {
-              paginationModel: { pageSize: 20, page: 0 },
-            },
-          }}
-          localeText={{
-            noRowsLabel: '등록된 정산 내역이 없습니다.',
-          }}
-          sx={{
-            border: 'none',
-            color: 'text.primary',
-            '& .MuiDataGrid-columnHeaders': {
-              bgcolor: 'grey.50',
-              borderBottom: '1px solid',
-              borderBottomColor: 'grey.200',
-            },
-            '& .MuiDataGrid-columnHeader, & .MuiDataGrid-cell': {
-              borderRight: '1px solid',
-              borderRightColor: 'grey.200',
-            },
-            '& .MuiDataGrid-row': {
-              bgcolor: 'background.paper',
-            },
-            '& .MuiDataGrid-row:hover': {
-              bgcolor: 'grey.100',
-            },
-            '& .MuiDataGrid-cell': {
-              borderBottom: '1px solid',
-              borderBottomColor: 'grey.200',
-            },
-            '& .MuiDataGrid-footerContainer': {
-              bgcolor: 'grey.50',
-              borderTop: '1px solid',
-              borderTopColor: 'grey.200',
-            },
-            '& .MuiDataGrid-columnSeparator': {
-              color: 'grey.300',
-            },
-            '& .MuiDataGrid-iconButtonContainer button, & .MuiDataGrid-menuIconButton': {
-              color: 'text.secondary',
-            },
-            '& .MuiDataGrid-sortIcon': {
-              color: 'text.secondary',
-            },
-            '& .MuiDataGrid-cell:focus, & .MuiDataGrid-columnHeader:focus': {
-              outline: 'none',
-            },
-          }}
-        />
-      </Box>
+      <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-8 md:px-10">
+        <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+          <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900">Settlement</h1>
 
-      <Box
-        sx={{
-          mt: 1.5,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          color: 'text.secondary',
-        }}
-      >
-        <Typography variant="caption">↓ 더 불러오기</Typography>
-        <Typography variant="caption" sx={{ fontWeight: 700 }}>
-          합계 {formatAmount(totalAmount)}
-        </Typography>
-      </Box>
+          {canManageSettlements && (
+            <button
+              type="button"
+              onClick={onOpenAddDialog}
+              className="flex h-12 min-w-[160px] items-center justify-center gap-2 rounded-xl px-6 text-base font-bold tracking-wide text-black shadow-lg transition-all hover:brightness-95"
+              style={{ backgroundColor: '#FFD700', boxShadow: '0 10px 24px rgba(255, 215, 0, 0.2)' }}
+            >
+              <span aria-hidden="true">⊕</span>
+              <span className="truncate">ADD SETTLEMENT</span>
+            </button>
+          )}
+        </div>
+
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th scope="col" className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500">
+                    날짜
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500">
+                    항목
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500">
+                    금액
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500">
+                    Relation
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-right text-sm font-bold uppercase tracking-wider text-slate-500"
+                  >
+                    관리
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-sm font-medium text-slate-500">
+                      정산 내역을 불러오는 중입니다.
+                    </td>
+                  </tr>
+                ) : rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-sm font-medium text-slate-500">
+                      등록된 정산 내역이 없습니다.
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((row) => {
+                    const relationLabel = row.relation.trim() || (row.amount < 0 ? 'Expense' : 'Income');
+                    const relationClassName =
+                      row.amount < 0
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-emerald-100 text-emerald-700';
+
+                    return (
+                      <tr key={row.id} className="transition-colors hover:bg-slate-50/50">
+                        <td className="px-6 py-5 text-sm text-slate-600">{row.date}</td>
+                        <td className="px-6 py-5 text-sm font-medium text-slate-900">{row.item}</td>
+                        <td
+                          className={`px-6 py-5 text-sm font-bold ${
+                            row.amount < 0 ? 'text-red-500' : 'text-slate-900'
+                          }`}
+                        >
+                          {formatAmount(row.amount)}
+                        </td>
+                        <td className="px-6 py-5">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${relationClassName}`}
+                          >
+                            {relationLabel}
+                          </span>
+                        </td>
+                        <td className="space-x-2 px-6 py-5 text-right">
+                          {canManageSettlements ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onEdit(row)}
+                                className="text-sm font-bold text-amber-500 transition-colors hover:text-amber-600"
+                              >
+                                Edit
+                              </button>
+                              <span className="text-slate-300">|</span>
+                              <button
+                                type="button"
+                                disabled={deletingSettlementId === row.id}
+                                onClick={() => void onDelete(row.id)}
+                                className="text-sm font-bold text-red-500 transition-colors hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {deletingSettlementId === row.id ? 'Deleting...' : 'Delete'}
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-sm text-slate-300">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-col items-center justify-between gap-6 lg:flex-row">
+          <div
+            className="w-full rounded-xl border px-6 py-4 lg:w-auto"
+            style={{ backgroundColor: 'rgba(255, 215, 0, 0.05)', borderColor: 'rgba(255, 215, 0, 0.2)' }}
+          >
+            <h3 className="text-lg font-medium text-slate-700">
+              합계
+              <span className="ml-2 text-2xl font-black" style={{ color: '#FFD700' }}>
+                {formatAmount(totalAmount)}
+              </span>
+            </h3>
+          </div>
+
+          <nav
+            aria-label="Settlement pagination"
+            className="flex flex-col items-center gap-4 text-sm text-slate-500 sm:flex-row sm:gap-6"
+          >
+            <div className="flex items-center gap-2">
+              <span>Rows per page:</span>
+              <div className="relative">
+                <select
+                  value={rowsPerPage}
+                  onChange={(event) => onRowsPerPageChange(Number(event.target.value))}
+                  className="cursor-pointer appearance-none rounded-lg border border-slate-300 bg-transparent py-1 pl-2 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-300"
+                >
+                  {ROWS_PER_PAGE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400"
+                >
+                  ▾
+                </span>
+              </div>
+            </div>
+
+            <span>{`${pageStart}-${pageEnd} of ${totalRows}`}</span>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onPreviousPage}
+                disabled={!canGoPrevious}
+                className="rounded p-1 transition-colors hover:bg-slate-200 disabled:opacity-30"
+                aria-label="Previous page"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                onClick={onNextPage}
+                disabled={!canGoNext}
+                className="rounded p-1 transition-colors hover:bg-slate-200 disabled:opacity-30"
+                aria-label="Next page"
+              >
+                ›
+              </button>
+            </div>
+          </nav>
+        </div>
+      </main>
+
+      <section className="mx-auto w-full max-w-[1200px] px-4 pb-12 md:px-10">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">총 수입</p>
+            <p className="text-2xl font-black text-emerald-500">{formatAmount(totalIncome)}</p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">총 지출</p>
+            <p className="text-2xl font-black text-red-500">{formatAmount(totalExpense)}</p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">이월 잔액</p>
+            <p className="text-2xl font-black" style={{ color: '#FFD700' }}>
+              {formatAmount(carryOverAmount)}
+            </p>
+          </div>
+        </div>
+      </section>
     </>
   );
 });
@@ -432,10 +483,8 @@ const AddSettlementDialog = memo(function AddSettlementDialog({
           value={form.item}
           onChange={handleChange}
         />
-        <Box sx={{ mt: 1.5 }}>
-          <Typography variant="body2" sx={{ mb: 0.75, color: 'text.secondary', fontWeight: 600 }}>
-            금액 구분
-          </Typography>
+        <div className="mt-3">
+          <p className="mb-1.5 text-sm font-semibold text-slate-600">금액 구분</p>
           <ToggleButtonGroup
             exclusive
             fullWidth
@@ -448,7 +497,7 @@ const AddSettlementDialog = memo(function AddSettlementDialog({
             <ToggleButton value="deposit">입금</ToggleButton>
             <ToggleButton value="withdraw">출금</ToggleButton>
           </ToggleButtonGroup>
-        </Box>
+        </div>
         <TextField
           margin="dense"
           type="number"
@@ -558,10 +607,8 @@ const EditSettlementDialog = memo(function EditSettlementDialog({
           value={form.item}
           onChange={handleChange}
         />
-        <Box sx={{ mt: 1.5 }}>
-          <Typography variant="body2" sx={{ mb: 0.75, color: 'text.secondary', fontWeight: 600 }}>
-            금액 구분
-          </Typography>
+        <div className="mt-3">
+          <p className="mb-1.5 text-sm font-semibold text-slate-600">금액 구분</p>
           <ToggleButtonGroup
             exclusive
             fullWidth
@@ -574,7 +621,7 @@ const EditSettlementDialog = memo(function EditSettlementDialog({
             <ToggleButton value="deposit">입금</ToggleButton>
             <ToggleButton value="withdraw">출금</ToggleButton>
           </ToggleButtonGroup>
-        </Box>
+        </div>
         <TextField
           margin="dense"
           type="number"
@@ -891,40 +938,74 @@ export default function Settlement() {
     [loadSettlements, logout, navigate, requireAdminAction],
   );
 
+  const [rowsPerPage, setRowsPerPage] = useState<number>(10);
+  const [page, setPage] = useState(0);
+
+  const sortedRows = useMemo(
+    () => [...settlementRows].sort((left, right) => right.date.localeCompare(left.date)),
+    [settlementRows],
+  );
+
+  const totalRows = sortedRows.length;
+  const maxPage = Math.max(0, Math.ceil(totalRows / rowsPerPage) - 1);
+
+  useEffect(() => {
+    setPage((previous) => Math.min(previous, maxPage));
+  }, [maxPage]);
+
+  const pagedRows = useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    return sortedRows.slice(startIndex, startIndex + rowsPerPage);
+  }, [page, rowsPerPage, sortedRows]);
+
   const totalAmount = settlementRows.reduce((sum, row) => sum + row.amount, 0);
+  const totalIncome = settlementRows.reduce(
+    (sum, row) => (row.amount > 0 ? sum + row.amount : sum),
+    0,
+  );
+  const totalExpense = settlementRows.reduce(
+    (sum, row) => (row.amount < 0 ? sum + row.amount : sum),
+    0,
+  );
+  const carryOverAmount = totalAmount;
+
+  const pageStart = totalRows === 0 ? 0 : page * rowsPerPage + 1;
+  const pageEnd = totalRows === 0 ? 0 : Math.min((page + 1) * rowsPerPage, totalRows);
 
   return (
-    <Box sx={{ px: { xs: 2, md: 3 }, py: 3 }}>
-      <Box
-        sx={{
-          mb: 2,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 2,
-        }}
-      >
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-            정산
-          </Typography>
-        </Box>
-
-        {canManageSettlements && (
-          <Button variant="contained" onClick={handleOpenAddDialog}>
-            ADD SETTLEMENT
-          </Button>
-        )}
-      </Box>
-
+    <>
       <SettlementGrid
-        rows={settlementRows}
+        rows={pagedRows}
         isLoading={isLoading}
         canManageSettlements={canManageSettlements}
         deletingSettlementId={deletingSettlementId}
+        onOpenAddDialog={handleOpenAddDialog}
         onEdit={handleOpenEditDialog}
         onDelete={handleDeleteSettlement}
         totalAmount={totalAmount}
+        totalIncome={totalIncome}
+        totalExpense={totalExpense}
+        carryOverAmount={carryOverAmount}
+        rowsPerPage={rowsPerPage}
+        pageStart={pageStart}
+        pageEnd={pageEnd}
+        totalRows={totalRows}
+        canGoPrevious={page > 0}
+        canGoNext={page < maxPage}
+        onRowsPerPageChange={(nextRowsPerPage) => {
+          if (!ROWS_PER_PAGE_OPTIONS.includes(nextRowsPerPage as (typeof ROWS_PER_PAGE_OPTIONS)[number])) {
+            return;
+          }
+
+          setRowsPerPage(nextRowsPerPage);
+          setPage(0);
+        }}
+        onPreviousPage={() => {
+          setPage((previous) => Math.max(0, previous - 1));
+        }}
+        onNextPage={() => {
+          setPage((previous) => Math.min(maxPage, previous + 1));
+        }}
       />
 
       <AddSettlementDialog
@@ -943,6 +1024,6 @@ export default function Settlement() {
         onClose={handleCloseEditDialog}
         onSubmit={handleUpdateSettlement}
       />
-    </Box>
+    </>
   );
 }
