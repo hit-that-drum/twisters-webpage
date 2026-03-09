@@ -828,7 +828,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                   type="submit"
                   className="w-full rounded-xl bg-green-700 py-4 text-sm font-bold text-white transition-all hover:bg-green-800 active:scale-[0.98]"
                 >
-                  {isLogin ? '로그인' : '회원가입'}
+                  {isLogin ? '회원가입' : '로그인'}
                 </button>
               </form>
 
@@ -871,13 +871,13 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
 
               {/* Footer: 클릭 시 모드 전환 */}
               <p className="mt-10 text-center text-sm text-gray-600">
-                {isLogin ? '가입하셨나요?' : '아직 가입하지 않으셨나요?'}{' '}
+                {isLogin ? '아직 가입하지 않으셨나요?' : '가입하셨나요?'}{' '}
                 <button
                   type="button"
                   onClick={() => navigate(isLogin ? '/signup' : '/signin')}
                   className="font-bold text-green-600 hover:underline"
                 >
-                  {isLogin ? '로그인' : '회원가입'}
+                  {isLogin ? '회원가입' : '로그인'}
                 </button>
               </p>
             </div>
