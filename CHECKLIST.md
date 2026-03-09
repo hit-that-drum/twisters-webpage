@@ -6,8 +6,9 @@
 
 - **(2026.03.07)**
   - ✅ 프론트엔드도 페이지 별로 코드 나누기
+- **(2026.03.09)**
+  - ✅ 'EDIT', 'DELETE' 아이콘 넣은 button componenet화
 
-- ☑️✅ 'EDIT', 'DELETE' 아이콘 넣은 button componenet화
 - ☑️✅ Global Button Component
 - ☑️✅ Golbal Modal Component
 - ☑️✅ ScreenLoader Component

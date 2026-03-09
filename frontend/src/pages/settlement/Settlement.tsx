@@ -19,6 +19,7 @@ import {
   ToggleButtonGroup,
 } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
+import EditDeleteButton from '@/common/components/EditDeleteButton';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
 
@@ -211,14 +212,19 @@ const SettlementGrid = memo(function SettlementGrid({
     <>
       <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-8 md:px-10">
         <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-          <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900">Settlement</h1>
+          <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900">
+            Settlement
+          </h1>
 
           {canManageSettlements && (
             <button
               type="button"
               onClick={onOpenAddDialog}
               className="flex h-12 min-w-[160px] items-center justify-center gap-2 rounded-xl px-6 text-base font-bold tracking-wide text-black shadow-lg transition-all hover:brightness-95"
-              style={{ backgroundColor: '#FFD700', boxShadow: '0 10px 24px rgba(255, 215, 0, 0.2)' }}
+              style={{
+                backgroundColor: '#FFD700',
+                boxShadow: '0 10px 24px rgba(255, 215, 0, 0.2)',
+              }}
             >
               <span aria-hidden="true">⊕</span>
               <span className="truncate">ADD SETTLEMENT</span>
@@ -231,16 +237,28 @@ const SettlementGrid = memo(function SettlementGrid({
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="bg-slate-50">
-                  <th scope="col" className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500">
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500"
+                  >
                     날짜
                   </th>
-                  <th scope="col" className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500">
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500"
+                  >
                     항목
                   </th>
-                  <th scope="col" className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500">
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500"
+                  >
                     금액
                   </th>
-                  <th scope="col" className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500">
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500"
+                  >
                     Relation
                   </th>
                   <th
@@ -255,19 +273,26 @@ const SettlementGrid = memo(function SettlementGrid({
               <tbody className="divide-y divide-slate-100">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-sm font-medium text-slate-500">
+                    <td
+                      colSpan={5}
+                      className="px-6 py-8 text-center text-sm font-medium text-slate-500"
+                    >
                       정산 내역을 불러오는 중입니다.
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-sm font-medium text-slate-500">
+                    <td
+                      colSpan={5}
+                      className="px-6 py-8 text-center text-sm font-medium text-slate-500"
+                    >
                       등록된 정산 내역이 없습니다.
                     </td>
                   </tr>
                 ) : (
                   rows.map((row) => {
-                    const relationLabel = row.relation.trim() || (row.amount < 0 ? 'Expense' : 'Income');
+                    const relationLabel =
+                      row.relation.trim() || (row.amount < 0 ? 'Expense' : 'Income');
                     const relationClassName =
                       row.amount < 0
                         ? 'bg-red-100 text-red-700'
@@ -293,24 +318,13 @@ const SettlementGrid = memo(function SettlementGrid({
                         </td>
                         <td className="space-x-2 px-6 py-5 text-right">
                           {canManageSettlements ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => onEdit(row)}
-                                className="text-sm font-bold text-amber-500 transition-colors hover:text-amber-600"
-                              >
-                                Edit
-                              </button>
-                              <span className="text-slate-300">|</span>
-                              <button
-                                type="button"
-                                disabled={deletingSettlementId === row.id}
-                                onClick={() => void onDelete(row.id)}
-                                className="text-sm font-bold text-red-500 transition-colors hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {deletingSettlementId === row.id ? 'Deleting...' : 'Delete'}
-                              </button>
-                            </>
+                            <EditDeleteButton
+                              onEditClick={() => onEdit(row)}
+                              onDeleteClick={() => {
+                                void onDelete(row.id);
+                              }}
+                              isDeleting={deletingSettlementId === row.id}
+                            />
                           ) : (
                             <span className="text-sm text-slate-300">-</span>
                           )}
@@ -327,7 +341,10 @@ const SettlementGrid = memo(function SettlementGrid({
         <div className="mt-6 flex flex-col items-center justify-between gap-6 lg:flex-row">
           <div
             className="w-full rounded-xl border px-6 py-4 lg:w-auto"
-            style={{ backgroundColor: 'rgba(255, 215, 0, 0.05)', borderColor: 'rgba(255, 215, 0, 0.2)' }}
+            style={{
+              backgroundColor: 'rgba(255, 215, 0, 0.05)',
+              borderColor: 'rgba(255, 215, 0, 0.2)',
+            }}
           >
             <h3 className="text-lg font-medium text-slate-700">
               합계
@@ -393,17 +410,23 @@ const SettlementGrid = memo(function SettlementGrid({
       <section className="mx-auto w-full max-w-[1200px] px-4 pb-12 md:px-10">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-6">
-            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">총 수입</p>
+            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">
+              총 수입
+            </p>
             <p className="text-2xl font-black text-emerald-500">{formatAmount(totalIncome)}</p>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-6">
-            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">총 지출</p>
+            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">
+              총 지출
+            </p>
             <p className="text-2xl font-black text-red-500">{formatAmount(totalExpense)}</p>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-6">
-            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">이월 잔액</p>
+            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">
+              이월 잔액
+            </p>
             <p className="text-2xl font-black" style={{ color: '#FFD700' }}>
               {formatAmount(carryOverAmount)}
             </p>
@@ -993,7 +1016,11 @@ export default function Settlement() {
         canGoPrevious={page > 0}
         canGoNext={page < maxPage}
         onRowsPerPageChange={(nextRowsPerPage) => {
-          if (!ROWS_PER_PAGE_OPTIONS.includes(nextRowsPerPage as (typeof ROWS_PER_PAGE_OPTIONS)[number])) {
+          if (
+            !ROWS_PER_PAGE_OPTIONS.includes(
+              nextRowsPerPage as (typeof ROWS_PER_PAGE_OPTIONS)[number],
+            )
+          ) {
             return;
           }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
+import EditDeleteButton from '@/common/components/EditDeleteButton';
 import { apiFetch } from '@/common/lib/api/apiClient';
 import { useAuth } from '@/features';
 
@@ -398,7 +399,9 @@ export default function AdminPage() {
 
   const showingStart = filteredUsers.length === 0 ? 0 : usersPage * USERS_PAGE_SIZE + 1;
   const showingEnd =
-    filteredUsers.length === 0 ? 0 : Math.min((usersPage + 1) * USERS_PAGE_SIZE, filteredUsers.length);
+    filteredUsers.length === 0
+      ? 0
+      : Math.min((usersPage + 1) * USERS_PAGE_SIZE, filteredUsers.length);
 
   const handleToggleFilter = () => {
     setStatusFilter((previous) => {
@@ -454,7 +457,10 @@ export default function AdminPage() {
       <div className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="rounded-lg p-3 text-amber-400" style={{ backgroundColor: 'rgba(255, 215, 0, 0.1)' }}>
+            <div
+              className="rounded-lg p-3 text-amber-400"
+              style={{ backgroundColor: 'rgba(255, 215, 0, 0.1)' }}
+            >
               👥
             </div>
             <div>
@@ -469,7 +475,9 @@ export default function AdminPage() {
             <div className="rounded-lg bg-amber-100 p-3 text-amber-600">⏳</div>
             <div>
               <p className="text-sm font-medium text-slate-500">Pending Approvals</p>
-              <p className="text-2xl font-bold text-slate-900">{formatCount(pendingApprovalsCount)}</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {formatCount(pendingApprovalsCount)}
+              </p>
             </div>
           </div>
         </div>
@@ -521,11 +529,16 @@ export default function AdminPage() {
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="divide-y divide-slate-100">
               {pendingUsers.map((user) => (
-                <div key={user.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div
+                  key={user.id}
+                  className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                >
                   <div>
                     <p className="text-base font-bold text-slate-900">{user.name}</p>
                     <p className="text-sm text-slate-500">{user.email}</p>
-                    <p className="text-xs text-slate-400">Requested at {formatDateTime(user.createdAt)}</p>
+                    <p className="text-xs text-slate-400">
+                      Requested at {formatDateTime(user.createdAt)}
+                    </p>
                   </div>
 
                   <button
@@ -569,16 +582,28 @@ export default function AdminPage() {
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50">
-                  <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500"
+                  >
                     Member
                   </th>
-                  <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500"
+                  >
                     Role
                   </th>
-                  <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500"
+                  >
                     Status
                   </th>
-                  <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500"
+                  >
                     Joined
                   </th>
                   <th
@@ -593,13 +618,19 @@ export default function AdminPage() {
               <tbody className="divide-y divide-slate-100">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-sm font-medium text-slate-500">
+                    <td
+                      colSpan={5}
+                      className="px-6 py-8 text-center text-sm font-medium text-slate-500"
+                    >
                       Loading users...
                     </td>
                   </tr>
                 ) : pagedUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-sm font-medium text-slate-500">
+                    <td
+                      colSpan={5}
+                      className="px-6 py-8 text-center text-sm font-medium text-slate-500"
+                    >
                       No users found for this filter.
                     </td>
                   </tr>
@@ -607,7 +638,9 @@ export default function AdminPage() {
                   pagedUsers.map((user) => {
                     const roleLabel = user.isAdmin ? 'Moderator' : 'Member';
                     const statusLabel = user.isAllowed ? 'Active' : 'Inactive';
-                    const statusTextClassName = user.isAllowed ? 'text-emerald-600' : 'text-slate-400';
+                    const statusTextClassName = user.isAllowed
+                      ? 'text-emerald-600'
+                      : 'text-slate-400';
                     const statusDotClassName = user.isAllowed ? 'bg-emerald-500' : 'bg-slate-300';
 
                     return (
@@ -633,37 +666,31 @@ export default function AdminPage() {
                         </td>
 
                         <td className="px-6 py-4">
-                          <div className={`flex items-center gap-1.5 text-sm font-medium ${statusTextClassName}`}>
+                          <div
+                            className={`flex items-center gap-1.5 text-sm font-medium ${statusTextClassName}`}
+                          >
                             <span className={`size-2 rounded-full ${statusDotClassName}`} />
                             {statusLabel}
                           </div>
                         </td>
 
-                        <td className="px-6 py-4 text-sm text-slate-500">{formatJoinedDate(user.createdAt)}</td>
+                        <td className="px-6 py-4 text-sm text-slate-500">
+                          {formatJoinedDate(user.createdAt)}
+                        </td>
 
                         <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              aria-label={`Edit ${user.name}`}
-                              onClick={() => {
-                                enqueueSnackbar('사용자 편집 기능은 준비 중입니다.', { variant: 'info' });
-                              }}
-                              className="p-2 text-amber-400 transition-colors hover:text-amber-500"
-                            >
-                              ✎
-                            </button>
-                            <button
-                              type="button"
-                              aria-label={`Delete ${user.name}`}
-                              onClick={() => {
-                                enqueueSnackbar('사용자 삭제 기능은 준비 중입니다.', { variant: 'info' });
-                              }}
-                              className="p-2 text-slate-400 transition-colors hover:text-red-500"
-                            >
-                              🗑
-                            </button>
-                          </div>
+                          <EditDeleteButton
+                            onEditClick={() => {
+                              enqueueSnackbar('사용자 편집 기능은 준비 중입니다.', {
+                                variant: 'info',
+                              });
+                            }}
+                            onDeleteClick={() => {
+                              enqueueSnackbar('사용자 삭제 기능은 준비 중입니다.', {
+                                variant: 'info',
+                              });
+                            }}
+                          />
                         </td>
                       </tr>
                     );

@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
+import EditDeleteButton from '@/common/components/EditDeleteButton';
 import { apiFetch } from '@/common/lib/api/apiClient';
 
 interface NoticeItem {
@@ -141,10 +142,7 @@ const parseNoticeList = (payload: unknown): NoticeItem[] => {
       }
 
       const normalizedPinned =
-        row.pinned === true ||
-        row.pinned === 1 ||
-        row.pinned === '1' ||
-        row.pinned === 'true';
+        row.pinned === true || row.pinned === 1 || row.pinned === '1' || row.pinned === 'true';
 
       const normalizedUpdateUser =
         typeof row.updateUser === 'string' && row.updateUser.trim().length > 0
@@ -505,7 +503,9 @@ export default function Notice() {
       <div className="layout-content-container flex w-full max-w-[1024px] flex-col gap-6">
         <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-4 md:flex-row md:items-end">
           <div className="flex flex-col gap-1">
-            <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900">Notices</h1>
+            <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900">
+              Notices
+            </h1>
             <p className="text-base font-normal text-slate-500">
               Important updates and announcements for the community
             </p>
@@ -579,32 +579,13 @@ export default function Notice() {
                           </h3>
 
                           {canManageNotices && (
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                title="Edit"
-                                aria-label="Edit notice"
-                                onClick={() => handleOpenEditDialog(notice)}
-                                className="flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-blue-100 hover:text-blue-700"
-                              >
-                                <span aria-hidden="true" className="text-base">
-                                  ✎
-                                </span>
-                              </button>
-
-                              <button
-                                type="button"
-                                title="Delete"
-                                aria-label="Delete notice"
-                                disabled={deletingNoticeId === notice.id}
-                                onClick={() => void handleDeleteNotice(notice.id)}
-                                className="flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-red-100 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                <span aria-hidden="true" className="text-base">
-                                  {deletingNoticeId === notice.id ? '…' : '🗑'}
-                                </span>
-                              </button>
-                            </div>
+                            <EditDeleteButton
+                              onEditClick={() => handleOpenEditDialog(notice)}
+                              onDeleteClick={() => {
+                                void handleDeleteNotice(notice.id);
+                              }}
+                              isDeleting={deletingNoticeId === notice.id}
+                            />
                           )}
                         </div>
 
@@ -617,14 +598,19 @@ export default function Notice() {
                         </div>
 
                         <ul className="space-y-2 text-sm text-slate-600">
-                          {(previewLines.length > 0 ? previewLines : ['내용이 없습니다.']).map((line, lineIndex) => (
-                            <li key={`${notice.id}-line-${lineIndex}`} className="flex items-start gap-2">
-                              <span className="mt-1 text-amber-500" aria-hidden="true">
-                                •
-                              </span>
-                              <span>{line}</span>
-                            </li>
-                          ))}
+                          {(previewLines.length > 0 ? previewLines : ['내용이 없습니다.']).map(
+                            (line, lineIndex) => (
+                              <li
+                                key={`${notice.id}-line-${lineIndex}`}
+                                className="flex items-start gap-2"
+                              >
+                                <span className="mt-1 text-amber-500" aria-hidden="true">
+                                  •
+                                </span>
+                                <span>{line}</span>
+                              </li>
+                            ),
+                          )}
                         </ul>
 
                         {notice.content.trim().length > 0 && (

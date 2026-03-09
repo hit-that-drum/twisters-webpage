@@ -13,6 +13,7 @@ import {
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
+import { EditDeleteButton } from '@/common/components';
 
 interface BoardPostItem {
   id: number;
@@ -940,32 +941,13 @@ export default function Board() {
                           </h3>
 
                           {canEditOrDelete && (
-                            <div className="flex gap-1.5 sm:gap-2">
-                              <button
-                                type="button"
-                                title="Edit post"
-                                aria-label="Edit post"
-                                onClick={() => handleOpenEditDialog(post)}
-                                className="flex size-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-blue-100 hover:text-blue-700 sm:size-9"
-                              >
-                                <span aria-hidden="true" className="text-sm sm:text-base">
-                                  ✎
-                                </span>
-                              </button>
-
-                              <button
-                                type="button"
-                                title="Delete post"
-                                aria-label="Delete post"
-                                disabled={deletingPostId === post.id}
-                                onClick={() => void handleDeletePost(post)}
-                                className="flex size-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-red-100 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60 sm:size-9"
-                              >
-                                <span aria-hidden="true" className="text-sm sm:text-base">
-                                  {deletingPostId === post.id ? '…' : '🗑'}
-                                </span>
-                              </button>
-                            </div>
+                            <EditDeleteButton
+                              onEditClick={() => handleOpenEditDialog(post)}
+                              onDeleteClick={() => {
+                                void handleDeletePost(post);
+                              }}
+                              isDeleting={deletingPostId === post.id}
+                            />
                           )}
                         </div>
 
@@ -980,14 +962,19 @@ export default function Board() {
                         </div>
 
                         <ul className="space-y-2 text-sm text-slate-600">
-                          {(previewLines.length > 0 ? previewLines : ['내용이 없습니다.']).map((line, lineIndex) => (
-                            <li key={`${post.id}-line-${lineIndex}`} className="flex items-start gap-2">
-                              <span className="mt-1 text-amber-500" aria-hidden="true">
-                                •
-                              </span>
-                              <span>{line}</span>
-                            </li>
-                          ))}
+                          {(previewLines.length > 0 ? previewLines : ['내용이 없습니다.']).map(
+                            (line, lineIndex) => (
+                              <li
+                                key={`${post.id}-line-${lineIndex}`}
+                                className="flex items-start gap-2"
+                              >
+                                <span className="mt-1 text-amber-500" aria-hidden="true">
+                                  •
+                                </span>
+                                <span>{line}</span>
+                              </li>
+                            ),
+                          )}
                         </ul>
 
                         <button
@@ -1009,7 +996,9 @@ export default function Board() {
                             <div className="rounded-lg border border-slate-200 bg-white p-3">
                               <div className="mb-2 flex items-center justify-between">
                                 <p className="text-sm font-bold text-slate-800">Comments</p>
-                                <span className="text-xs font-medium text-slate-500">{comments.length}</span>
+                                <span className="text-xs font-medium text-slate-500">
+                                  {comments.length}
+                                </span>
                               </div>
 
                               {isLoadingComments ? (
@@ -1029,7 +1018,9 @@ export default function Board() {
                                       >
                                         <div className="mb-1 flex items-start justify-between gap-2">
                                           <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-                                            <span className="font-semibold text-slate-700">{comment.authorName}</span>
+                                            <span className="font-semibold text-slate-700">
+                                              {comment.authorName}
+                                            </span>
                                             <span aria-hidden="true">•</span>
                                             <span>{formatRelativeTime(comment.createdAt)}</span>
                                           </div>
@@ -1037,16 +1028,22 @@ export default function Board() {
                                           {canDelete && (
                                             <button
                                               type="button"
-                                              onClick={() => void handleDeleteComment(post.id, comment)}
+                                              onClick={() =>
+                                                void handleDeleteComment(post.id, comment)
+                                              }
                                               disabled={deletingCommentKey === commentDeleteKey}
                                               className="text-xs font-semibold text-red-600 transition-colors hover:text-red-700 disabled:opacity-60"
                                             >
-                                              {deletingCommentKey === commentDeleteKey ? 'Deleting...' : 'Delete'}
+                                              {deletingCommentKey === commentDeleteKey
+                                                ? 'Deleting...'
+                                                : 'Delete'}
                                             </button>
                                           )}
                                         </div>
 
-                                        <p className="whitespace-pre-wrap text-sm text-slate-700">{comment.content}</p>
+                                        <p className="whitespace-pre-wrap text-sm text-slate-700">
+                                          {comment.content}
+                                        </p>
                                       </li>
                                     );
                                   })}
@@ -1057,7 +1054,9 @@ export default function Board() {
                                 <div className="space-y-2">
                                   <textarea
                                     value={commentDraft}
-                                    onChange={(event) => handleCommentDraftChange(post.id, event.target.value)}
+                                    onChange={(event) =>
+                                      handleCommentDraftChange(post.id, event.target.value)
+                                    }
                                     rows={3}
                                     placeholder="댓글을 입력하세요"
                                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500"
@@ -1069,12 +1068,16 @@ export default function Board() {
                                       disabled={submittingCommentPostId === post.id}
                                       className="rounded-md bg-slate-800 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:opacity-60"
                                     >
-                                      {submittingCommentPostId === post.id ? 'Saving...' : 'Add Comment'}
+                                      {submittingCommentPostId === post.id
+                                        ? 'Saving...'
+                                        : 'Add Comment'}
                                     </button>
                                   </div>
                                 </div>
                               ) : (
-                                <p className="text-sm text-slate-500">댓글을 작성하려면 로그인하세요.</p>
+                                <p className="text-sm text-slate-500">
+                                  댓글을 작성하려면 로그인하세요.
+                                </p>
                               )}
                             </div>
                           </div>
@@ -1148,7 +1151,11 @@ export default function Board() {
           <Button onClick={handleCloseAddDialog} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button onClick={() => void handleCreatePost()} variant="contained" disabled={isSubmitting}>
+          <Button
+            onClick={() => void handleCreatePost()}
+            variant="contained"
+            disabled={isSubmitting}
+          >
             {isSubmitting ? 'Saving...' : 'Save'}
           </Button>
         </DialogActions>
@@ -1196,7 +1203,11 @@ export default function Board() {
           <Button onClick={handleCloseEditDialog} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button onClick={() => void handleUpdatePost()} variant="contained" disabled={isSubmitting}>
+          <Button
+            onClick={() => void handleUpdatePost()}
+            variant="contained"
+            disabled={isSubmitting}
+          >
             {isSubmitting ? 'Updating...' : 'Update'}
           </Button>
         </DialogActions>
