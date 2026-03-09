@@ -828,7 +828,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                   type="submit"
                   className="w-full rounded-xl bg-green-700 py-4 text-sm font-bold text-white transition-all hover:bg-green-800 active:scale-[0.98]"
                 >
-                  {isLogin ? '회원가입' : '로그인'}
+                  {isLogin ? '로그인' : '회원가입'}
                 </button>
               </form>
 
