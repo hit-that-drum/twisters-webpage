@@ -12,6 +12,7 @@ import {
   setAuthTokens,
 } from '@/common/lib/auth/authStorage';
 import { useAuth } from '@/features';
+import { SiKakaotalk } from 'react-icons/si';
 
 const WRONG_PASSWORD_ATTEMPTS_KEY = 'wrongPasswordAttemptsByEmail';
 const MAX_WRONG_PASSWORD_ATTEMPTS = 5;
@@ -676,9 +677,12 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
   };
 
   const handleGoogleError = () => {
-    enqueueSnackbar('Google 로그인에 실패했습니다. Google Console의 Authorized JavaScript origins 설정을 확인해주세요.', {
-      variant: 'error',
-    });
+    enqueueSnackbar(
+      'Google 로그인에 실패했습니다. Google Console의 Authorized JavaScript origins 설정을 확인해주세요.',
+      {
+        variant: 'error',
+      },
+    );
   };
 
   const handleKakaoLogin = () => {
@@ -718,8 +722,8 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
           {/* 왼쪽 영역 */}
           <div className="flex w-full flex-col justify-center px-6 md:w-1/2 lg:px-24">
             <div className="max-w-[400px]">
-              <h2 className="mb-10 text-4xl font-bold tracking-tight text-gray-900">
-                {isLogin ? 'Welcome Back!' : 'Get Started Now!'}
+              <h2 className="font-grand-hotel mb-10 text-5xl font-bold tracking-tight text-gray-900">
+                {isLogin ? 'COME ON!' : 'WELCOME!'}
               </h2>
 
               <form className="space-y-6" onSubmit={handleSubmit}>
@@ -748,7 +752,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                 {/* Email */}
                 <div>
                   <label htmlFor="email" className="mb-2 block text-sm font-semibold text-gray-800">
-                    Email address
+                    E-MAIL
                   </label>
                   <input
                     id="email"
@@ -756,7 +760,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="Enter your email"
+                    placeholder="E-MAIL을 입력해주세요"
                     className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
                     required
                   />
@@ -768,7 +772,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                     htmlFor="password"
                     className="mb-2 block text-sm font-semibold text-gray-800"
                   >
-                    Password
+                    PASSWORD
                   </label>
                   <input
                     id="password"
@@ -776,7 +780,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    placeholder="Password"
+                    placeholder="비밀번호를 입력해주세요(8-12자)"
                     className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
                     required
                   />
@@ -786,7 +790,8 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                   <p className={`mt-2 text-xs font-medium ${wrongPasswordIndicatorClassName}`}>
                     Wrong password attempts: {wrongPasswordAttemptCount}/
                     {MAX_WRONG_PASSWORD_ATTEMPTS}
-                    {' · '}Remaining before auto reset: {remainingWrongPasswordAttempts}
+                    {' · '}비밀번호 자동 리셋 Remaining before auto reset:{' '}
+                    {remainingWrongPasswordAttempts}
                   </p>
                 )}
 
@@ -799,21 +804,21 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                         id="remember"
                         checked={rememberFor30Days}
                         onChange={(event) => setRememberFor30Days(event.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 accent-blue-700 cursor-pointer"
+                        className="h-4 w-4 rounded border-gray-300 accent-green-700 cursor-pointer"
                       />
                       <label
                         htmlFor="remember"
                         className="text-xs font-medium text-gray-600 cursor-pointer"
                       >
-                        Remember for 30 days
+                        30일 동안 기억하기
                       </label>
                     </div>
                     <button
                       type="button"
-                      className="text-xs font-bold text-blue-600 hover:underline"
+                      className="text-xs font-bold text-green-600 hover:underline"
                       onClick={handleForgotPassword}
                     >
-                      Forgot password
+                      비밀번호 재설정
                     </button>
                   </div>
                 )}
@@ -821,9 +826,9 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-blue-700 py-4 text-sm font-bold text-white transition-all hover:bg-blue-800 active:scale-[0.98]"
+                  className="w-full rounded-xl bg-green-700 py-4 text-sm font-bold text-white transition-all hover:bg-green-800 active:scale-[0.98]"
                 >
-                  {isLogin ? 'Sign In' : 'Signup'}
+                  {isLogin ? '로그인' : '회원가입'}
                 </button>
               </form>
 
@@ -833,11 +838,15 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
               </div>
 
               {/* Social Buttons */}
-              <div className="flex flex-col items-center gap-3">
+              <div className="flex flex-wrap items-center justify-center gap-3">
                 {isGoogleOAuthEnabled ? (
-                  <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    width="192"
+                  />
                 ) : (
-                  <p className="text-xs text-gray-400">
+                  <p className="w-full text-center text-xs text-gray-400">
                     Google 로그인을 사용하려면 `VITE_GOOGLE_CLIENT_ID` 설정이 필요합니다.
                   </p>
                 )}
@@ -846,27 +855,29 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                   type="button"
                   onClick={handleKakaoLogin}
                   disabled={!isKakaoOAuthEnabled}
-                  className="w-full rounded-xl bg-[#FEE500] py-3 text-sm font-semibold text-[#191919] transition hover:bg-[#fada0a] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+                  className="inline-flex h-10 w-48 items-center justify-center gap-2 rounded-sm bg-[#FEE500] px-4 text-sm font-semibold text-[#191919] transition hover:bg-[#fada0a] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
                 >
-                  카카오로 로그인
+                  <SiKakaotalk size={20} />
+                  <span>카카오로 로그인</span>
                 </button>
 
                 {!isKakaoOAuthEnabled && (
-                  <p className="text-xs text-gray-400">
-                    Kakao 로그인을 사용하려면 `VITE_KAKAO_REST_API_KEY`, `VITE_KAKAO_REDIRECT_URI` 설정이 필요합니다.
+                  <p className="w-full text-center text-xs text-gray-400">
+                    Kakao 로그인을 사용하려면 `VITE_KAKAO_REST_API_KEY`, `VITE_KAKAO_REDIRECT_URI`
+                    설정이 필요합니다.
                   </p>
                 )}
               </div>
 
               {/* Footer: 클릭 시 모드 전환 */}
               <p className="mt-10 text-center text-sm text-gray-600">
-                {isLogin ? "Don't have an account?" : 'Have an account?'}{' '}
+                {isLogin ? '가입하셨나요?' : '아직 가입하지 않으셨나요?'}{' '}
                 <button
                   type="button"
                   onClick={() => navigate(isLogin ? '/signup' : '/signin')}
-                  className="font-bold text-blue-600 hover:underline"
+                  className="font-bold text-green-600 hover:underline"
                 >
-                  {isLogin ? 'Sign Up' : 'Sign In'}
+                  {isLogin ? '로그인' : '회원가입'}
                 </button>
               </p>
             </div>
