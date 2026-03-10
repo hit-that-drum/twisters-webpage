@@ -55,7 +55,7 @@ export default function AppLayout() {
         </div>
       </main>
 
-      <div className="px-6 pb-4">
+      <div>
         <Footer />
       </div>
     </div>
