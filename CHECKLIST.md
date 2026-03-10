@@ -7,6 +7,7 @@
 - **(2026.03.07)**
   - ✅ 프론트엔드도 페이지 별로 코드 나누기
 - **(2026.03.09)**
+
   - ✅ 'EDIT', 'DELETE' 아이콘 넣은 button componenet화
 
 - ☑️✅ Global Button Component
@@ -22,12 +23,14 @@
 ## BACK-END
 
 - **(2026.03.07)**
+
   - ✅ NGR 백엔드 쪽 코드 분리 로직 보기
   - ✅ VONE-API 쪽 코드 분리 로직 보기
 
 - ☑️✅ DB 호스팅
 - ☑️✅ 도메인 설정
 - ☑️✅ 이미지 호스팅 할 곳 찾아보기
+- ☑️✅ init.sql 관련해서 데이터 미리 넣어주는 부분들 다 없애기(코드 보면 정보 다 알 수 있으니까 아무래도... 근데 그럼 여태까지 된 것들은...? 그건 어쩔 수 없겠죠... Well... Anyway...)
 - ☑️✅ 배포
 
 ---
@@ -51,10 +54,12 @@
 - **(2026.03.08)**
   - ✅ 가입할 때 유저네임이 "TEST"로 시작하면 테스트 계정으로 분리
 - **(2026.03.09)**
+
   - ✅ 메인 페이지 스타일링 조정(언어, 버튼 위치 등)
   - ✅ 카카오톡 아이콘 가져오기
 
 - ☑️✅ 비밀번호 제한사항 걸고 정규식으로 체크 (체크하는 거 유저에게 보이게 UI/UX적으로 깔끔하게 보이게)
+
 - 배포 이후
   - ☑️✅ 이메일 인증
   - ☑️✅ 회원가입 승인이 완료되면 이메일로 알림 보내기
@@ -64,6 +69,7 @@
 ### HEADER
 
 - **(2026.03.04)**
+
   - ✅ 탭 정보에 들어가는 로고 및 헤더 로고 변경
   - ✅ 글씨체 바꾸기
   - ✅ 헤더 스타일링 다시 하기
@@ -77,8 +83,13 @@
 
 ### FOOTER
 
-- FOOTER에 들어가야 하는 정보  
-  [https://blog.duda.co/website-footer-design-best-practices-examples](https://blog.duda.co/website-footer-design-best-practices-examples)
+- **(2026.03.10)**
+
+  - ✅ Footer 초기 디자인
+    - FOOTER에 들어가야 하는 정보  
+      [https://blog.duda.co/website-footer-design-best-practices-examples](https://blog.duda.co/website-footer-design-best-practices-examples)
+
+- ☑️✅ Privacy, Terms에 들어가는 정보 만들기
 
 ---
 
@@ -103,7 +114,7 @@
 ### NOTICE
 
 - **(2026.03.08)**
-  - ✅ 테스트 유저일 때 test_member DB에서 쿼리해 와서 정보 보여주기
+  - ✅ 테스트 유저일 때 test_notice DB에서 쿼리해 와서 정보 보여주기
   - ✅ Stitch AI로 디자인 완료
 
 ---
@@ -111,7 +122,7 @@
 ### BOARD
 
 - **(2026.03.08)**
-  - ✅ 테스트 유저일 때 test_member DB에서 쿼리해 와서 정보 보여주기
+  - ✅ 테스트 유저일 때 test_board DB에서 쿼리해 와서 정보 보여주기
   - ✅ 멤버들이 게시글 올릴 수 있는 게시판 페이지 필요
   - ✅ Stitch AI로 디자인 완료
 
@@ -127,7 +138,7 @@
 ### SETTLEMENT
 
 - **(2026.03.08)**
-  - ✅ 테스트 유저일 때 test_member DB에서 쿼리해 와서 정보 보여주기
+  - ✅ 테스트 유저일 때 test_settlement DB에서 쿼리해 와서 정보 보여주기
   - ✅ Stitch AI로 디자인 완료
 
 ---
@@ -135,8 +146,10 @@
 ### ADMIN
 
 - **(2026.03.07)**
+
   - ✅ 회원가입한 유저를 허가하는 로직을 만들어야 함
   - ✅ Stitch AI로 디자인 완료
 
 - ☑️✅ 회원가입 승인 버튼만 있고 거절 버튼은 없어서 "DECLINE" 버튼 추가
 - ☑️✅ 사용자 삭제 기능 도입
+- ☑️✅ TEST_ADMIN 계정일 때 test_member 계정에서 member query 해오기
