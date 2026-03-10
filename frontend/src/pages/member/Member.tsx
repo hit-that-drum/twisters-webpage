@@ -13,6 +13,7 @@ import {
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
+import { EditDeleteButton } from '@/common/components';
 
 interface MemberUser {
   id: number;
@@ -704,14 +705,10 @@ export default function Member() {
                     </div>
 
                     {canManageMembers && (
-                      <button
-                        type="button"
-                        onClick={handleOpenEditDialog}
-                        className="flex h-11 min-w-[120px] items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
-                      >
-                        <span aria-hidden="true">✎</span>
-                        EDIT
-                      </button>
+                      <EditDeleteButton
+                        onEditClick={handleOpenEditDialog}
+                        isExisteDeleteButton={false}
+                      />
                     )}
                   </div>
 

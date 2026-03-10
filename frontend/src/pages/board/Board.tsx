@@ -1026,18 +1026,16 @@ export default function Board() {
                                           </div>
 
                                           {canDelete && (
-                                            <button
-                                              type="button"
-                                              onClick={() =>
+                                            <EditDeleteButton
+                                              isExisteEditButton={false}
+                                              onDeleteClick={() =>
                                                 void handleDeleteComment(post.id, comment)
                                               }
-                                              disabled={deletingCommentKey === commentDeleteKey}
-                                              className="text-xs font-semibold text-red-600 transition-colors hover:text-red-700 disabled:opacity-60"
-                                            >
-                                              {deletingCommentKey === commentDeleteKey
-                                                ? 'Deleting...'
-                                                : 'Delete'}
-                                            </button>
+                                              isDeleting={deletingCommentKey === commentDeleteKey}
+                                              isDeleteDisabled={
+                                                deletingCommentKey === commentDeleteKey
+                                              }
+                                            />
                                           )}
                                         </div>
 
