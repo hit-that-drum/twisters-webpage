@@ -420,7 +420,7 @@ export default function AdminPage() {
   };
 
   const handleAddNewUser = () => {
-    navigate('/member');
+    console.log('handleAddNewUser');
   };
 
   if (isAuthLoading) {
@@ -442,7 +442,7 @@ export default function AdminPage() {
         </div>
 
         <div className="flex gap-3">
-          <TwistersButton
+          <GlobalButton
             onClick={handleAddNewUser}
             label="Add New User"
             iconBasicMappingType="ADD"
