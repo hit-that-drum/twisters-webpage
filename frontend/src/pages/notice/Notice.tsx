@@ -1,20 +1,11 @@
 import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  TextField,
-} from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
-import EditDeleteButton from '@/common/components/EditDeleteButton';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import GlobalButton from '@/common/components/GlobalButton';
+import { EditDeleteButton, GlobalButton } from '@/common/components';
+import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
+import NoticeDetailModal, { type NoticeFormState } from './NoticeDetailModal';
 
 interface NoticeItem {
   id: number;
@@ -216,12 +207,12 @@ export default function Notice() {
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [editingNoticeId, setEditingNoticeId] = useState<number | null>(null);
-  const [newNotice, setNewNotice] = useState({
+  const [newNotice, setNewNotice] = useState<NoticeFormState>({
     title: '',
     content: '',
     pinned: false,
   });
-  const [editNotice, setEditNotice] = useState({
+  const [editNotice, setEditNotice] = useState<NoticeFormState>({
     title: '',
     content: '',
     pinned: false,
@@ -284,10 +275,14 @@ export default function Notice() {
       return;
     }
 
+    setNewNotice({ title: '', content: '', pinned: false });
     setOpenAddDialog(true);
   };
 
-  const handleCloseAddDialog = () => {
+  const handleCloseAddDialog = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+
     if (isSubmitting) {
       return;
     }
@@ -309,7 +304,10 @@ export default function Notice() {
     setOpenEditDialog(true);
   };
 
-  const handleCloseEditDialog = () => {
+  const handleCloseEditDialog = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+
     if (isSubmitting) {
       return;
     }
@@ -333,6 +331,28 @@ export default function Notice() {
       [name]: value,
     }));
   };
+
+  const addNoticeActions: TAction[] = [
+    {
+      label: isSubmitting ? 'Saving...' : 'Save',
+      onClick: () => {
+        void handleCreateNotice();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting,
+    },
+  ];
+
+  const editNoticeActions: TAction[] = [
+    {
+      label: isSubmitting ? 'Updating...' : 'Update',
+      onClick: () => {
+        void handleUpdateNotice();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting,
+    },
+  ];
 
   const handleCreateNotice = async () => {
     if (!requireAuthForMutation()) {
@@ -654,97 +674,39 @@ export default function Notice() {
         )}
       </div>
 
-      <Dialog open={openAddDialog} onClose={handleCloseAddDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Add Notice</DialogTitle>
-        <DialogContent>
-          <TextField
-            margin="dense"
-            label="Title"
-            name="title"
-            fullWidth
-            value={newNotice.title}
-            onChange={handleChangeNewNotice}
-          />
-          <TextField
-            margin="dense"
-            label="Content"
-            name="content"
-            fullWidth
-            multiline
-            minRows={5}
-            value={newNotice.content}
-            onChange={handleChangeNewNotice}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={newNotice.pinned}
-                onChange={(event) =>
-                  setNewNotice((previous) => ({
-                    ...previous,
-                    pinned: event.target.checked,
-                  }))
-                }
-              />
-            }
-            label="Pinned"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseAddDialog} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button onClick={handleCreateNotice} variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <NoticeDetailModal
+        type="ADD"
+        open={openAddDialog}
+        handleClose={handleCloseAddDialog}
+        title="ADD NOTICE"
+        actions={addNoticeActions}
+        form={newNotice}
+        isSubmitting={isSubmitting}
+        onFormChange={handleChangeNewNotice}
+        onPinnedChange={(checked) => {
+          setNewNotice((previous) => ({
+            ...previous,
+            pinned: checked,
+          }));
+        }}
+      />
 
-      <Dialog open={openEditDialog} onClose={handleCloseEditDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Edit Notice</DialogTitle>
-        <DialogContent>
-          <TextField
-            margin="dense"
-            label="Title"
-            name="title"
-            fullWidth
-            value={editNotice.title}
-            onChange={handleChangeEditNotice}
-          />
-          <TextField
-            margin="dense"
-            label="Content"
-            name="content"
-            fullWidth
-            multiline
-            minRows={5}
-            value={editNotice.content}
-            onChange={handleChangeEditNotice}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={editNotice.pinned}
-                onChange={(event) =>
-                  setEditNotice((previous) => ({
-                    ...previous,
-                    pinned: event.target.checked,
-                  }))
-                }
-              />
-            }
-            label="Pinned"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseEditDialog} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button onClick={handleUpdateNotice} variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? 'Updating...' : 'Update'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <NoticeDetailModal
+        type="EDIT"
+        open={openEditDialog}
+        handleClose={handleCloseEditDialog}
+        title="EDIT NOTICE"
+        actions={editNoticeActions}
+        form={editNotice}
+        isSubmitting={isSubmitting}
+        onFormChange={handleChangeEditNotice}
+        onPinnedChange={(checked) => {
+          setEditNotice((previous) => ({
+            ...previous,
+            pinned: checked,
+          }));
+        }}
+      />
     </main>
   );
 }

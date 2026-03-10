@@ -1,19 +1,11 @@
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  TextField,
-} from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
 import { EditDeleteButton, GlobalButton } from '@/common/components';
+import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
+import BoardDetailModal, { type BoardFormState } from './BoardDetailModal';
 
 interface BoardPostItem {
   id: number;
@@ -322,12 +314,12 @@ export default function Board() {
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
-  const [newPost, setNewPost] = useState({
+  const [newPost, setNewPost] = useState<BoardFormState>({
     title: '',
     content: '',
     pinned: false,
   });
-  const [editPost, setEditPost] = useState({
+  const [editPost, setEditPost] = useState<BoardFormState>({
     title: '',
     content: '',
     pinned: false,
@@ -485,10 +477,14 @@ export default function Board() {
       return;
     }
 
+    setNewPost({ title: '', content: '', pinned: false });
     setOpenAddDialog(true);
   };
 
-  const handleCloseAddDialog = () => {
+  const handleCloseAddDialog = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+
     if (isSubmitting) {
       return;
     }
@@ -515,7 +511,10 @@ export default function Board() {
     setOpenEditDialog(true);
   };
 
-  const handleCloseEditDialog = () => {
+  const handleCloseEditDialog = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+
     if (isSubmitting) {
       return;
     }
@@ -539,6 +538,28 @@ export default function Board() {
       [name]: value,
     }));
   };
+
+  const addPostActions: TAction[] = [
+    {
+      label: isSubmitting ? 'Saving...' : 'Save',
+      onClick: () => {
+        void handleCreatePost();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting,
+    },
+  ];
+
+  const editPostActions: TAction[] = [
+    {
+      label: isSubmitting ? 'Updating...' : 'Update',
+      onClick: () => {
+        void handleUpdatePost();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting,
+    },
+  ];
 
   const handleCreatePost = async () => {
     if (!requireAuthenticatedAction()) {
@@ -1104,109 +1125,41 @@ export default function Board() {
         )}
       </div>
 
-      <Dialog open={openAddDialog} onClose={handleCloseAddDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Add Post</DialogTitle>
-        <DialogContent>
-          <TextField
-            margin="dense"
-            label="Title"
-            name="title"
-            fullWidth
-            value={newPost.title}
-            onChange={handleChangeNewPost}
-          />
-          <TextField
-            margin="dense"
-            label="Content"
-            name="content"
-            fullWidth
-            multiline
-            minRows={5}
-            value={newPost.content}
-            onChange={handleChangeNewPost}
-          />
-          {canPinPost && (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={newPost.pinned}
-                  onChange={(event) =>
-                    setNewPost((previous) => ({
-                      ...previous,
-                      pinned: event.target.checked,
-                    }))
-                  }
-                />
-              }
-              label="Pinned"
-            />
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseAddDialog} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => void handleCreatePost()}
-            variant="contained"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Saving...' : 'Save'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <BoardDetailModal
+        type="ADD"
+        open={openAddDialog}
+        handleClose={handleCloseAddDialog}
+        title="ADD POST"
+        actions={addPostActions}
+        form={newPost}
+        isSubmitting={isSubmitting}
+        canPinPost={canPinPost}
+        onFormChange={handleChangeNewPost}
+        onPinnedChange={(checked) => {
+          setNewPost((previous) => ({
+            ...previous,
+            pinned: checked,
+          }));
+        }}
+      />
 
-      <Dialog open={openEditDialog} onClose={handleCloseEditDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Edit Post</DialogTitle>
-        <DialogContent>
-          <TextField
-            margin="dense"
-            label="Title"
-            name="title"
-            fullWidth
-            value={editPost.title}
-            onChange={handleChangeEditPost}
-          />
-          <TextField
-            margin="dense"
-            label="Content"
-            name="content"
-            fullWidth
-            multiline
-            minRows={5}
-            value={editPost.content}
-            onChange={handleChangeEditPost}
-          />
-          {canPinPost && (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={editPost.pinned}
-                  onChange={(event) =>
-                    setEditPost((previous) => ({
-                      ...previous,
-                      pinned: event.target.checked,
-                    }))
-                  }
-                />
-              }
-              label="Pinned"
-            />
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseEditDialog} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => void handleUpdatePost()}
-            variant="contained"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Updating...' : 'Update'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <BoardDetailModal
+        type="EDIT"
+        open={openEditDialog}
+        handleClose={handleCloseEditDialog}
+        title="EDIT POST"
+        actions={editPostActions}
+        form={editPost}
+        isSubmitting={isSubmitting}
+        canPinPost={canPinPost}
+        onFormChange={handleChangeEditPost}
+        onPinnedChange={(checked) => {
+          setEditPost((previous) => ({
+            ...previous,
+            pinned: checked,
+          }));
+        }}
+      />
     </main>
   );
 }
