@@ -9,3 +9,21 @@
 This is a community website based on registered members.<br>
 Users can access the internal site through singup/login, and access is granted upon administrator approval.<br>
 Role-based access control between administrators a nd regular users is implemented to manage permissions, enabling administrative announcements and interactions among members.<br>
+
+---
+
+### 테스트 계정
+
+| Role   | Name        | Email                    | Password            |
+| ------ | ----------- | ------------------------ | ------------------- |
+| Admin  | TEST_ADMIN  | twistersAdmin@gmail.com  | twisters-admin-test |
+| Member | TEST_MEMBER | twistersMember@gmail.com | twister-member-test |
+
+<br>
+
+- 회원가입시 NAME 부분에 "TEST"로 시작하는 이름으로 가입하면 테스트 계정으로 분류됩니다.
+- 테스트 계정은 실제 DB가 아닌 테스트 DB의 정보로 각 페이지에 접근 가능합니다.
+- ADMIN 계정은 모든 페이지에 대한 접근 및 CRUD 동작이 가능합니다.
+- MEMBER 계정은 주로 READ 권한을 가지며 BOARD 페이지에서는 CRUD 동작이 가능합니다.
+
+---
