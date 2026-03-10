@@ -1,19 +1,11 @@
 import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  TextField,
-} from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { EditDeleteButton, GlobalButton, GlobalModal } from '@/common/components';
+import { EditDeleteButton, GlobalButton } from '@/common/components';
+import MemberDetailModal, { type MemberFormState } from './MemberDetailModal';
+import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 
 interface MemberUser {
   id: number;
@@ -21,21 +13,9 @@ interface MemberUser {
   email: string | null;
   isAdmin: boolean;
   phone: string | null;
-  role: string | null;
-  department: string | null;
   joinedAt: string | null;
+  birthDate: string | null;
   bio: string | null;
-}
-
-interface MemberFormState {
-  name: string;
-  email: string;
-  isAdmin: boolean;
-  phone: string;
-  role: string;
-  department: string;
-  joinedAt: string;
-  bio: string;
 }
 
 interface ParsedMemberDuesStatus {
@@ -49,16 +29,20 @@ interface DuesDisplayMeta {
   className: string;
 }
 
+interface DetailInfoItem {
+  key: string;
+  label: string;
+  value: string | null;
+}
+
 const DEPOSIT_KEY_PATTERN = /^deposit(\d{4})$/;
 
 const createDefaultMemberForm = (): MemberFormState => ({
   name: '',
   email: '',
-  isAdmin: false,
   phone: '',
-  role: '',
-  department: '',
   joinedAt: '',
+  birthDate: '',
   bio: '',
 });
 
@@ -99,11 +83,9 @@ const parseMembers = (payload: unknown): MemberUser[] => {
         id?: unknown;
         name?: unknown;
         email?: unknown;
-        isAdmin?: unknown;
         phone?: unknown;
-        role?: unknown;
-        department?: unknown;
         joinedAt?: unknown;
+        birthDate?: unknown;
         bio?: unknown;
       };
 
@@ -127,13 +109,11 @@ const parseMembers = (payload: unknown): MemberUser[] => {
         id: row.id,
         name: row.name,
         email: normalizeNullableString(row.email),
-        isAdmin: parseBoolean(row.isAdmin),
         phone: normalizeNullableString(row.phone),
-        role: normalizeNullableString(row.role),
-        department: normalizeNullableString(row.department),
         joinedAt: normalizeNullableString(row.joinedAt),
+        birthDate: normalizeNullableString(row.birthDate),
         bio: normalizeNullableString(row.bio),
-      } satisfies MemberUser;
+      };
     })
     .filter((item): item is MemberUser => item !== null);
 };
@@ -187,11 +167,9 @@ const parseMemberDuesStatus = (payload: unknown): ParsedMemberDuesStatus => {
 const toEditForm = (member: MemberUser): MemberFormState => ({
   name: member.name,
   email: member.email ?? '',
-  isAdmin: member.isAdmin,
   phone: member.phone ?? '',
-  role: member.role ?? '',
-  department: member.department ?? '',
   joinedAt: member.joinedAt ?? '',
+  birthDate: member.birthDate ?? '',
   bio: member.bio ?? '',
 });
 
@@ -254,6 +232,29 @@ const getDuesDisplayMeta = (year: number, isPaid: boolean): DuesDisplayMeta => {
     icon: '•',
     className: 'bg-amber-50 text-amber-700',
   };
+};
+
+const renderDetailValue = (value: string | null) => {
+  if (!value || !value.trim()) {
+    return '-';
+  }
+
+  return value;
+};
+
+const DetailInfoDesc = (detailInfo: DetailInfoItem[]) => {
+  return (
+    <div className="grid grid-cols-1 gap-x-12 gap-y-7 md:grid-cols-2 xl:grid-cols-2">
+      {detailInfo.map((el) => {
+        return (
+          <div key={el.key} className="flex flex-col gap-1">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">{el.label}</p>
+            <p className="text-lg font-semibold text-slate-800">{renderDetailValue(el.value)}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
 };
 
 export default function Member() {
@@ -390,30 +391,44 @@ export default function Member() {
     return duesStatusByMemberId[selectedUser.id] ?? ({} as Record<number, boolean>);
   }, [duesStatusByMemberId, selectedUser]);
 
-  const requireAdminAction = () => {
-    if (!meInfo) {
-      handleExpiredSession();
-      return false;
+  const userDetailInfo = useMemo<DetailInfoItem[]>(() => {
+    if (!selectedUser) {
+      return [];
     }
 
-    if (!canManageMembers) {
-      enqueueSnackbar('관리자만 회원 정보를 관리할 수 있습니다.', { variant: 'error' });
-      return false;
-    }
-
-    return true;
-  };
+    return [
+      {
+        key: 'email',
+        label: 'Email',
+        value: selectedUser.email,
+      },
+      {
+        key: 'phone',
+        label: 'Phone',
+        value: selectedUser.phone,
+      },
+      {
+        key: 'birthDate',
+        label: 'Birth Date',
+        value: selectedUser.birthDate,
+      },
+      {
+        key: 'joinedAt',
+        label: 'Joined At',
+        value: selectedUser.joinedAt,
+      },
+    ];
+  }, [selectedUser]);
 
   const handleOpenAddDialog = () => {
-    if (!requireAdminAction()) {
-      return;
-    }
-
     setAddMemberForm(createDefaultMemberForm());
     setOpenAddDialog(true);
   };
 
-  const handleCloseAddDialog = () => {
+  const handleCloseAddDialog = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+
     if (isSubmitting) {
       return;
     }
@@ -422,10 +437,6 @@ export default function Member() {
   };
 
   const handleOpenEditDialog = () => {
-    if (!requireAdminAction()) {
-      return;
-    }
-
     if (!selectedUser) {
       enqueueSnackbar('먼저 수정할 회원을 선택해주세요.', { variant: 'error' });
       return;
@@ -435,7 +446,10 @@ export default function Member() {
     setOpenEditDialog(true);
   };
 
-  const handleCloseEditDialog = () => {
+  const handleCloseEditDialog = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+
     if (isSubmitting) {
       return;
     }
@@ -459,11 +473,21 @@ export default function Member() {
     }));
   };
 
-  const handleCreateMember = async () => {
-    if (!requireAdminAction()) {
-      return;
-    }
+  const handleAddDateChange = (field: 'joinedAt' | 'birthDate', value: string) => {
+    setAddMemberForm((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  };
 
+  const handleEditDateChange = (field: 'joinedAt' | 'birthDate', value: string) => {
+    setEditMemberForm((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  };
+
+  const handleCreateMember = async () => {
     setIsSubmitting(true);
 
     try {
@@ -497,10 +521,6 @@ export default function Member() {
   };
 
   const handleUpdateMember = async () => {
-    if (!requireAdminAction()) {
-      return;
-    }
-
     if (!selectedUser) {
       enqueueSnackbar('수정할 회원을 찾을 수 없습니다.', { variant: 'error' });
       return;
@@ -541,10 +561,6 @@ export default function Member() {
   };
 
   const handleDeleteMember = async () => {
-    if (!requireAdminAction()) {
-      return;
-    }
-
     if (!selectedUser) {
       enqueueSnackbar('삭제할 회원을 찾을 수 없습니다.', { variant: 'error' });
       return;
@@ -586,13 +602,37 @@ export default function Member() {
     }
   };
 
-  const renderDetailValue = (value: string | null) => {
-    if (!value || !value.trim()) {
-      return '-';
-    }
+  // ===== 정리한 코드 =====
 
-    return value;
-  };
+  const addModalActions: TAction[] = [
+    {
+      label: '저장',
+      onClick: () => {
+        void handleCreateMember();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting,
+    },
+  ];
+
+  const editModalActions: TAction[] = [
+    {
+      label: '삭제',
+      onClick: () => {
+        void handleDeleteMember();
+      },
+      buttonStyle: 'error',
+      disabled: isSubmitting,
+    },
+    {
+      label: '수정',
+      onClick: () => {
+        void handleUpdateMember();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting,
+    },
+  ];
 
   return (
     <section className="px-3 py-6 sm:px-4 sm:py-8 lg:px-20">
@@ -706,9 +746,6 @@ export default function Member() {
                           <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">
                             {selectedUser.isAdmin ? 'Administrator' : 'Member'}
                           </span>
-                          <span className="text-sm font-medium italic text-slate-400">
-                            Active Member
-                          </span>
                         </div>
                       </div>
                     </div>
@@ -721,56 +758,7 @@ export default function Member() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-x-12 gap-y-7 md:grid-cols-2 xl:grid-cols-3">
-                    <div className="flex flex-col gap-1">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                        Email
-                      </p>
-                      <p className="text-lg font-semibold text-slate-800">
-                        {renderDetailValue(selectedUser.email)}
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                        Admin
-                      </p>
-                      <p className="text-lg font-semibold text-slate-800">
-                        {selectedUser.isAdmin ? 'Yes' : 'No'}
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                        Phone
-                      </p>
-                      <p className="text-lg font-semibold text-slate-800">
-                        {renderDetailValue(selectedUser.phone)}
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                        Joined At
-                      </p>
-                      <p className="text-lg font-semibold text-slate-800">
-                        {renderDetailValue(selectedUser.joinedAt)}
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                        Role
-                      </p>
-                      <p className="text-lg font-semibold text-slate-800">
-                        {renderDetailValue(selectedUser.role)}
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                        Department
-                      </p>
-                      <p className="text-lg font-semibold text-slate-800">
-                        {renderDetailValue(selectedUser.department)}
-                      </p>
-                    </div>
-                  </div>
+                  {DetailInfoDesc(userDetailInfo)}
                 </div>
 
                 <div className="border-t border-slate-100 bg-slate-50 px-6 py-6 md:px-8">
@@ -778,7 +766,7 @@ export default function Member() {
                     <span aria-hidden="true" className="text-amber-500">
                       ₩
                     </span>
-                    회비 입금 여부 (Membership Fee Payment)
+                    회비 입금 여부
                   </h3>
 
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -828,206 +816,29 @@ export default function Member() {
         </div>
       </div>
 
-      <Dialog open={openAddDialog} onClose={handleCloseAddDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Add Member</DialogTitle>
-        <DialogContent>
-          <TextField
-            margin="dense"
-            label="Name"
-            name="name"
-            fullWidth
-            value={addMemberForm.name}
-            onChange={handleChangeAddForm}
-          />
-          <TextField
-            margin="dense"
-            label="Email (Optional)"
-            name="email"
-            type="email"
-            fullWidth
-            value={addMemberForm.email}
-            onChange={handleChangeAddForm}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={addMemberForm.isAdmin}
-                onChange={(event) => {
-                  setAddMemberForm((previous) => ({
-                    ...previous,
-                    isAdmin: event.target.checked,
-                  }));
-                }}
-              />
-            }
-            label="Admin Member"
-          />
-          <TextField
-            margin="dense"
-            label="Phone"
-            name="phone"
-            fullWidth
-            value={addMemberForm.phone}
-            onChange={handleChangeAddForm}
-          />
-          <TextField
-            margin="dense"
-            label="Role"
-            name="role"
-            fullWidth
-            value={addMemberForm.role}
-            onChange={handleChangeAddForm}
-          />
-          <TextField
-            margin="dense"
-            label="Department"
-            name="department"
-            fullWidth
-            value={addMemberForm.department}
-            onChange={handleChangeAddForm}
-          />
-          <TextField
-            margin="dense"
-            label="Joined At"
-            name="joinedAt"
-            type="date"
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-            value={addMemberForm.joinedAt}
-            onChange={handleChangeAddForm}
-          />
-          <TextField
-            margin="dense"
-            label="Bio"
-            name="bio"
-            fullWidth
-            multiline
-            minRows={4}
-            value={addMemberForm.bio}
-            onChange={handleChangeAddForm}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseAddDialog} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => void handleCreateMember()}
-            variant="contained"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Saving...' : 'Save'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <MemberDetailModal
+        type="ADD"
+        open={openAddDialog}
+        handleClose={handleCloseAddDialog}
+        title="ADD MEMBER"
+        actions={addModalActions}
+        form={addMemberForm}
+        isSubmitting={isSubmitting}
+        onFormChange={handleChangeAddForm}
+        onDateChange={handleAddDateChange}
+      />
 
-      <GlobalModal
+      <MemberDetailModal
+        type="EDIT"
         open={openEditDialog}
         handleClose={handleCloseEditDialog}
         title="EDIT MEMBER"
-        actions={[
-          { label: '삭제', onClick: handleDeleteMember, buttonStyle: 'error' },
-          { label: '수정', onClick: handleUpdateMember, buttonStyle: 'confirm' },
-        ]}
-      >
-        <div>YAP</div>
-      </GlobalModal>
-
-      {/* <Dialog open={openEditDialog} onClose={handleCloseEditDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Edit Member</DialogTitle>
-        <DialogContent>
-          <TextField
-            margin="dense"
-            label="Name"
-            name="name"
-            fullWidth
-            value={editMemberForm.name}
-            onChange={handleChangeEditForm}
-          />
-          <TextField
-            margin="dense"
-            label="Email (Optional)"
-            name="email"
-            type="email"
-            fullWidth
-            value={editMemberForm.email}
-            onChange={handleChangeEditForm}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={editMemberForm.isAdmin}
-                onChange={(event) => {
-                  setEditMemberForm((previous) => ({
-                    ...previous,
-                    isAdmin: event.target.checked,
-                  }));
-                }}
-              />
-            }
-            label="Admin Member"
-          />
-          <TextField
-            margin="dense"
-            label="Phone"
-            name="phone"
-            fullWidth
-            value={editMemberForm.phone}
-            onChange={handleChangeEditForm}
-          />
-          <TextField
-            margin="dense"
-            label="Role"
-            name="role"
-            fullWidth
-            value={editMemberForm.role}
-            onChange={handleChangeEditForm}
-          />
-          <TextField
-            margin="dense"
-            label="Department"
-            name="department"
-            fullWidth
-            value={editMemberForm.department}
-            onChange={handleChangeEditForm}
-          />
-          <TextField
-            margin="dense"
-            label="Joined At"
-            name="joinedAt"
-            type="date"
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-            value={editMemberForm.joinedAt}
-            onChange={handleChangeEditForm}
-          />
-          <TextField
-            margin="dense"
-            label="Bio"
-            name="bio"
-            fullWidth
-            multiline
-            minRows={4}
-            value={editMemberForm.bio}
-            onChange={handleChangeEditForm}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button color="error" onClick={() => void handleDeleteMember()} disabled={isSubmitting}>
-            {isSubmitting ? 'Deleting...' : 'Delete'}
-          </Button>
-          <Button onClick={handleCloseEditDialog} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => void handleUpdateMember()}
-            variant="contained"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Updating...' : 'Update'}
-          </Button>
-        </DialogActions>
-      </Dialog> */}
+        actions={editModalActions}
+        form={editMemberForm}
+        isSubmitting={isSubmitting}
+        onFormChange={handleChangeEditForm}
+        onDateChange={handleEditDateChange}
+      />
     </section>
   );
 }
