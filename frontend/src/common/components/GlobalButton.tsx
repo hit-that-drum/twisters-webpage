@@ -3,6 +3,7 @@ import type { IconType } from 'react-icons';
 import { HiOutlinePlusCircle } from 'react-icons/hi';
 import { MdOutlineModeEditOutline } from 'react-icons/md';
 import { RiDeleteBack2Line } from 'react-icons/ri';
+import { twMerge } from 'tailwind-merge';
 
 const baseClassName =
   'inline-flex items-center justify-center gap-2 rounded-xl text-slate-900 transition-all';
@@ -17,7 +18,7 @@ const appearanceClassName: Record<GlobalButtonAppearance, string> = {
 };
 
 const joinClassName = (...classNames: Array<string | undefined>) => {
-  return classNames.filter(Boolean).join(' ');
+  return twMerge(classNames.filter(Boolean).join(' '));
 };
 
 type IconBasicMappingType = 'ADD' | 'EDIT' | 'DELETE' | 'NONE';

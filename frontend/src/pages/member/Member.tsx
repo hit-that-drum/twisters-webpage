@@ -13,7 +13,7 @@ import {
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { EditDeleteButton, GlobalButton } from '@/common/components';
+import { EditDeleteButton, GlobalButton, GlobalModal } from '@/common/components';
 
 interface MemberUser {
   id: number;
@@ -921,7 +921,19 @@ export default function Member() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openEditDialog} onClose={handleCloseEditDialog} fullWidth maxWidth="sm">
+      <GlobalModal
+        open={openEditDialog}
+        handleClose={handleCloseEditDialog}
+        title="EDIT MEMBER"
+        actions={[
+          { label: '삭제', onClick: handleDeleteMember, buttonStyle: 'error' },
+          { label: '수정', onClick: handleUpdateMember, buttonStyle: 'confirm' },
+        ]}
+      >
+        <div>YAP</div>
+      </GlobalModal>
+
+      {/* <Dialog open={openEditDialog} onClose={handleCloseEditDialog} fullWidth maxWidth="sm">
         <DialogTitle>Edit Member</DialogTitle>
         <DialogContent>
           <TextField
@@ -1015,7 +1027,7 @@ export default function Member() {
             {isSubmitting ? 'Updating...' : 'Update'}
           </Button>
         </DialogActions>
-      </Dialog>
+      </Dialog> */}
     </section>
   );
 }
