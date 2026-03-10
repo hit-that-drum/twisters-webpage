@@ -9,9 +9,9 @@
 - **(2026.03.09)**
   - ✅ 'EDIT', 'DELETE' 아이콘 넣은 button componenet화
 - **(2026.03.10)**
-  - ☑️✅ Global Button Component
+  - ✅ Global Button Component
+  - ✅ Golbal Modal Component
 
-- ☑️✅ Golbal Modal Component
 - ☑️✅ ScreenLoader Component
 - ☑️✅ 404 Error page
 - ☑️✅ 창 새로 켜도 로그인 상태 유지되게 상태관리
@@ -23,7 +23,6 @@
 ## BACK-END
 
 - **(2026.03.07)**
-
   - ✅ NGR 백엔드 쪽 코드 분리 로직 보기
   - ✅ VONE-API 쪽 코드 분리 로직 보기
 
@@ -54,7 +53,6 @@
 - **(2026.03.08)**
   - ✅ 가입할 때 유저네임이 "TEST"로 시작하면 테스트 계정으로 분리
 - **(2026.03.09)**
-
   - ✅ 메인 페이지 스타일링 조정(언어, 버튼 위치 등)
   - ✅ 카카오톡 아이콘 가져오기
 
@@ -69,7 +67,6 @@
 ### HEADER
 
 - **(2026.03.04)**
-
   - ✅ 탭 정보에 들어가는 로고 및 헤더 로고 변경
   - ✅ 글씨체 바꾸기
   - ✅ 헤더 스타일링 다시 하기
@@ -84,7 +81,6 @@
 ### FOOTER
 
 - **(2026.03.10)**
-
   - ✅ Footer 초기 디자인
     - FOOTER에 들어가야 하는 정보  
       [https://blog.duda.co/website-footer-design-best-practices-examples](https://blog.duda.co/website-footer-design-best-practices-examples)
@@ -108,6 +104,12 @@
 - **(2026.03.08)**
   - ✅ 테스트 유저일 때 test_member DB에서 쿼리해 와서 정보 보여주기
   - ✅ Stitch AI로 디자인 완료
+- **(2026.03.10)**
+  - ✅ Global Modal로 변경
+  - ✅ birthDate 필드 추가
+
+- ☑️✅ member DB에서 role, description 컬럼 제거
+- ☑️✅ member DB에 birthDate 컬럼 추가
 
 ---
 
@@ -146,7 +148,6 @@
 ### ADMIN
 
 - **(2026.03.07)**
-
   - ✅ 회원가입한 유저를 허가하는 로직을 만들어야 함
   - ✅ Stitch AI로 디자인 완료
 
