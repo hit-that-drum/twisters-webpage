@@ -13,7 +13,7 @@ import {
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { EditDeleteButton } from '@/common/components';
+import { EditDeleteButton, GlobalButton } from '@/common/components';
 
 interface MemberUser {
   id: number;
@@ -599,23 +599,20 @@ export default function Member() {
       <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Members</h1>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+              Members
+            </h1>
             <p className="mt-1 text-sm text-slate-500">
               왼쪽 Member Directory에서 회원을 선택하면 상세 정보를 확인할 수 있습니다.
             </p>
           </div>
 
           {canManageMembers && (
-            <button
-              type="button"
+            <GlobalButton
               onClick={handleOpenAddDialog}
-              className="flex h-11 items-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black uppercase tracking-wider text-slate-900 shadow-lg shadow-amber-200 transition-all hover:bg-amber-200 sm:h-12 sm:px-6"
-            >
-              <span aria-hidden="true" className="text-base">
-                ⊕
-              </span>
-              ADD MEMBER
-            </button>
+              label="ADD MEMBER"
+              iconBasicMappingType="ADD"
+            />
           )}
         </div>
 
@@ -630,11 +627,17 @@ export default function Member() {
               </h3>
             </div>
 
-            <div className="flex flex-col" role="listbox" aria-labelledby="member-directory-heading">
+            <div
+              className="flex flex-col"
+              role="listbox"
+              aria-labelledby="member-directory-heading"
+            >
               {isLoading ? (
                 <p className="px-4 py-5 text-sm font-medium text-slate-500">Loading members...</p>
               ) : users.length === 0 ? (
-                <p className="px-4 py-5 text-sm font-medium text-slate-500">No members available.</p>
+                <p className="px-4 py-5 text-sm font-medium text-slate-500">
+                  No members available.
+                </p>
               ) : (
                 users.map((user) => {
                   const isActive = user.id === selectedUserId;
@@ -663,7 +666,11 @@ export default function Member() {
                       </span>
 
                       <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-sm ${isActive ? 'font-bold' : 'font-semibold'}`}>
+                        <span
+                          className={`block truncate text-sm ${
+                            isActive ? 'font-bold' : 'font-semibold'
+                          }`}
+                        >
                           {user.name}
                         </span>
                         <span className="block truncate text-xs text-slate-400">
@@ -699,7 +706,9 @@ export default function Member() {
                           <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">
                             {selectedUser.isAdmin ? 'Administrator' : 'Member'}
                           </span>
-                          <span className="text-sm font-medium italic text-slate-400">Active Member</span>
+                          <span className="text-sm font-medium italic text-slate-400">
+                            Active Member
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -714,37 +723,49 @@ export default function Member() {
 
                   <div className="grid grid-cols-1 gap-x-12 gap-y-7 md:grid-cols-2 xl:grid-cols-3">
                     <div className="flex flex-col gap-1">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Email</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                        Email
+                      </p>
                       <p className="text-lg font-semibold text-slate-800">
                         {renderDetailValue(selectedUser.email)}
                       </p>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Admin</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                        Admin
+                      </p>
                       <p className="text-lg font-semibold text-slate-800">
                         {selectedUser.isAdmin ? 'Yes' : 'No'}
                       </p>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Phone</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                        Phone
+                      </p>
                       <p className="text-lg font-semibold text-slate-800">
                         {renderDetailValue(selectedUser.phone)}
                       </p>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Joined At</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                        Joined At
+                      </p>
                       <p className="text-lg font-semibold text-slate-800">
                         {renderDetailValue(selectedUser.joinedAt)}
                       </p>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Role</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                        Role
+                      </p>
                       <p className="text-lg font-semibold text-slate-800">
                         {renderDetailValue(selectedUser.role)}
                       </p>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Department</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                        Department
+                      </p>
                       <p className="text-lg font-semibold text-slate-800">
                         {renderDetailValue(selectedUser.department)}
                       </p>
@@ -790,7 +811,9 @@ export default function Member() {
                 </div>
 
                 <div className="border-t border-slate-100 px-6 py-6 md:px-8">
-                  <h3 className="mb-3 text-lg font-bold uppercase tracking-tight text-slate-900">Bio</h3>
+                  <h3 className="mb-3 text-lg font-bold uppercase tracking-tight text-slate-900">
+                    Bio
+                  </h3>
                   <p className="whitespace-pre-wrap leading-relaxed text-slate-600">
                     {renderDetailValue(selectedUser.bio)}
                   </p>

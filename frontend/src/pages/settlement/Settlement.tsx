@@ -22,6 +22,7 @@ import { enqueueSnackbar } from 'notistack';
 import EditDeleteButton from '@/common/components/EditDeleteButton';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
+import GlobalButton from '@/common/components/GlobalButton';
 
 interface SettlementRecord {
   id: number;
@@ -217,18 +218,11 @@ const SettlementGrid = memo(function SettlementGrid({
           </h1>
 
           {canManageSettlements && (
-            <button
-              type="button"
+            <GlobalButton
               onClick={onOpenAddDialog}
-              className="flex h-12 min-w-[160px] items-center justify-center gap-2 rounded-xl px-6 text-base font-bold tracking-wide text-black shadow-lg transition-all hover:brightness-95"
-              style={{
-                backgroundColor: '#FFD700',
-                boxShadow: '0 10px 24px rgba(255, 215, 0, 0.2)',
-              }}
-            >
-              <span aria-hidden="true">⊕</span>
-              <span className="truncate">ADD SETTLEMENT</span>
-            </button>
+              label="ADD SETTLEMENT"
+              iconBasicMappingType="ADD"
+            />
           )}
         </div>
 
@@ -750,8 +744,8 @@ export default function Settlement() {
             typeof record.amount === 'number'
               ? record.amount
               : typeof record.amount === 'string'
-                ? Number(record.amount)
-                : NaN;
+              ? Number(record.amount)
+              : NaN;
 
           if (
             typeof record.id !== 'number' ||

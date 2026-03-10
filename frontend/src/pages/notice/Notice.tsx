@@ -14,6 +14,7 @@ import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import EditDeleteButton from '@/common/components/EditDeleteButton';
 import { apiFetch } from '@/common/lib/api/apiClient';
+import GlobalButton from '@/common/components/GlobalButton';
 
 interface NoticeItem {
   id: number;
@@ -512,14 +513,11 @@ export default function Notice() {
           </div>
 
           {canManageNotices && (
-            <button
-              type="button"
+            <GlobalButton
               onClick={handleOpenAddDialog}
-              className="flex h-12 min-w-[140px] items-center justify-center gap-2 rounded-xl bg-amber-300 px-6 text-sm font-black uppercase tracking-wider text-slate-900 shadow-lg shadow-amber-200 transition-all hover:bg-amber-200"
-            >
-              <span aria-hidden="true">⊕</span>
-              <span>Add Notice</span>
-            </button>
+              label="Add Notice"
+              iconBasicMappingType="ADD"
+            />
           )}
         </div>
 

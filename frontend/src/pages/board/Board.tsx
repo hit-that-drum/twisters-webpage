@@ -13,7 +13,7 @@ import {
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { EditDeleteButton } from '@/common/components';
+import { EditDeleteButton, GlobalButton } from '@/common/components';
 
 interface BoardPostItem {
   id: number;
@@ -831,14 +831,11 @@ export default function Board() {
           </div>
 
           {canCreatePost && (
-            <button
-              type="button"
+            <GlobalButton
               onClick={handleOpenAddDialog}
-              className="flex h-10 min-w-[124px] items-center justify-center gap-2 rounded-xl bg-amber-300 px-4 text-xs font-black uppercase tracking-wider text-slate-900 shadow-lg shadow-amber-200 transition-all hover:bg-amber-200 sm:h-12 sm:min-w-[140px] sm:px-6 sm:text-sm"
-            >
-              <span aria-hidden="true">⊕</span>
-              <span>Add Post</span>
-            </button>
+              label="Add Post"
+              iconBasicMappingType="ADD"
+            />
           )}
         </div>
 

@@ -4,6 +4,7 @@ import { enqueueSnackbar } from 'notistack';
 import EditDeleteButton from '@/common/components/EditDeleteButton';
 import { apiFetch } from '@/common/lib/api/apiClient';
 import { useAuth } from '@/features';
+import GlobalButton from '@/common/components/GlobalButton';
 
 interface PendingUserRecord {
   id: number;
@@ -441,16 +442,11 @@ export default function AdminPage() {
         </div>
 
         <div className="flex gap-3">
-          <button
-            type="button"
+          <TwistersButton
             onClick={handleAddNewUser}
-            className="flex items-center gap-2 rounded-xl bg-amber-300 px-4 py-2 font-bold text-black shadow-sm transition-all hover:bg-amber-200"
-          >
-            <span aria-hidden="true" className="text-lg">
-              ＋
-            </span>
-            <span>Add New User</span>
-          </button>
+            label="Add New User"
+            iconBasicMappingType="ADD"
+          />
         </div>
       </div>
 
@@ -648,7 +644,9 @@ export default function AdminPage() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div
-                              className={`flex size-10 items-center justify-center rounded-full text-xs font-bold ${getAvatarToneClassName(user.id)}`}
+                              className={`flex size-10 items-center justify-center rounded-full text-xs font-bold ${getAvatarToneClassName(
+                                user.id,
+                              )}`}
                             >
                               {getInitials(user.name)}
                             </div>
@@ -702,7 +700,9 @@ export default function AdminPage() {
 
           <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
             <p className="text-sm text-slate-500">
-              {`Showing ${showingStart}-${showingEnd} of ${formatCount(filteredUsers.length)} members`}
+              {`Showing ${showingStart}-${showingEnd} of ${formatCount(
+                filteredUsers.length,
+              )} members`}
             </p>
             <div className="flex gap-2">
               <button
