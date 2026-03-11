@@ -6,6 +6,9 @@ import { apiFetch } from '@/common/lib/api/apiClient';
 import { EditDeleteButton, GlobalButton } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import BoardDetailModal, { type BoardFormState } from './BoardDetailModal';
+import { AiTwotonePushpin } from 'react-icons/ai';
+import { IoPersonCircleSharp } from 'react-icons/io5';
+import { FaClock } from 'react-icons/fa';
 
 interface BoardPostItem {
   id: number;
@@ -939,10 +942,7 @@ export default function Board() {
                       {post.pinned && (
                         <div className="absolute left-3 top-3 sm:left-4 sm:top-4">
                           <span className="flex items-center gap-1 rounded bg-amber-300 px-2 py-1 text-[10px] font-black uppercase text-slate-900 shadow-sm">
-                            <span aria-hidden="true" className="text-[11px]">
-                              📌
-                            </span>
-                            Pinned
+                            <AiTwotonePushpin size="20px" color="white" />
                           </span>
                         </div>
                       )}
@@ -967,30 +967,18 @@ export default function Board() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 sm:text-sm">
-                          <span aria-hidden="true">👤</span>
+                          <span aria-hidden="true">
+                            <IoPersonCircleSharp size="20px" />
+                          </span>
                           <span>Posted by {post.createUser}</span>
                           <span className="mx-1" aria-hidden="true">
                             •
                           </span>
-                          <span aria-hidden="true">⏱</span>
+                          <span aria-hidden="true">
+                            <FaClock size="16px" />
+                          </span>
                           <span>{formatRelativeTime(post.createDate)}</span>
                         </div>
-
-                        <ul className="space-y-2 text-sm text-slate-600">
-                          {(previewLines.length > 0 ? previewLines : ['내용이 없습니다.']).map(
-                            (line, lineIndex) => (
-                              <li
-                                key={`${post.id}-line-${lineIndex}`}
-                                className="flex items-start gap-2"
-                              >
-                                <span className="mt-1 text-amber-500" aria-hidden="true">
-                                  •
-                                </span>
-                                <span>{line}</span>
-                              </li>
-                            ),
-                          )}
-                        </ul>
 
                         <button
                           type="button"

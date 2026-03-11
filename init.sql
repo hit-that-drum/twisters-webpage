@@ -109,6 +109,7 @@ CREATE TABLE public.notice (
     "updateUser" character varying(100) NOT NULL,
     "updateDate" timestamp with time zone DEFAULT now() NOT NULL,
     content text NOT NULL,
+    "imageUrl" text,
     pinned boolean DEFAULT false NOT NULL
 );
 

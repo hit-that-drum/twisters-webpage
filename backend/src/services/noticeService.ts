@@ -86,6 +86,10 @@ const normalizeNoticeMutationPayload = (
   authenticatedUser: AuthenticatedUser,
 ): NoticeMutationPayload => {
   const title = typeof payload.title === 'string' ? payload.title.trim() : '';
+  const imageUrl =
+    typeof payload.imageUrl === 'string' && payload.imageUrl.trim().length > 0
+      ? payload.imageUrl.trim()
+      : null;
   const content = typeof payload.content === 'string' ? payload.content.trim() : '';
 
   if (!title || !content) {
@@ -94,6 +98,7 @@ const normalizeNoticeMutationPayload = (
 
   return {
     title,
+    imageUrl,
     content,
     pinned: parsePinned(payload.pinned, false),
     auditUser: resolveAuditUser(authenticatedUser),
@@ -106,6 +111,7 @@ class NoticeService {
     const rows = await noticeRepository.findAll(scope);
     return rows.map((row) => ({
       ...row,
+      imageUrl: typeof row.imageUrl === 'string' && row.imageUrl.trim().length > 0 ? row.imageUrl.trim() : null,
       pinned: Boolean(row.pinned),
     }));
   }

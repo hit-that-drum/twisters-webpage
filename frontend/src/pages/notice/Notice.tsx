@@ -17,6 +17,7 @@ interface NoticeItem {
   createDate: string;
   updateUser: string;
   updateDate: string;
+  imageUrl: string | null;
   content: string;
   pinned: boolean;
 }
@@ -97,6 +98,7 @@ const parseNoticeList = (payload: unknown): NoticeItem[] => {
         createDate?: unknown;
         updateUser?: unknown;
         updateDate?: unknown;
+        imageUrl?: unknown;
         content?: unknown;
         pinned?: unknown;
       };
@@ -124,6 +126,11 @@ const parseNoticeList = (payload: unknown): NoticeItem[] => {
           ? row.updateDate
           : row.createDate;
 
+      const normalizedImageUrl =
+        typeof row.imageUrl === 'string' && row.imageUrl.trim().length > 0
+          ? row.imageUrl.trim()
+          : null;
+
       return {
         id: row.id,
         title: row.title,
@@ -131,6 +138,7 @@ const parseNoticeList = (payload: unknown): NoticeItem[] => {
         createDate: row.createDate,
         updateUser: normalizedUpdateUser,
         updateDate: normalizedUpdateDate,
+        imageUrl: normalizedImageUrl,
         content: row.content,
         pinned: normalizedPinned,
       } satisfies NoticeItem;
@@ -186,11 +194,13 @@ export default function Notice() {
   const [editingNoticeId, setEditingNoticeId] = useState<number | null>(null);
   const [newNotice, setNewNotice] = useState<NoticeFormState>({
     title: '',
+    imageUrl: '',
     content: '',
     pinned: false,
   });
   const [editNotice, setEditNotice] = useState<NoticeFormState>({
     title: '',
+    imageUrl: '',
     content: '',
     pinned: false,
   });
@@ -251,7 +261,7 @@ export default function Notice() {
       return;
     }
 
-    setNewNotice({ title: '', content: '', pinned: false });
+    setNewNotice({ title: '', imageUrl: '', content: '', pinned: false });
     setOpenAddDialog(true);
   };
 
@@ -274,6 +284,7 @@ export default function Notice() {
     setEditingNoticeId(notice.id);
     setEditNotice({
       title: notice.title,
+      imageUrl: notice.imageUrl ?? '',
       content: notice.content,
       pinned: notice.pinned,
     });
@@ -350,6 +361,7 @@ export default function Notice() {
         method: 'POST',
         body: JSON.stringify({
           title,
+          imageUrl: newNotice.imageUrl.trim() || null,
           content,
           pinned: newNotice.pinned,
         }),
@@ -372,7 +384,7 @@ export default function Notice() {
 
       enqueueSnackbar(getApiMessage(payload, '공지사항이 등록되었습니다.'), { variant: 'success' });
       setOpenAddDialog(false);
-      setNewNotice({ title: '', content: '', pinned: false });
+      setNewNotice({ title: '', imageUrl: '', content: '', pinned: false });
       await loadNotices();
     } catch (error) {
       console.error('Notice create error:', error);
@@ -407,6 +419,7 @@ export default function Notice() {
         method: 'PUT',
         body: JSON.stringify({
           title,
+          imageUrl: editNotice.imageUrl.trim() || null,
           content,
           pinned: editNotice.pinned,
         }),
@@ -516,6 +529,13 @@ export default function Notice() {
           ) : (
             displayedNotices.map((notice, index) => {
               const imagePreset = NOTICE_IMAGE_PRESETS[index % NOTICE_IMAGE_PRESETS.length];
+              const imageStyle = notice.imageUrl
+                ? {
+                    backgroundImage: `linear-gradient(140deg, rgba(15,23,42,0.1) 0%, rgba(15,23,42,0.36) 100%), url(${notice.imageUrl})`,
+                  }
+                : {
+                    background: imagePreset.gradient,
+                  };
 
               return (
                 <article key={notice.id} className="group">
@@ -526,19 +546,21 @@ export default function Notice() {
                         : 'border border-slate-200 shadow-sm hover:shadow-md'
                     }`}
                   >
-                    <div
-                      role="img"
-                      aria-label={imagePreset.alt}
-                      className="relative aspect-video w-full overflow-hidden bg-center bg-no-repeat xl:w-72 xl:flex-shrink-0"
-                      style={{ background: imagePreset.gradient }}
-                    >
-                      {notice.pinned && (
-                        <div className="absolute left-4 top-4">
-                          <span className="flex items-center gap-1 rounded bg-amber-300 px-1 py-1 text-[10px] font-black uppercase text-slate-900 shadow-sm">
-                            <AiTwotonePushpin size="20px" color="white" />
-                          </span>
-                        </div>
-                      )}
+                    <div className="flex items-center justify-center border-r border-gray-300">
+                      <div
+                        role="img"
+                        aria-label={imagePreset.alt}
+                        className="relative w-full min-h-[282px] overflow-hidden bg-center bg-cover bg-no-repeat xl:w-[282px] xl:min-w-[282px] xl:flex-shrink-0 xl:self-center"
+                        style={imageStyle}
+                      >
+                        {notice.pinned && (
+                          <div className="absolute left-4 top-4">
+                            <span className="flex items-center gap-1 rounded bg-amber-300 px-1 py-1 text-[10px] font-black uppercase text-slate-900 shadow-sm">
+                              <AiTwotonePushpin size="20px" color="white" />
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex flex-1 flex-col justify-between p-6">
@@ -571,14 +593,13 @@ export default function Notice() {
                           <span>{formatRelativeTime(notice.createDate)}</span>
                         </div>
 
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                        <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 min-h-[122px]">
                           <p className="whitespace-pre-wrap">{notice.content}</p>
                         </div>
-
-                        <p className="text-xs font-medium text-slate-400">
-                          Updated: {notice.updateUser} · {formatDateTime(notice.updateDate)}
-                        </p>
                       </div>
+                      <p className="text-xs font-medium text-slate-400 mt-4">
+                        Updated: {notice.updateUser} · {formatDateTime(notice.updateDate)}
+                      </p>
                     </div>
                   </div>
                 </article>

@@ -12,8 +12,10 @@
 
   - ✅ Global Button Component
   - ✅ Golbal Modal Component
+- **(2026.03.11)**
+  - ✅ 본문 최상단 카드 width fullscreen으로 수정
 
-- ☑️✅ 본문 최상단 카드 width fullscreen으로 수정
+- ☑️✅ File Upload Component
 - ☑️✅ ScreenLoader Component
 - ☑️✅ 404 Error page
 - ☑️✅ 창 새로 켜도 로그인 상태 유지되게 상태관리
@@ -132,6 +134,9 @@
   - ✅ Stitch AI로 디자인 완료
 - **(2026.03.10)**
   - ✅ Global Modal로 변경
+  - ️✅ notice DB에 noticeImage 컬럼 추가
+
+- ☑️✅ content에 bulletpoint를 넣을 수 있을까?
 
 ---
 

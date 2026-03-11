@@ -7,6 +7,7 @@ export type NoticeModalType = 'ADD' | 'EDIT';
 
 export interface NoticeFormState {
   title: string;
+  imageUrl: string;
   content: string;
   pinned: boolean;
 }
@@ -37,6 +38,15 @@ function NoticeDetailForm({
         name="title"
         fullWidth
         value={form.title}
+        onChange={onFormChange}
+        disabled={isSubmitting}
+      />
+      <TextField
+        margin="dense"
+        label="IMAGE URL (optional)"
+        name="imageUrl"
+        fullWidth
+        value={form.imageUrl}
         onChange={onFormChange}
         disabled={isSubmitting}
       />
