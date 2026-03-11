@@ -6,6 +6,9 @@ import { apiFetch } from '@/common/lib/api/apiClient';
 import { EditDeleteButton, GlobalButton } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import NoticeDetailModal, { type NoticeFormState } from './NoticeDetailModal';
+import { AiTwotonePushpin } from 'react-icons/ai';
+import { IoPersonCircleSharp } from 'react-icons/io5';
+import { FaClock } from 'react-icons/fa';
 
 interface NoticeItem {
   id: number;
@@ -25,19 +28,16 @@ const NOTICE_IMAGE_PRESETS = [
     alt: 'Community meeting visual',
     gradient:
       'linear-gradient(135deg, rgba(26,54,93,0.95) 0%, rgba(60,114,178,0.82) 55%, rgba(178,214,242,0.75) 100%)',
-    symbol: '🏛',
   },
   {
     alt: 'Parking zone visual',
     gradient:
       'linear-gradient(135deg, rgba(26,49,66,0.96) 0%, rgba(74,104,129,0.86) 55%, rgba(191,211,230,0.75) 100%)',
-    symbol: '🅿',
   },
   {
     alt: 'Maintenance and tools visual',
     gradient:
       'linear-gradient(135deg, rgba(59,62,82,0.95) 0%, rgba(109,130,171,0.84) 54%, rgba(236,223,170,0.76) 100%)',
-    symbol: '🛠',
   },
 ];
 
@@ -77,28 +77,6 @@ const formatDateTime = (rawDate: string) => {
   }
 
   return parsedDate.toLocaleString();
-};
-
-const extractPreviewLines = (content: string, maxLines = 3) => {
-  const byLine = content
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  if (byLine.length > 0) {
-    return byLine.slice(0, maxLines);
-  }
-
-  const bySentence = (content.match(/[^.!?]+[.!?]?/g) ?? [])
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  if (bySentence.length > 0) {
-    return bySentence.slice(0, maxLines);
-  }
-
-  const trimmed = content.trim();
-  return trimmed ? [trimmed] : [];
 };
 
 const parseNoticeList = (payload: unknown): NoticeItem[] => {
@@ -200,7 +178,6 @@ export default function Notice() {
   const { meInfo, logout } = useAuth();
   const [noticeList, setNoticeList] = useState<NoticeItem[]>([]);
   const [visibleNoticeCount, setVisibleNoticeCount] = useState(DEFAULT_VISIBLE_NOTICES);
-  const [expandedNoticeIds, setExpandedNoticeIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingNoticeId, setDeletingNoticeId] = useState<number | null>(null);
@@ -235,7 +212,6 @@ export default function Notice() {
       const normalizedList = parseNoticeList(payload);
       setNoticeList(normalizedList);
       setVisibleNoticeCount(DEFAULT_VISIBLE_NOTICES);
-      setExpandedNoticeIds([]);
     } catch (error) {
       console.error('Notice list fetch error:', error);
       enqueueSnackbar('공지사항을 불러오는 중 오류가 발생했습니다.', { variant: 'error' });
@@ -509,16 +485,6 @@ export default function Notice() {
     setVisibleNoticeCount((previous) => previous + DEFAULT_VISIBLE_NOTICES);
   };
 
-  const toggleNoticeExpand = (noticeId: number) => {
-    setExpandedNoticeIds((previous) => {
-      if (previous.includes(noticeId)) {
-        return previous.filter((id) => id !== noticeId);
-      }
-
-      return [...previous, noticeId];
-    });
-  };
-
   return (
     <main className="flex flex-1 flex-col items-center px-4 py-8 lg:px-20">
       <div className="layout-content-container flex w-full flex-col gap-6">
@@ -549,9 +515,7 @@ export default function Notice() {
             </div>
           ) : (
             displayedNotices.map((notice, index) => {
-              const previewLines = extractPreviewLines(notice.content, 3);
               const imagePreset = NOTICE_IMAGE_PRESETS[index % NOTICE_IMAGE_PRESETS.length];
-              const isExpanded = expandedNoticeIds.includes(notice.id);
 
               return (
                 <article key={notice.id} className="group">
@@ -568,19 +532,10 @@ export default function Notice() {
                       className="relative aspect-video w-full overflow-hidden bg-center bg-no-repeat xl:w-72 xl:flex-shrink-0"
                       style={{ background: imagePreset.gradient }}
                     >
-                      <div className="flex h-full w-full items-end bg-black/5 p-4">
-                        <span className="text-4xl drop-shadow-sm" aria-hidden="true">
-                          {imagePreset.symbol}
-                        </span>
-                      </div>
-
                       {notice.pinned && (
                         <div className="absolute left-4 top-4">
-                          <span className="flex items-center gap-1 rounded bg-amber-300 px-2 py-1 text-[10px] font-black uppercase text-slate-900 shadow-sm">
-                            <span aria-hidden="true" className="text-[11px]">
-                              📌
-                            </span>
-                            Pinned
+                          <span className="flex items-center gap-1 rounded bg-amber-300 px-1 py-1 text-[10px] font-black uppercase text-slate-900 shadow-sm">
+                            <AiTwotonePushpin size="20px" color="white" />
                           </span>
                         </div>
                       )}
@@ -605,45 +560,20 @@ export default function Notice() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-500">
-                          <span aria-hidden="true">👤</span>
+                          <span aria-hidden="true">
+                            <IoPersonCircleSharp size="20px" />
+                          </span>
                           <span>Posted by {notice.createUser}</span>
                           <span className="mx-1">•</span>
-                          <span aria-hidden="true">⏱</span>
+                          <span aria-hidden="true">
+                            <FaClock size="16px" />
+                          </span>
                           <span>{formatRelativeTime(notice.createDate)}</span>
                         </div>
 
-                        <ul className="space-y-2 text-sm text-slate-600">
-                          {(previewLines.length > 0 ? previewLines : ['내용이 없습니다.']).map(
-                            (line, lineIndex) => (
-                              <li
-                                key={`${notice.id}-line-${lineIndex}`}
-                                className="flex items-start gap-2"
-                              >
-                                <span className="mt-1 text-amber-500" aria-hidden="true">
-                                  •
-                                </span>
-                                <span>{line}</span>
-                              </li>
-                            ),
-                          )}
-                        </ul>
-
-                        {notice.content.trim().length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => toggleNoticeExpand(notice.id)}
-                            className="w-fit text-sm font-semibold text-blue-700 transition-colors hover:text-blue-800"
-                            aria-expanded={isExpanded}
-                          >
-                            {isExpanded ? 'Hide full notice' : 'Read full notice'}
-                          </button>
-                        )}
-
-                        {isExpanded && (
-                          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                            <p className="whitespace-pre-wrap">{notice.content}</p>
-                          </div>
-                        )}
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                          <p className="whitespace-pre-wrap">{notice.content}</p>
+                        </div>
 
                         <p className="text-xs font-medium text-slate-400">
                           Updated: {notice.updateUser} · {formatDateTime(notice.updateDate)}
