@@ -6,6 +6,7 @@ import { apiFetch } from '@/common/lib/api/apiClient';
 import { EditDeleteButton, GlobalButton } from '@/common/components';
 import MemberDetailModal, { type MemberFormState } from './MemberDetailModal';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
+import { BiMoneyWithdraw } from 'react-icons/bi';
 
 interface MemberUser {
   id: number;
@@ -41,7 +42,6 @@ const createDefaultMemberForm = (): MemberFormState => ({
   name: '',
   email: '',
   phone: '',
-  joinedAt: '',
   birthDate: '',
   bio: '',
 });
@@ -168,7 +168,6 @@ const toEditForm = (member: MemberUser): MemberFormState => ({
   name: member.name,
   email: member.email ?? '',
   phone: member.phone ?? '',
-  joinedAt: member.joinedAt ?? '',
   birthDate: member.birthDate ?? '',
   bio: member.bio ?? '',
 });
@@ -473,14 +472,14 @@ export default function Member() {
     }));
   };
 
-  const handleAddDateChange = (field: 'joinedAt' | 'birthDate', value: string) => {
+  const handleAddDateChange = (field: 'birthDate', value: string) => {
     setAddMemberForm((previous) => ({
       ...previous,
       [field]: value,
     }));
   };
 
-  const handleEditDateChange = (field: 'joinedAt' | 'birthDate', value: string) => {
+  const handleEditDateChange = (field: 'birthDate', value: string) => {
     setEditMemberForm((previous) => ({
       ...previous,
       [field]: value,
@@ -640,11 +639,8 @@ export default function Member() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
-              Members
+              MEMBER
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              왼쪽 Member Directory에서 회원을 선택하면 상세 정보를 확인할 수 있습니다.
-            </p>
           </div>
 
           {canManageMembers && (
@@ -764,7 +760,7 @@ export default function Member() {
                 <div className="border-t border-slate-100 bg-slate-50 px-6 py-6 md:px-8">
                   <h3 className="mb-5 flex items-center gap-2 text-lg font-bold text-slate-900">
                     <span aria-hidden="true" className="text-amber-500">
-                      ₩
+                      <BiMoneyWithdraw />
                     </span>
                     회비 입금 여부
                   </h3>
