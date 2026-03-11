@@ -18,7 +18,7 @@ interface NoticeItem {
   pinned: boolean;
 }
 
-const DEFAULT_VISIBLE_NOTICES = 3;
+const DEFAULT_VISIBLE_NOTICES = 5;
 
 const NOTICE_IMAGE_PRESETS = [
   {
@@ -334,7 +334,7 @@ export default function Notice() {
 
   const addNoticeActions: TAction[] = [
     {
-      label: isSubmitting ? 'Saving...' : 'Save',
+      label: '저장',
       onClick: () => {
         void handleCreateNotice();
       },
@@ -345,7 +345,7 @@ export default function Notice() {
 
   const editNoticeActions: TAction[] = [
     {
-      label: isSubmitting ? 'Updating...' : 'Update',
+      label: '수정',
       onClick: () => {
         void handleUpdateNotice();
       },
@@ -521,15 +521,12 @@ export default function Notice() {
 
   return (
     <main className="flex flex-1 flex-col items-center px-4 py-8 lg:px-20">
-      <div className="layout-content-container flex w-full max-w-[1024px] flex-col gap-6">
+      <div className="layout-content-container flex w-full flex-col gap-6">
         <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-4 md:flex-row md:items-end">
           <div className="flex flex-col gap-1">
             <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900">
-              Notices
+              NOTICE
             </h1>
-            <p className="text-base font-normal text-slate-500">
-              Important updates and announcements for the community
-            </p>
           </div>
 
           {canManageNotices && (

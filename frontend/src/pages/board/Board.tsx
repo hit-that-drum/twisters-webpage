@@ -840,15 +840,12 @@ export default function Board() {
 
   return (
     <main className="flex flex-1 flex-col items-center px-3 py-6 sm:px-4 sm:py-8 lg:px-20">
-      <div className="layout-content-container flex w-full max-w-[1024px] flex-col gap-5 sm:gap-6">
+      <div className="layout-content-container flex w-full flex-col gap-5 sm:gap-6">
         <div className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-3 sm:gap-4 sm:pb-4 md:flex-row md:items-end">
           <div className="flex flex-col gap-1">
             <h1 className="text-3xl font-black leading-tight tracking-tight text-slate-900 sm:text-4xl">
-              Board
+              BOARD
             </h1>
-            <p className="text-sm font-normal text-slate-500 sm:text-base">
-              Team discussions, updates, and collaboration notes
-            </p>
           </div>
 
           {canCreatePost && (

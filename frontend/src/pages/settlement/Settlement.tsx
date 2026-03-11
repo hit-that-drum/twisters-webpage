@@ -195,10 +195,10 @@ const SettlementGrid = memo(function SettlementGrid({
 }: SettlementGridProps) {
   return (
     <>
-      <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-8 md:px-10">
+      <main className="mx-auto w-full flex-1 px-4 py-8 md:px-10">
         <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900">
-            Settlement
+            SETTLEMENT
           </h1>
 
           {canManageSettlements && (

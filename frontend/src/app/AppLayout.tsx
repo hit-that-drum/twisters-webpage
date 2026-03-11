@@ -43,14 +43,14 @@ export default function AppLayout() {
 
       {meInfo?.isTest && (
         <div className="px-6 pb-4 pt-1">
-          <div className="mx-auto w-full max-w-7xl rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold tracking-wide text-amber-900">
+          <div className="mx-auto w-full rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold tracking-wide text-amber-900">
             TEST MODE: Showing isolated TEST data for notice, member, settlement, and board.
           </div>
         </div>
       )}
 
       <main className="flex-1 px-6 pb-6">
-        <div className="mx-auto w-full max-w-7xl rounded-2xl border border-gray-200 bg-white">
+        <div className="mx-auto w-full rounded-2xl border border-gray-200 bg-white">
           <Outlet />
         </div>
       </main>

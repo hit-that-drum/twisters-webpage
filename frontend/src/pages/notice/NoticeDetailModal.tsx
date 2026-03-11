@@ -59,7 +59,7 @@ function NoticeDetailForm({
             disabled={isSubmitting}
           />
         }
-        label="Pinned"
+        label="고정하기"
       />
     </div>
   );

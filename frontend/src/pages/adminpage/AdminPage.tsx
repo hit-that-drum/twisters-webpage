@@ -432,13 +432,10 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col px-4 py-8 md:px-10">
+    <main className="mx-auto flex w-full flex-1 flex-col px-4 py-8 md:px-10">
       <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Admin Dashboard</h1>
-          <p className="mt-1 text-slate-500">
-            Manage community members and content moderation workflows.
-          </p>
+          <h1 className="text-3xl font-black tracking-tight text-slate-900">ADMIN DASHBOARD</h1>
         </div>
 
         <div className="flex gap-3">

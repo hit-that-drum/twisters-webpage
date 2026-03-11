@@ -635,7 +635,7 @@ export default function Member() {
 
   return (
     <section className="px-3 py-6 sm:px-4 sm:py-8 lg:px-20">
-      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-8">
+      <div className="mx-auto flex w-full flex-col gap-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
