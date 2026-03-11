@@ -135,8 +135,7 @@
 - **(2026.03.10)**
   - ✅ Global Modal로 변경
   - ️✅ notice DB에 noticeImage 컬럼 추가
-
-- ☑️✅ content에 bulletpoint를 넣을 수 있을까?
+  - ️✅ content에 bulletpoint를 넣을 수 있을까?
 
 ---
 
