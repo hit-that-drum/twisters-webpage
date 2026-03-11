@@ -20,7 +20,50 @@ const BOARD_ORDER_BY: Record<BoardSortOption, string> = {
 
 let ensureBoardSchemaPromise: Promise<void> | null = null;
 
+type BoardImageColumnMeta = {
+  data_type: string;
+  udt_name: string;
+};
+
 class BoardRepository {
+  private async ensureBoardImageColumn(tableName: 'board' | 'test_board') {
+    const columnResult = await pool.query<BoardImageColumnMeta>(
+      `SELECT data_type, udt_name
+         FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+          AND column_name = 'imageUrl'
+        LIMIT 1`,
+      [tableName],
+    );
+
+    const imageColumn = columnResult.rows[0];
+
+    if (!imageColumn) {
+      await pool.query(
+        `ALTER TABLE ${tableName} ADD COLUMN "imageUrl" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`,
+      );
+      return;
+    }
+
+    if (imageColumn.udt_name !== '_text') {
+      await pool.query(`
+        ALTER TABLE ${tableName}
+        ALTER COLUMN "imageUrl" TYPE TEXT[]
+        USING CASE
+          WHEN "imageUrl" IS NULL OR BTRIM("imageUrl") = '' THEN ARRAY[]::TEXT[]
+          ELSE ARRAY["imageUrl"]
+        END
+      `);
+    }
+
+    await pool.query(`UPDATE ${tableName} SET "imageUrl" = ARRAY[]::TEXT[] WHERE "imageUrl" IS NULL`);
+    await pool.query(
+      `ALTER TABLE ${tableName} ALTER COLUMN "imageUrl" SET DEFAULT ARRAY[]::TEXT[]`,
+    );
+    await pool.query(`ALTER TABLE ${tableName} ALTER COLUMN "imageUrl" SET NOT NULL`);
+  }
+
   private async ensureBoardSchema() {
     if (!ensureBoardSchemaPromise) {
       ensureBoardSchemaPromise = (async () => {
@@ -33,6 +76,7 @@ class BoardRepository {
             "createDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             "updateUser" VARCHAR(100) NOT NULL,
             "updateDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            "imageUrl" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
             content TEXT NOT NULL,
             pinned BOOLEAN NOT NULL DEFAULT FALSE
           )
@@ -47,6 +91,7 @@ class BoardRepository {
             "createDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             "updateUser" VARCHAR(100) NOT NULL,
             "updateDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            "imageUrl" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
             content TEXT NOT NULL,
             pinned BOOLEAN NOT NULL DEFAULT FALSE
           )
@@ -58,6 +103,9 @@ class BoardRepository {
         await pool.query(
           'ALTER TABLE test_board ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT FALSE',
         );
+
+        await this.ensureBoardImageColumn('board');
+        await this.ensureBoardImageColumn('test_board');
 
         await pool.query(`
           CREATE TABLE IF NOT EXISTS board_comments (
@@ -177,7 +225,7 @@ class BoardRepository {
     }
 
     const result = await pool.query<BoardRow>(
-      `SELECT id, "authorId", title, "createUser", "createDate", "updateUser", "updateDate", content, pinned FROM ${boardTableName} ${whereClause} ORDER BY ${orderBy} LIMIT 200`,
+      `SELECT id, "authorId", title, "createUser", "createDate", "updateUser", "updateDate", "imageUrl", content, pinned FROM ${boardTableName} ${whereClause} ORDER BY ${orderBy} LIMIT 200`,
       values,
     );
     return result.rows;
@@ -195,12 +243,13 @@ class BoardRepository {
   async create(scope: DataScope, payload: BoardMutationPayload) {
     const boardTableName = getScopedTableNames(scope).board;
     await pool.query(
-      `INSERT INTO ${boardTableName} ("authorId", title, "createUser", "updateUser", content, pinned) VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO ${boardTableName} ("authorId", title, "createUser", "updateUser", "imageUrl", content, pinned) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         payload.authorId,
         payload.title,
         payload.auditUser,
         payload.auditUser,
+        payload.imageUrl,
         payload.content,
         payload.pinned,
       ],
@@ -210,8 +259,8 @@ class BoardRepository {
   async updateById(scope: DataScope, boardId: number, payload: BoardMutationPayload) {
     const boardTableName = getScopedTableNames(scope).board;
     const result = await pool.query(
-      `UPDATE ${boardTableName} SET title = $1, "updateUser" = $2, content = $3, pinned = $4 WHERE id = $5`,
-      [payload.title, payload.auditUser, payload.content, payload.pinned, boardId],
+      `UPDATE ${boardTableName} SET title = $1, "updateUser" = $2, "imageUrl" = $3, content = $4, pinned = $5 WHERE id = $6`,
+      [payload.title, payload.auditUser, payload.imageUrl, payload.content, payload.pinned, boardId],
     );
     return result.rowCount ?? 0;
   }

@@ -42,7 +42,7 @@ function MemberDetailForm({
   onDateChange,
 }: Pick<
   MemberDetailModalProps,
-  'type' | 'form' | 'isSubmitting' | 'onFormChange' | 'onDateChange'
+  'form' | 'isSubmitting' | 'onFormChange' | 'onDateChange'
 >) {
   return (
     <div className="flex flex-col gap-1 pt-1">
@@ -109,7 +109,6 @@ function MemberDetailForm({
 }
 
 export default function MemberDetailModal({
-  type,
   open,
   handleClose,
   actions,

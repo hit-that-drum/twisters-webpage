@@ -1,4 +1,11 @@
-import { Dialog, DialogActions, DialogContent, DialogTitle, type ButtonProps } from '@mui/material';
+import {
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  type ButtonProps,
+  type DialogProps,
+} from '@mui/material';
 import type { ReactNode } from 'react';
 import GlobalButton from './GlobalButton';
 
@@ -25,6 +32,7 @@ interface GlobalModalProps {
   children: ReactNode;
   keepOnBackdropClick?: boolean;
   disableEscapeKeyDown?: boolean;
+  maxWidth?: DialogProps['maxWidth'];
 }
 
 const modalButtonStyle = 'min-w-[60px] h-10 border-2 text-white text-sm';
@@ -37,6 +45,7 @@ export default function GlobalModal({
   children,
   keepOnBackdropClick = true,
   disableEscapeKeyDown,
+  maxWidth = 'sm',
 }: GlobalModalProps) {
   const closeDialog = (e: object, reason: ModalCloseReason) => {
     if (keepOnBackdropClick && reason === 'backdropClick') return;
@@ -50,7 +59,7 @@ export default function GlobalModal({
       open={open}
       onClose={(e, reason) => closeDialog(e, reason as ModalCloseReason)}
       fullWidth
-      maxWidth="sm"
+      maxWidth={maxWidth}
     >
       <DialogTitle>{title}</DialogTitle>
       <DialogContent dividers={true}>{children || '내용을 입력해주세요'}</DialogContent>

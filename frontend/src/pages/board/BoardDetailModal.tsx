@@ -7,6 +7,7 @@ export type BoardModalType = 'ADD' | 'EDIT';
 
 export interface BoardFormState {
   title: string;
+  imageUrl: string[];
   content: string;
   pinned: boolean;
 }
@@ -21,6 +22,7 @@ interface BoardDetailModalProps {
   isSubmitting?: boolean;
   canPinPost: boolean;
   onFormChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onImageUrlsChange: (value: string[]) => void;
   onPinnedChange: (checked: boolean) => void;
 }
 
@@ -29,10 +31,11 @@ function BoardDetailForm({
   isSubmitting = false,
   canPinPost,
   onFormChange,
+  onImageUrlsChange,
   onPinnedChange,
 }: Pick<
   BoardDetailModalProps,
-  'form' | 'isSubmitting' | 'canPinPost' | 'onFormChange' | 'onPinnedChange'
+  'form' | 'isSubmitting' | 'canPinPost' | 'onFormChange' | 'onImageUrlsChange' | 'onPinnedChange'
 >) {
   return (
     <div className="flex flex-col gap-1 pt-1">
@@ -43,6 +46,24 @@ function BoardDetailForm({
         fullWidth
         value={form.title}
         onChange={onFormChange}
+        disabled={isSubmitting}
+      />
+      <TextField
+        margin="dense"
+        label="IMAGE URLS (one per line)"
+        name="imageUrl"
+        fullWidth
+        multiline
+        minRows={3}
+        value={form.imageUrl.join('\n')}
+        onChange={(event) => {
+          const nextUrls = event.target.value
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+          onImageUrlsChange(nextUrls);
+        }}
+        helperText="The first URL becomes the main image. Add one image URL per line."
         disabled={isSubmitting}
       />
       <TextField
@@ -82,6 +103,7 @@ export default function BoardDetailModal({
   isSubmitting,
   canPinPost,
   onFormChange,
+  onImageUrlsChange,
   onPinnedChange,
 }: BoardDetailModalProps) {
   return (
@@ -92,6 +114,7 @@ export default function BoardDetailModal({
         isSubmitting={isSubmitting}
         canPinPost={canPinPost}
         onFormChange={onFormChange}
+        onImageUrlsChange={onImageUrlsChange}
         onPinnedChange={onPinnedChange}
       />
     </GlobalModal>

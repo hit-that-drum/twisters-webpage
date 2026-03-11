@@ -106,6 +106,14 @@ const normalizeBoardMutationPayload = (
   defaultPinned: boolean,
 ): BoardMutationPayload => {
   const title = typeof payload.title === 'string' ? payload.title.trim() : '';
+  const imageUrl = Array.isArray(payload.imageUrl)
+    ? payload.imageUrl
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+    : typeof payload.imageUrl === 'string' && payload.imageUrl.trim().length > 0
+      ? [payload.imageUrl.trim()]
+      : [];
   const content = typeof payload.content === 'string' ? payload.content.trim() : '';
 
   if (!title || !content) {
@@ -120,6 +128,10 @@ const normalizeBoardMutationPayload = (
     throw new HttpError(400, '본문은 20000자 이하로 입력해주세요.');
   }
 
+  if (imageUrl.length > 12) {
+    throw new HttpError(400, '이미지는 최대 12장까지 등록할 수 있습니다.');
+  }
+
   const requestedPinned = parsePinned(payload.pinned, defaultPinned);
   if (requestedPinned && !isAdminUser(authenticatedUser)) {
     throw new HttpError(403, '관리자만 상단 고정 게시글을 지정할 수 있습니다.');
@@ -128,6 +140,7 @@ const normalizeBoardMutationPayload = (
   return {
     authorId: authenticatedUser.id,
     title,
+    imageUrl,
     content,
     pinned: requestedPinned,
     auditUser: resolveAuditUser(authenticatedUser),
@@ -204,6 +217,12 @@ class BoardService {
     const rows = await boardRepository.findAll(scope, normalizedQuery);
     return rows.map((row) => ({
       ...row,
+      imageUrl: Array.isArray(row.imageUrl)
+        ? row.imageUrl
+            .filter((item): item is string => typeof item === 'string')
+            .map((item) => item.trim())
+            .filter((item) => item.length > 0)
+        : [],
       pinned: Boolean(row.pinned),
     }));
   }
@@ -267,10 +286,6 @@ class BoardService {
     const isAuthor = existingBoard.authorId !== null && existingBoard.authorId === sessionUser.id;
     if (!isAdmin && !isAuthor) {
       throw new HttpError(403, '작성자 또는 관리자만 게시글을 삭제할 수 있습니다.');
-    }
-
-    if (Boolean(existingBoard.pinned) && !isAdmin) {
-      throw new HttpError(403, '상단 고정 게시글은 관리자만 삭제할 수 있습니다.');
     }
 
     const deletedCount = await boardRepository.deleteById(scope, boardId);
