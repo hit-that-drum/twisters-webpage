@@ -41,7 +41,7 @@ class AuthRepository {
   async findMeById(userId: number) {
     await this.ensureUsersSchema();
     const result = await pool.query<MeUserRow>(
-      'SELECT id, name, email, "isAdmin", "isTest" FROM users WHERE id = $1',
+      'SELECT id, name, email, "profileImage", "isAdmin", "isTest" FROM users WHERE id = $1',
       [userId],
     );
 

@@ -20,6 +20,7 @@ export interface MeUser {
   id: number;
   name: string;
   email: string;
+  profileImage: string | null;
   isAdmin: boolean;
   isTest: boolean;
 }
@@ -34,6 +35,7 @@ export interface MeUserRow {
   id: number;
   name: string;
   email: string;
+  profileImage: string | null;
   isAdmin: boolean | number;
   isTest: boolean | number;
 }

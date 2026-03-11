@@ -333,6 +333,10 @@ class AuthService {
       id: me.id,
       name: me.name,
       email: me.email,
+      profileImage:
+        typeof me.profileImage === 'string' && me.profileImage.trim().length > 0
+          ? me.profileImage.trim()
+          : null,
       isAdmin: Boolean(me.isAdmin),
       isTest: normalizeBoolean(me.isTest, false),
     };

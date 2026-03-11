@@ -17,8 +17,6 @@ export default function LNB({ onNavigate }: { onNavigate?: () => void }) {
     { to: '/notice', label: '📢 Notice' },
     { to: '/settlement', label: '💰 Settlement' },
     { to: '/board', label: '🎲 Board' },
-    { to: '/mypage', label: '📝 My Page' },
-    { to: '/admin', label: '👑 Admin', adminOnly: true },
   ];
 
   const visibleMenuItems = menuItems.filter((item) => {
