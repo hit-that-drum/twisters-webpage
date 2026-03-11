@@ -16,7 +16,7 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
         <button
           type="button"
           onClick={() => setIsMobileMenuOpen((previous) => !previous)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-xl font-light text-gray-700 transition hover:bg-gray-100 md:hidden"
+          className="rounded-lg border border-amber-300 px-3 py-2 text-xl font-light text-gray-700 transition hover:bg-amber-200 md:hidden"
           aria-expanded={isMobileMenuOpen}
           aria-controls="header-mobile-lnb"
         >
@@ -26,14 +26,14 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
         <button
           type="button"
           onClick={handleLogout}
-          className="shrink-0 rounded-lg bg-blue-700 px-4 py-2 text-xl font-light text-white transition hover:bg-blue-800"
+          className="shrink-0 rounded-lg bg-amber-300 px-4 py-2 text-xl font-light text-white transition hover:bg-amber-200"
         >
           Logout
         </button>
       </div>
 
       {isMobileMenuOpen && (
-        <div id="header-mobile-lnb" className="mt-3 border-t border-gray-200 pt-3 md:hidden">
+        <div id="header-mobile-lnb" className="mt-3 border-t border-amber-300 pt-3 md:hidden">
           <LNB onNavigate={() => setIsMobileMenuOpen(false)} />
         </div>
       )}

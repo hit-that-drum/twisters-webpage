@@ -41,9 +41,9 @@ export default function LNB({ onNavigate }: { onNavigate?: () => void }) {
             to={item.to}
             onClick={onNavigate}
             className={({ isActive }) =>
-              `whitespace-nowrap rounded-lg px-3 py-2 text-2xl font-light transition ${
+              `whitespace-nowrap rounded-lg px-3 py-2 text-3xl font-light transition ${
                 isActive
-                  ? 'bg-blue-700 text-white shadow-sm'
+                  ? 'bg-amber-300 text-white shadow-sm'
                   : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
               }`
             }
