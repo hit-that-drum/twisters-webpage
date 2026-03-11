@@ -79,8 +79,14 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
     { label: '☑️ Logout', onClick: handleLogoutClick, danger: true },
   ];
 
+  const isAdminUser = meInfo?.isAdmin === true;
+
   const visibleProfileMenuItems = profileMenuItems.filter((item) => {
-    if (item.adminOnly && meInfo?.isAdmin !== true) {
+    if (isAdminUser) {
+      return true;
+    }
+
+    if (item.adminOnly) {
       return false;
     }
 
