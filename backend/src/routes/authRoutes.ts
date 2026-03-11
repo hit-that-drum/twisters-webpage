@@ -9,6 +9,11 @@ router.post('/signin', authController.signIn);
 
 router.post('/signup', authController.signUp);
 router.get('/me', passport.authenticate('jwt', { session: false }), authController.getMe);
+router.patch(
+  '/me/profile-image',
+  passport.authenticate('jwt', { session: false }),
+  authController.updateProfileImage,
+);
 router.get('/users', passport.authenticate('jwt', { session: false }), authController.getUsers);
 router.post('/refresh', authController.refreshSession);
 router.post('/heartbeat', passport.authenticate('jwt', { session: false }), authController.heartbeat);

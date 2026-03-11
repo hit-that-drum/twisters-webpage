@@ -105,6 +105,8 @@ const normalizeBoardMutationPayload = (
   authenticatedUser: AuthenticatedUser,
   defaultPinned: boolean,
 ): BoardMutationPayload => {
+  const maxInlineImageChars = 5_000_000;
+  const maxInlineImagesTotalChars = 20_000_000;
   const title = typeof payload.title === 'string' ? payload.title.trim() : '';
   const imageUrl = Array.isArray(payload.imageUrl)
     ? payload.imageUrl
@@ -130,6 +132,14 @@ const normalizeBoardMutationPayload = (
 
   if (imageUrl.length > 12) {
     throw new HttpError(400, '이미지는 최대 12장까지 등록할 수 있습니다.');
+  }
+
+  if (imageUrl.some((image) => image.length > maxInlineImageChars)) {
+    throw new HttpError(400, '각 이미지는 5MB 이하 문자열 데이터만 저장할 수 있습니다.');
+  }
+
+  if (imageUrl.reduce((total, image) => total + image.length, 0) > maxInlineImagesTotalChars) {
+    throw new HttpError(400, '게시글 이미지 전체 크기는 20MB 이하만 저장할 수 있습니다.');
   }
 
   const requestedPinned = parsePinned(payload.pinned, defaultPinned);

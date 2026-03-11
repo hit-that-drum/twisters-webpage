@@ -631,6 +631,12 @@ export default function Notice() {
         form={newNotice}
         isSubmitting={isSubmitting}
         onFormChange={handleChangeNewNotice}
+        onImageUrlsChange={(value) => {
+          setNewNotice((previous) => ({
+            ...previous,
+            imageUrl: value[0] ?? '',
+          }));
+        }}
         onPinnedChange={(checked) => {
           setNewNotice((previous) => ({
             ...previous,
@@ -648,6 +654,12 @@ export default function Notice() {
         form={editNotice}
         isSubmitting={isSubmitting}
         onFormChange={handleChangeEditNotice}
+        onImageUrlsChange={(value) => {
+          setEditNotice((previous) => ({
+            ...previous,
+            imageUrl: value[0] ?? '',
+          }));
+        }}
         onPinnedChange={(checked) => {
           setEditNotice((previous) => ({
             ...previous,

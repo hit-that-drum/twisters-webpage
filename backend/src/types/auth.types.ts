@@ -108,3 +108,7 @@ export interface KakaoAuthDTO {
 export interface RefreshSessionDTO {
   refreshToken?: unknown;
 }
+
+export interface UpdateProfileImageDTO {
+  profileImage?: unknown;
+}

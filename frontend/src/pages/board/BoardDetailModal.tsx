@@ -1,6 +1,6 @@
 import { Checkbox, FormControlLabel, TextField } from '@mui/material';
 import type { ChangeEvent, ReactNode } from 'react';
-import { GlobalModal } from '@/common/components';
+import { GlobalImageUpload, GlobalModal } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 
 export type BoardModalType = 'ADD' | 'EDIT';
@@ -48,23 +48,13 @@ function BoardDetailForm({
         onChange={onFormChange}
         disabled={isSubmitting}
       />
-      <TextField
-        margin="dense"
-        label="IMAGE URLS (one per line)"
-        name="imageUrl"
-        fullWidth
-        multiline
-        minRows={3}
-        value={form.imageUrl.join('\n')}
-        onChange={(event) => {
-          const nextUrls = event.target.value
-            .split('\n')
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0);
-          onImageUrlsChange(nextUrls);
-        }}
-        helperText="The first URL becomes the main image. Add one image URL per line."
+      <GlobalImageUpload
+        value={form.imageUrl}
+        onChange={onImageUrlsChange}
         disabled={isSubmitting}
+        maxImages={12}
+        label="BOARD IMAGES"
+        helperText="Add multiple images. The first image becomes the main image used in the card and modal."
       />
       <TextField
         margin="dense"

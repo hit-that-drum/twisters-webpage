@@ -9,6 +9,8 @@ import {
 import { type AuthenticatedUser } from '../types/common.types.js';
 import { resolveDataScopeByUser } from '../utils/dataScope.js';
 
+const MAX_INLINE_IMAGE_CHARS = 5_000_000;
+
 const parseNoticeId = (rawNoticeId?: string) => {
   const noticeId = Number(rawNoticeId);
   if (!Number.isInteger(noticeId) || noticeId <= 0) {
@@ -94,6 +96,10 @@ const normalizeNoticeMutationPayload = (
 
   if (!title || !content) {
     throw new HttpError(400, '제목과 내용을 모두 입력해주세요.');
+  }
+
+  if (imageUrl && imageUrl.length > MAX_INLINE_IMAGE_CHARS) {
+    throw new HttpError(400, '공지사항 이미지는 5MB 이하 문자열 데이터만 저장할 수 있습니다.');
   }
 
   return {

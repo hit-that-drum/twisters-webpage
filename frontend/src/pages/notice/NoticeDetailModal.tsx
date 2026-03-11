@@ -1,6 +1,6 @@
 import { Checkbox, FormControlLabel, TextField } from '@mui/material';
 import type { ChangeEvent, KeyboardEvent, ReactNode } from 'react';
-import { GlobalModal } from '@/common/components';
+import { GlobalImageUpload, GlobalModal } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 
 export type NoticeModalType = 'ADD' | 'EDIT';
@@ -25,6 +25,7 @@ interface NoticeDetailModalProps {
   form: NoticeFormState;
   isSubmitting?: boolean;
   onFormChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onImageUrlsChange: (value: string[]) => void;
   onPinnedChange: (checked: boolean) => void;
 }
 
@@ -32,8 +33,12 @@ function NoticeDetailForm({
   form,
   isSubmitting = false,
   onFormChange,
+  onImageUrlsChange,
   onPinnedChange,
-}: Pick<NoticeDetailModalProps, 'form' | 'isSubmitting' | 'onFormChange' | 'onPinnedChange'>) {
+}: Pick<
+  NoticeDetailModalProps,
+  'form' | 'isSubmitting' | 'onFormChange' | 'onImageUrlsChange' | 'onPinnedChange'
+>) {
   const handleContentKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey) {
       return;
@@ -118,14 +123,13 @@ function NoticeDetailForm({
         onChange={onFormChange}
         disabled={isSubmitting}
       />
-      <TextField
-        margin="dense"
-        label="IMAGE URL (optional)"
-        name="imageUrl"
-        fullWidth
-        value={form.imageUrl}
-        onChange={onFormChange}
+      <GlobalImageUpload
+        value={form.imageUrl ? [form.imageUrl] : []}
+        onChange={onImageUrlsChange}
         disabled={isSubmitting}
+        maxImages={1}
+        label="NOTICE IMAGE"
+        helperText="Upload one image, drag and drop it, or paste an image URL."
       />
       <TextField
         margin="dense"
@@ -163,6 +167,7 @@ export default function NoticeDetailModal({
   form,
   isSubmitting,
   onFormChange,
+  onImageUrlsChange,
   onPinnedChange,
 }: NoticeDetailModalProps) {
   return (
@@ -172,6 +177,7 @@ export default function NoticeDetailModal({
         form={form}
         isSubmitting={isSubmitting}
         onFormChange={onFormChange}
+        onImageUrlsChange={onImageUrlsChange}
         onPinnedChange={onPinnedChange}
       />
     </GlobalModal>

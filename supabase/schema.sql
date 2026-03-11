@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
   password VARCHAR(255),
   google_id VARCHAR(255),
   kakao_id VARCHAR(255),
-  "profileImage" VARCHAR(512),
+  "profileImage" TEXT,
   "isAdmin" BOOLEAN NOT NULL DEFAULT FALSE,
   "isTest" BOOLEAN NOT NULL DEFAULT FALSE,
   "isAllowed" BOOLEAN NOT NULL DEFAULT FALSE,
