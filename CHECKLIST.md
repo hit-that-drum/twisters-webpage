@@ -9,9 +9,9 @@
 - **(2026.03.09)**
   - ✅ 'EDIT', 'DELETE' 아이콘 넣은 button componenet화
 - **(2026.03.10)**
-
   - ✅ Global Button Component
   - ✅ Golbal Modal Component
+
 - **(2026.03.11)**
   - ✅ 본문 최상단 카드 width fullscreen으로 수정
   - ✅ File Upload Component
@@ -27,13 +27,11 @@
 ### HEADER
 
 - **(2026.03.04)**
-
   - ✅ 탭 정보에 들어가는 로고 및 헤더 로고 변경
   - ✅ 글씨체 바꾸기
   - ✅ 헤더 스타일링 다시 하기
 
 - **(2026.03.11)**
-
   - ✅ key color 변경
   - ️✅ 지금은 Logout 버튼으로 되어 있는데 이걸 프로필 사진 동그라미로 바꾸고 그걸 클릭하면 로그아웃이랑 나오게 바꾸기
   - ️✅ 저렇게 바꾸고 나면 My Page랑 Admin랑 Logout이랑 이렇게 세 개가 그 안으로 들어가면 될 듯
@@ -43,7 +41,6 @@
 ### FOOTER
 
 - **(2026.03.10)**
-
   - ✅ Footer 초기 디자인
     - FOOTER에 들어가야 하는 정보  
       [https://blog.duda.co/website-footer-design-best-practices-examples](https://blog.duda.co/website-footer-design-best-practices-examples)
@@ -55,7 +52,6 @@
 ## BACK-END
 
 - **(2026.03.07)**
-
   - ✅ NGR 백엔드 쪽 코드 분리 로직 보기
   - ✅ VONE-API 쪽 코드 분리 로직 보기
 
@@ -86,7 +82,6 @@
 - **(2026.03.08)**
   - ✅ 가입할 때 유저네임이 "TEST"로 시작하면 테스트 계정으로 분리
 - **(2026.03.09)**
-
   - ✅ 메인 페이지 스타일링 조정(언어, 버튼 위치 등)
   - ✅ 카카오톡 아이콘 가져오기
 
@@ -116,7 +111,6 @@
   - ✅ 테스트 유저일 때 test_member DB에서 쿼리해 와서 정보 보여주기
   - ✅ Stitch AI로 디자인 완료
 - **(2026.03.10)**
-
   - ✅ Global Modal로 변경
   - ✅ birthDate 필드 추가
 
@@ -157,6 +151,9 @@
   - ✅ Stitch AI로 디자인 완료
 - **(2026.03.10)**
   - ✅ Global Modal로 변경
+- **(2026.03.17)**
+  - ✅ 이미지 미리보기 펼쳐졌을 때만 보이게 적용
+  - ✅ 이미지 위에 몇번째 이미지인지 나타나게 처리
 
 ---
 
@@ -173,14 +170,13 @@
   - ️✅ TEST 계정이거나 ADMIN 계정이면 route 노출
 
 - ☑️✅ 유저 타입 구분해서 플로우 차트 그리기
-- ☑️✅ 플로우 차트 embed || 이미지로 첨부 (이건 해 보고 생각해보기) 
+- ☑️✅ 플로우 차트 embed || 이미지로 첨부 (이건 해 보고 생각해보기)
 
 ---
 
 ### ADMIN
 
 - **(2026.03.07)**
-
   - ✅ 회원가입한 유저를 허가하는 로직을 만들어야 함
   - ✅ Stitch AI로 디자인 완료
 

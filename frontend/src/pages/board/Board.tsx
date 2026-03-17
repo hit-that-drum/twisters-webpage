@@ -1,4 +1,12 @@
-import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type CSSProperties,
+  type ChangeEvent,
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
@@ -10,6 +18,7 @@ import BoardImageModal from './BoardImageModal';
 import { AiTwotonePushpin } from 'react-icons/ai';
 import { IoPersonCircleSharp } from 'react-icons/io5';
 import { FaClock } from 'react-icons/fa';
+import { IoIosArrowBack, IoIosArrowDown, IoIosArrowForward, IoIosArrowUp } from 'react-icons/io';
 
 interface BoardPostItem {
   id: number;
@@ -136,26 +145,11 @@ const formatDateTime = (rawDate: string) => {
   return parsedDate.toLocaleString();
 };
 
-const extractPreviewLines = (content: string, maxLines = 3) => {
-  const byLine = content
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  if (byLine.length > 0) {
-    return byLine.slice(0, maxLines);
-  }
-
-  const bySentence = (content.match(/[^.!?]+[.!?]?/g) ?? [])
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  if (bySentence.length > 0) {
-    return bySentence.slice(0, maxLines);
-  }
-
-  const trimmed = content.trim();
-  return trimmed ? [trimmed] : [];
+const COLLAPSED_POST_CONTENT_STYLE: CSSProperties = {
+  display: '-webkit-box',
+  overflow: 'hidden',
+  WebkitBoxOrient: 'vertical',
+  WebkitLineClamp: 5,
 };
 
 const normalizeImageUrlList = (rawValue: unknown): string[] => {
@@ -184,18 +178,18 @@ const parseBoardPosts = (payload: unknown): BoardPostItem[] => {
         return null;
       }
 
-        const row = item as {
-          id?: unknown;
-          authorId?: unknown;
-          title?: unknown;
-          createUser?: unknown;
-          createDate?: unknown;
-          updateUser?: unknown;
-          updateDate?: unknown;
-          imageUrl?: unknown;
-          content?: unknown;
-          pinned?: unknown;
-        };
+      const row = item as {
+        id?: unknown;
+        authorId?: unknown;
+        title?: unknown;
+        createUser?: unknown;
+        createDate?: unknown;
+        updateUser?: unknown;
+        updateDate?: unknown;
+        imageUrl?: unknown;
+        content?: unknown;
+        pinned?: unknown;
+      };
 
       if (
         typeof row.id !== 'number' ||
@@ -220,23 +214,23 @@ const parseBoardPosts = (payload: unknown): BoardPostItem[] => {
           ? row.updateDate
           : row.createDate;
 
-        const normalizedPinned =
-          row.pinned === true || row.pinned === 1 || row.pinned === '1' || row.pinned === 'true';
+      const normalizedPinned =
+        row.pinned === true || row.pinned === 1 || row.pinned === '1' || row.pinned === 'true';
 
-        const normalizedImageUrl = normalizeImageUrlList(row.imageUrl);
+      const normalizedImageUrl = normalizeImageUrlList(row.imageUrl);
 
-        return {
-          id: row.id,
-          authorId: normalizedAuthorId,
-          title: row.title,
-          createUser: row.createUser,
-          createDate: row.createDate,
-          updateUser: normalizedUpdateUser,
-          updateDate: normalizedUpdateDate,
-          imageUrl: normalizedImageUrl,
-          content: row.content,
-          pinned: normalizedPinned,
-        } satisfies BoardPostItem;
+      return {
+        id: row.id,
+        authorId: normalizedAuthorId,
+        title: row.title,
+        createUser: row.createUser,
+        createDate: row.createDate,
+        updateUser: normalizedUpdateUser,
+        updateDate: normalizedUpdateDate,
+        imageUrl: normalizedImageUrl,
+        content: row.content,
+        pinned: normalizedPinned,
+      } satisfies BoardPostItem;
     })
     .filter((item): item is BoardPostItem => item !== null);
 };
@@ -331,7 +325,9 @@ export default function Board() {
   const [loadingCommentsPostIds, setLoadingCommentsPostIds] = useState<number[]>([]);
   const [submittingCommentPostId, setSubmittingCommentPostId] = useState<number | null>(null);
   const [deletingCommentKey, setDeletingCommentKey] = useState<string | null>(null);
-  const [currentImageIndexByPost, setCurrentImageIndexByPost] = useState<Record<number, number>>({});
+  const [currentImageIndexByPost, setCurrentImageIndexByPost] = useState<Record<number, number>>(
+    {},
+  );
   const [imageModalPostId, setImageModalPostId] = useState<number | null>(null);
 
   const [openAddDialog, setOpenAddDialog] = useState(false);
@@ -614,11 +610,12 @@ export default function Board() {
     setIsSubmitting(true);
 
     try {
-      const requestBody: { title: string; imageUrl: string[]; content: string; pinned?: boolean } = {
-        imageUrl: newPost.imageUrl,
-        title,
-        content,
-      };
+      const requestBody: { title: string; imageUrl: string[]; content: string; pinned?: boolean } =
+        {
+          imageUrl: newPost.imageUrl,
+          title,
+          content,
+        };
 
       if (canPinPost) {
         requestBody.pinned = newPost.pinned;
@@ -674,11 +671,12 @@ export default function Board() {
     setIsSubmitting(true);
 
     try {
-      const requestBody: { title: string; imageUrl: string[]; content: string; pinned?: boolean } = {
-        imageUrl: editPost.imageUrl,
-        title,
-        content,
-      };
+      const requestBody: { title: string; imageUrl: string[]; content: string; pinned?: boolean } =
+        {
+          imageUrl: editPost.imageUrl,
+          title,
+          content,
+        };
 
       if (canPinPost) {
         requestBody.pinned = editPost.pinned;
@@ -894,7 +892,8 @@ export default function Board() {
     [boardPosts, imageModalPostId],
   );
   const imageModalCurrentIndex = imageModalPost
-    ? (currentImageIndexByPost[imageModalPost.id] ?? 0) % Math.max(imageModalPost.imageUrl.length, 1)
+    ? (currentImageIndexByPost[imageModalPost.id] ?? 0) %
+      Math.max(imageModalPost.imageUrl.length, 1)
     : 0;
 
   useEffect(() => {
@@ -989,15 +988,16 @@ export default function Board() {
             </div>
           ) : (
             displayedPosts.map((post, index) => {
-              const previewLines = extractPreviewLines(post.content, 3);
               const imagePreset = BOARD_IMAGE_PRESETS[index % BOARD_IMAGE_PRESETS.length];
               const isExpanded = post.pinned || expandedPostIds.includes(post.id);
+              const postContent = post.content.trim() || '내용이 없습니다.';
               const canEditOrDelete = canMutatePost(post);
               const comments = commentsByPost[post.id] ?? [];
               const isLoadingComments = loadingCommentsPostIds.includes(post.id);
               const commentDraft = commentDraftByPost[post.id] ?? '';
               const currentImageIndex = currentImageIndexByPost[post.id] ?? 0;
-              const safeImageIndex = post.imageUrl.length > 0 ? currentImageIndex % post.imageUrl.length : 0;
+              const safeImageIndex =
+                post.imageUrl.length > 0 ? currentImageIndex % post.imageUrl.length : 0;
               const activeImageUrl = post.imageUrl[safeImageIndex] ?? null;
               const imageStyle = activeImageUrl
                 ? {
@@ -1044,7 +1044,9 @@ export default function Board() {
                           }
                         }}
                         className={`relative min-h-[282px] overflow-hidden bg-center bg-cover bg-no-repeat ${
-                          post.imageUrl.length > 0 ? 'cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset' : ''
+                          post.imageUrl.length > 0
+                            ? 'cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset'
+                            : ''
                         }`}
                         style={imageStyle}
                       >
@@ -1053,6 +1055,14 @@ export default function Board() {
                             <span className="flex items-center gap-1 rounded bg-amber-300 px-2 py-1 text-[10px] font-black uppercase text-slate-900 shadow-sm">
                               <AiTwotonePushpin size="20px" color="white" />
                             </span>
+                          </div>
+                        )}
+
+                        {post.imageUrl.length > 0 && (
+                          <div className="pointer-events-none absolute right-3 top-3 sm:right-4 sm:top-4">
+                            <div className="rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-sm backdrop-blur-sm">
+                              {`${safeImageIndex + 1}/${post.imageUrl.length}`}
+                            </div>
                           </div>
                         )}
 
@@ -1067,7 +1077,7 @@ export default function Board() {
                               className="absolute left-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-lg font-bold text-white backdrop-blur-sm transition hover:bg-black/60"
                               aria-label="Previous image"
                             >
-                              ‹
+                              <IoIosArrowBack />
                             </button>
                             <button
                               type="button"
@@ -1078,13 +1088,13 @@ export default function Board() {
                               className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-lg font-bold text-white backdrop-blur-sm transition hover:bg-black/60"
                               aria-label="Next image"
                             >
-                              ›
+                              <IoIosArrowForward />
                             </button>
                           </>
                         )}
                       </div>
 
-                      {post.imageUrl.length > 1 && (
+                      {isExpanded && (
                         <div
                           className="grid grid-cols-4 gap-2 border-t border-slate-200 p-3"
                           aria-label={`${post.title} image thumbnails`}
@@ -1113,64 +1123,69 @@ export default function Board() {
                       )}
                     </div>
 
-                    <div className="flex flex-1 flex-col justify-between p-6">
+                    <div className="flex flex-1 flex-col justify-end p-6">
                       <div className="flex flex-col gap-3">
                         <div className="flex items-start justify-between gap-4">
-                          <h3 className="text-xl font-bold leading-tight text-slate-900 transition-colors group-hover:text-blue-700">
+                          <h3 className="text-xl font-bold leading-tight text-slate-900 transition-colors">
                             {post.title}
                           </h3>
 
-                          {canEditOrDelete && (
-                            <EditDeleteButton
-                              onEditClick={() => handleOpenEditDialog(post)}
-                              onDeleteClick={() => {
-                                void handleDeletePost(post);
-                              }}
-                              isDeleting={deletingPostId === post.id}
-                            />
-                          )}
+                          <div className="flex gap-5">
+                            <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-500">
+                              <span aria-hidden="true">
+                                <IoPersonCircleSharp size="20px" />
+                              </span>
+                              <span>Posted by {post.createUser}</span>
+                              <span className="mx-1" aria-hidden="true">
+                                •
+                              </span>
+                              <span aria-hidden="true">
+                                <FaClock size="16px" />
+                              </span>
+                              <span>{formatRelativeTime(post.createDate)}</span>
+                            </div>
+                            {canEditOrDelete && (
+                              <EditDeleteButton
+                                onEditClick={() => handleOpenEditDialog(post)}
+                                onDeleteClick={() => {
+                                  void handleDeletePost(post);
+                                }}
+                                isDeleting={deletingPostId === post.id}
+                              />
+                            )}
+                          </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-500">
-                          <span aria-hidden="true">
-                            <IoPersonCircleSharp size="20px" />
-                          </span>
-                          <span>Posted by {post.createUser}</span>
-                          <span className="mx-1" aria-hidden="true">
-                            •
-                          </span>
-                          <span aria-hidden="true">
-                            <FaClock size="16px" />
-                          </span>
-                          <span>{formatRelativeTime(post.createDate)}</span>
-                        </div>
+                        <div id={`board-post-content-${post.id}`} className="space-y-3">
+                          <div className="relative min-h-[142px] rounded-lg border border-slate-200 bg-slate-50 p-3 pr-14 text-sm text-slate-700">
+                            {!post.pinned && (
+                              <button
+                                type="button"
+                                onClick={() => togglePostExpand(post.id)}
+                                className="absolute right-3 top-3 inline-flex size-8 items-center justify-center transition-colors hover:cursor-pointer"
+                                aria-expanded={isExpanded}
+                                aria-controls={`board-post-content-${post.id}`}
+                                aria-label={
+                                  isExpanded ? 'Collapse post content' : 'Expand post content'
+                                }
+                              >
+                                {isExpanded ? (
+                                  <IoIosArrowUp size="22px" />
+                                ) : (
+                                  <IoIosArrowDown size="22px" />
+                                )}
+                              </button>
+                            )}
 
-                        {!isExpanded && (
-                          <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 min-h-[122px]">
-                            <p className="whitespace-pre-wrap">
-                              {(previewLines.length > 0 ? previewLines : ['내용이 없습니다.']).join('\n')}
+                            <p
+                              className="whitespace-pre-wrap break-words leading-relaxed"
+                              style={isExpanded ? undefined : COLLAPSED_POST_CONTENT_STYLE}
+                            >
+                              {postContent}
                             </p>
                           </div>
-                        )}
 
-                        {!post.pinned && (
-                          <button
-                            type="button"
-                            onClick={() => togglePostExpand(post.id)}
-                            className="w-fit text-sm font-semibold text-blue-700 transition-colors hover:text-blue-800"
-                            aria-expanded={isExpanded}
-                            aria-controls={`board-post-content-${post.id}`}
-                          >
-                            {isExpanded ? 'Hide full post' : 'Read full post'}
-                          </button>
-                        )}
-
-                        {isExpanded && (
-                          <div id={`board-post-content-${post.id}`} className="space-y-3">
-                            <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 min-h-[122px]">
-                              <p className="whitespace-pre-wrap">{post.content}</p>
-                            </div>
-
+                          {isExpanded && (
                             <div className="rounded-lg border border-slate-200 bg-white p-3">
                               <div className="mb-2 flex items-center justify-between">
                                 <p className="text-sm font-bold text-slate-800">Comments</p>
@@ -1182,7 +1197,7 @@ export default function Board() {
                               {isLoadingComments ? (
                                 <p className="text-sm text-slate-500">댓글을 불러오는 중입니다.</p>
                               ) : comments.length === 0 ? (
-                                <p className="text-sm text-slate-500">첫 댓글을 남겨보세요.</p>
+                                <p className="text-sm text-slate-500 pb-2">첫 댓글을 남겨보세요.</p>
                               ) : (
                                 <ul className="mb-3 space-y-2">
                                   {comments.map((comment) => {
@@ -1256,11 +1271,11 @@ export default function Board() {
                                 </p>
                               )}
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
 
                         <p className="text-xs font-medium text-slate-400 mt-4">
-                          Updated: {post.updateUser} · {formatDateTime(post.updateDate)}
+                          Updated by {post.updateUser} · {formatDateTime(post.updateDate)}
                         </p>
                       </div>
                     </div>

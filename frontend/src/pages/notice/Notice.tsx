@@ -566,7 +566,7 @@ export default function Notice() {
                     <div className="flex flex-1 flex-col justify-between p-6">
                       <div className="flex flex-col gap-3">
                         <div className="flex items-start justify-between gap-4">
-                          <h3 className="text-xl font-bold leading-tight text-slate-900 transition-colors group-hover:text-blue-700">
+                          <h3 className="text-xl font-bold leading-tight text-slate-900 transition-colors">
                             {notice.title}
                           </h3>
 
@@ -598,7 +598,7 @@ export default function Notice() {
                         </div>
                       </div>
                       <p className="text-xs font-medium text-slate-400 mt-4">
-                        Updated: {notice.updateUser} · {formatDateTime(notice.updateDate)}
+                        Updated by {notice.updateUser} · {formatDateTime(notice.updateDate)}
                       </p>
                     </div>
                   </div>
