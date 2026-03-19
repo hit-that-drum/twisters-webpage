@@ -3,6 +3,16 @@ import type { ChangeEvent, ReactNode } from 'react';
 import { GlobalModal } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const formatRoleLabel = (role: AdminUserFormState['role']) => {
+  return role === 'admin' ? 'Moderator' : 'Member';
+};
+
+const formatStatusLabel = (status: AdminUserFormState['status']) => {
+  return status === 'active' ? 'Active' : 'Inactive';
+};
+
 export interface AdminUserFormState {
   name: string;
   email: string;
@@ -16,22 +26,84 @@ interface AdminUserDetailModalProps {
   actions: TAction[];
   title: ReactNode;
   form: AdminUserFormState;
+  initialForm: AdminUserFormState;
   isSubmitting?: boolean;
   disablePrivilegeControls?: boolean;
+  userName?: string;
+  joinedLabel?: string;
   onFormChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
 }
 
 function AdminUserDetailForm({
   form,
+  initialForm,
   isSubmitting = false,
   disablePrivilegeControls = false,
+  userName,
+  joinedLabel,
   onFormChange,
 }: Pick<
   AdminUserDetailModalProps,
-  'form' | 'isSubmitting' | 'disablePrivilegeControls' | 'onFormChange'
+  | 'form'
+  | 'initialForm'
+  | 'isSubmitting'
+  | 'disablePrivilegeControls'
+  | 'userName'
+  | 'joinedLabel'
+  | 'onFormChange'
 >) {
+  const trimmedName = form.name.trim();
+  const trimmedEmail = form.email.trim().toLowerCase();
+  const initialName = initialForm.name.trim();
+  const initialEmail = initialForm.email.trim().toLowerCase();
+
+  const hasNameChange = trimmedName !== initialName;
+  const hasEmailChange = trimmedEmail !== initialEmail;
+  const hasRoleChange = form.role !== initialForm.role;
+  const hasStatusChange = form.status !== initialForm.status;
+  const hasAccessChange = hasRoleChange || hasStatusChange;
+
+  const isNameInvalid = trimmedName.length === 0;
+  const isEmailInvalid = trimmedEmail.length === 0 || !isValidEmail(trimmedEmail);
+
   return (
     <div className="flex flex-col gap-1 pt-1">
+      <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <p className="font-semibold text-slate-900">{userName || 'Selected user'}</p>
+        {joinedLabel ? <p className="mt-1">Joined {joinedLabel}</p> : null}
+        <p className="mt-2 text-xs leading-5 text-slate-500">
+          Name and email update profile details. Role and status control admin access and sign-in availability.
+        </p>
+      </div>
+
+      {disablePrivilegeControls ? (
+        <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+          <p className="font-semibold">Current admin safeguard</p>
+          <p className="mt-1 leading-5 text-sky-800">
+            You can update your own name and email here, but role and status stay locked to prevent accidental loss of admin access.
+          </p>
+        </div>
+      ) : null}
+
+      {hasAccessChange ? (
+        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-semibold">Access change warning</p>
+          {hasRoleChange ? (
+            <p className="mt-1 leading-5 text-amber-900">
+              Role changes from {formatRoleLabel(initialForm.role)} to {formatRoleLabel(form.role)}.
+            </p>
+          ) : null}
+          {hasStatusChange ? (
+            <p className="mt-1 leading-5 text-amber-900">
+              Status changes from {formatStatusLabel(initialForm.status)} to {formatStatusLabel(form.status)}. Inactive users cannot continue after their next authenticated request.
+            </p>
+          ) : null}
+          <p className="mt-2 text-xs leading-5 text-amber-800">
+            Save applies permission changes immediately for future authenticated requests.
+          </p>
+        </div>
+      ) : null}
+
       <TextField
         margin="dense"
         label="NAME"
@@ -40,6 +112,14 @@ function AdminUserDetailForm({
         value={form.name}
         onChange={onFormChange}
         disabled={isSubmitting}
+        error={isNameInvalid}
+        helperText={
+          isNameInvalid
+            ? 'Name is required.'
+            : hasNameChange
+              ? 'This updated display name appears anywhere the user is shown in the app.'
+              : 'Shown in the admin table and user-facing profile views.'
+        }
       />
       <TextField
         margin="dense"
@@ -50,6 +130,14 @@ function AdminUserDetailForm({
         value={form.email}
         onChange={onFormChange}
         disabled={isSubmitting}
+        error={isEmailInvalid}
+        helperText={
+          isEmailInvalid
+            ? 'Enter a valid email address for sign-in and password reset.'
+            : hasEmailChange
+              ? 'The new email becomes the user\'s sign-in address after save.'
+              : 'Used for sign-in, approval tracking, and password reset.'
+        }
       />
       <TextField
         select
@@ -62,8 +150,10 @@ function AdminUserDetailForm({
         disabled={isSubmitting || disablePrivilegeControls}
         helperText={
           disablePrivilegeControls
-            ? '현재 로그인한 관리자 계정의 권한은 여기서 변경할 수 없습니다.'
-            : '사용자 권한을 선택해주세요.'
+            ? 'Your current admin role cannot be changed from this modal.'
+            : hasRoleChange
+              ? `This user will switch to ${formatRoleLabel(form.role)} permissions after save.`
+              : 'Moderators can manage users, approvals, and protected admin actions.'
         }
       >
         <MenuItem value="member">Member</MenuItem>
@@ -80,8 +170,12 @@ function AdminUserDetailForm({
         disabled={isSubmitting || disablePrivilegeControls}
         helperText={
           disablePrivilegeControls
-            ? '현재 로그인한 관리자 계정의 활성 상태는 여기서 변경할 수 없습니다.'
-            : '사용자 접근 상태를 선택해주세요.'
+            ? 'Your current admin access state cannot be changed from this modal.'
+            : hasStatusChange
+              ? form.status === 'inactive'
+                ? 'Inactive users lose access until an admin re-enables the account.'
+                : 'Re-activating restores access on the next authenticated request.'
+              : 'Active users can sign in. Inactive users stay blocked until re-enabled.'
         }
       >
         <MenuItem value="active">Active</MenuItem>
@@ -97,16 +191,22 @@ export default function AdminUserDetailModal({
   actions,
   title,
   form,
+  initialForm,
   isSubmitting,
   disablePrivilegeControls,
+  userName,
+  joinedLabel,
   onFormChange,
 }: AdminUserDetailModalProps) {
   return (
     <GlobalModal open={open} handleClose={handleClose} title={title} actions={actions}>
       <AdminUserDetailForm
         form={form}
+        initialForm={initialForm}
         isSubmitting={isSubmitting}
         disablePrivilegeControls={disablePrivilegeControls}
+        userName={userName}
+        joinedLabel={joinedLabel}
         onFormChange={onFormChange}
       />
     </GlobalModal>

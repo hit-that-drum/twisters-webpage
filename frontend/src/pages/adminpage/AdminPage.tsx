@@ -235,6 +235,15 @@ const formatCount = (count: number) => {
   return countFormatter.format(count);
 };
 
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const toAdminUserForm = (user: AdminUserRecord): AdminUserFormState => ({
+  name: user.name,
+  email: user.email,
+  role: user.isAdmin ? 'admin' : 'member',
+  status: user.isAllowed ? 'active' : 'inactive',
+});
+
 const EMPTY_ADMIN_USER_FORM: AdminUserFormState = {
   name: '',
   email: '',
@@ -427,16 +436,37 @@ export default function AdminPage() {
   const handleOpenEditDialog = useCallback(
     (user: AdminUserRecord) => {
       setEditingUserId(user.id);
-      setEditUserForm({
-        name: user.name,
-        email: user.email,
-        role: user.isAdmin ? 'admin' : 'member',
-        status: user.isAllowed ? 'active' : 'inactive',
-      });
+      setEditUserForm(toAdminUserForm(user));
       setOpenEditDialog(true);
     },
     [canManageUsers],
   );
+
+  const editingUser = useMemo(
+    () => allUsers.find((user) => user.id === editingUserId) ?? null,
+    [allUsers, editingUserId],
+  );
+
+  const initialEditUserForm = useMemo(
+    () => (editingUser ? toAdminUserForm(editingUser) : EMPTY_ADMIN_USER_FORM),
+    [editingUser],
+  );
+
+  const hasEditChanges = useMemo(
+    () =>
+      editUserForm.name.trim() !== initialEditUserForm.name.trim() ||
+      editUserForm.email.trim().toLowerCase() !== initialEditUserForm.email.trim().toLowerCase() ||
+      editUserForm.role !== initialEditUserForm.role ||
+      editUserForm.status !== initialEditUserForm.status,
+    [editUserForm, initialEditUserForm],
+  );
+
+  const isEditFormValid = useMemo(() => {
+    const normalizedName = editUserForm.name.trim();
+    const normalizedEmail = editUserForm.email.trim().toLowerCase();
+
+    return normalizedName.length > 0 && isValidEmail(normalizedEmail);
+  }, [editUserForm.email, editUserForm.name]);
 
   const handleCloseEditDialog = useCallback(
     (event: object, reason: ModalCloseReason) => {
@@ -447,11 +477,20 @@ export default function AdminPage() {
         return;
       }
 
+      if (hasEditChanges) {
+        const shouldClose = window.confirm(
+          '변경 사항이 있습니다. 저장하지 않고 닫으면 변경사항이 유실됩니다. 닫으시겠습니까?',
+        );
+        if (!shouldClose) {
+          return;
+        }
+      }
+
       setOpenEditDialog(false);
       setEditingUserId(null);
       setEditUserForm(EMPTY_ADMIN_USER_FORM);
     },
-    [isSubmitting],
+    [hasEditChanges, isSubmitting],
   );
 
   const handleEditFormChange = useCallback(
@@ -476,6 +515,11 @@ export default function AdminPage() {
       return;
     }
 
+    if (!hasEditChanges) {
+      enqueueSnackbar('변경된 내용이 없습니다.', { variant: 'info' });
+      return;
+    }
+
     const normalizedName = editUserForm.name.trim();
     const normalizedEmail = editUserForm.email.trim().toLowerCase();
 
@@ -484,8 +528,18 @@ export default function AdminPage() {
       return;
     }
 
-    if (!normalizedEmail.includes('@')) {
+    if (!isValidEmail(normalizedEmail)) {
       enqueueSnackbar('이메일 형식이 올바르지 않습니다.', { variant: 'error' });
+      return;
+    }
+
+    if (
+      meInfo?.id === editingUserId &&
+      (editUserForm.role !== initialEditUserForm.role || editUserForm.status !== initialEditUserForm.status)
+    ) {
+      enqueueSnackbar('현재 로그인한 관리자 계정의 권한 상태는 변경할 수 없습니다.', {
+        variant: 'error',
+      });
       return;
     }
 
@@ -540,6 +594,9 @@ export default function AdminPage() {
     editUserForm.status,
     editingUserId,
     handleExpiredSession,
+    hasEditChanges,
+    initialEditUserForm.role,
+    initialEditUserForm.status,
     loadUsers,
     meInfo?.id,
     refreshMeInfo,
@@ -650,12 +707,12 @@ export default function AdminPage() {
 
   const editModalActions: TAction[] = [
     {
-      label: isSubmitting ? 'Updating...' : 'Update',
+      label: isSubmitting ? 'Updating...' : hasEditChanges ? 'Update' : 'No changes',
       onClick: () => {
         void handleUpdateUser();
       },
       buttonStyle: 'confirm',
-      disabled: isSubmitting,
+      disabled: isSubmitting || !hasEditChanges || !isEditFormValid,
     },
   ];
 
@@ -976,8 +1033,11 @@ export default function AdminPage() {
         title="EDIT USER"
         actions={editModalActions}
         form={editUserForm}
+        initialForm={initialEditUserForm}
         isSubmitting={isSubmitting}
         disablePrivilegeControls={meInfo?.id === editingUserId}
+        userName={editingUser?.name}
+        joinedLabel={editingUser ? formatJoinedDate(editingUser.createdAt) : undefined}
         onFormChange={handleEditFormChange}
       />
     </main>
