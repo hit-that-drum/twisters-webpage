@@ -2,6 +2,7 @@ import pool from '../db.js';
 import {
   type AdminUserRow,
   type ApprovalUserRow,
+  type ManagedUserRow,
   type MeUserRow,
   type PasswordResetLookupRow,
   type PendingUserRow,
@@ -163,6 +164,14 @@ class AuthRepository {
     return result.rows[0] ?? null;
   }
 
+  async findManagedUserById(userId: number) {
+    const result = await pool.query<ManagedUserRow>(
+      'SELECT id, "isAdmin", "isAllowed" FROM users WHERE id = $1 LIMIT 1',
+      [userId],
+    );
+    return result.rows[0] ?? null;
+  }
+
   async approveUserById(userId: number) {
     const result = await pool.query('UPDATE users SET "isAllowed" = TRUE WHERE id = $1', [userId]);
     return (result.rowCount ?? 0) > 0;
@@ -171,6 +180,39 @@ class AuthRepository {
   async deletePendingUserById(userId: number) {
     const result = await pool.query('DELETE FROM users WHERE id = $1 AND "isAllowed" = FALSE', [userId]);
     return (result.rowCount ?? 0) > 0;
+  }
+
+  async deleteManagedUserById(userId: number, protectLastActiveAdmin: boolean) {
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      if (protectLastActiveAdmin) {
+        const activeAdminsResult = await client.query<{ id: number }>(
+          'SELECT id FROM users WHERE "isAdmin" = TRUE AND "isAllowed" = TRUE FOR UPDATE',
+        );
+
+        if (activeAdminsResult.rows.length <= 1) {
+          await client.query('ROLLBACK');
+          return 'last_active_admin' as const;
+        }
+      }
+
+      const deleteResult = await client.query('DELETE FROM users WHERE id = $1', [userId]);
+      await client.query('COMMIT');
+
+      if ((deleteResult.rowCount ?? 0) === 0) {
+        return 'not_found' as const;
+      }
+
+      return 'deleted' as const;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async markUnusedResetTokensAsUsed(userId: number) {

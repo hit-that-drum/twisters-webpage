@@ -59,6 +59,12 @@ export interface UserApprovalRow {
   isAllowed: boolean | number;
 }
 
+export interface ManagedUserRow {
+  id: number;
+  isAdmin: boolean | number;
+  isAllowed: boolean | number;
+}
+
 export interface AdminUserRow {
   id: number;
   name: string;

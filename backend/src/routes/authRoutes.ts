@@ -47,5 +47,11 @@ router.patch(
   requireAdmin,
   authController.declineUser,
 );
+router.delete(
+  '/admin/users/:id',
+  passport.authenticate('jwt', { session: false }),
+  requireAdmin,
+  authController.deleteUser,
+);
 
 export default router;

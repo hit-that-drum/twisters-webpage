@@ -239,6 +239,7 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
   const [decliningUserId, setDecliningUserId] = useState<number | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [pendingUsers, setPendingUsers] = useState<PendingUserRecord[]>([]);
   const [allUsers, setAllUsers] = useState<AdminUserRecord[]>([]);
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>('all');
@@ -408,6 +409,52 @@ export default function AdminPage() {
       }
     },
     [canManageUsers, handleExpiredSession, loadUsers],
+  );
+
+  const handleDeleteUser = useCallback(
+    async (user: AdminUserRecord) => {
+      if (meInfo?.id === user.id) {
+        enqueueSnackbar('현재 로그인한 관리자 계정은 삭제할 수 없습니다.', { variant: 'error' });
+        return;
+      }
+
+      const shouldDelete = window.confirm(
+        `'${user.name}' 사용자를 삭제하시겠습니까? 연결된 세션은 종료되며 작성 기록의 작성자는 비워질 수 있습니다.`,
+      );
+      if (!shouldDelete) {
+        return;
+      }
+
+      setDeletingUserId(user.id);
+
+      try {
+        const response = await apiFetch(`/authentication/admin/users/${user.id}`, {
+          method: 'DELETE',
+        });
+        const payload = await parseApiResponse(response);
+
+        if (response.status === 401) {
+          handleExpiredSession();
+          return;
+        }
+
+        if (!response.ok) {
+          enqueueSnackbar(`사용자 삭제 실패: ${getApiMessage(payload, '알 수 없는 에러')}`, {
+            variant: 'error',
+          });
+          return;
+        }
+
+        enqueueSnackbar(getApiMessage(payload, '사용자가 삭제되었습니다.'), { variant: 'success' });
+        await loadUsers();
+      } catch (error) {
+        console.error('User delete error:', error);
+        enqueueSnackbar('사용자 삭제 중 오류가 발생했습니다.', { variant: 'error' });
+      } finally {
+        setDeletingUserId(null);
+      }
+    },
+    [canManageUsers, handleExpiredSession, loadUsers, meInfo?.id],
   );
 
   const sortedAllUsers = useMemo(
@@ -689,6 +736,7 @@ export default function AdminPage() {
                       ? 'text-emerald-600'
                       : 'text-slate-400';
                     const statusDotClassName = user.isAllowed ? 'bg-emerald-500' : 'bg-slate-300';
+                    const isCurrentAdminUser = meInfo?.id === user.id;
 
                     return (
                       <tr key={user.id} className="transition-colors hover:bg-slate-50/50">
@@ -735,10 +783,10 @@ export default function AdminPage() {
                               });
                             }}
                             onDeleteClick={() => {
-                              enqueueSnackbar('사용자 삭제 기능은 준비 중입니다.', {
-                                variant: 'info',
-                              });
+                              void handleDeleteUser(user);
                             }}
+                            isDeleting={deletingUserId === user.id}
+                            isDeleteDisabled={deletingUserId !== null || isCurrentAdminUser}
                           />
                         </td>
                       </tr>

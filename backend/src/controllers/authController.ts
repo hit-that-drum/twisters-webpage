@@ -220,3 +220,13 @@ export const declineUser = async (req: Request, res: Response) => {
     return handleControllerError(res, error, '사용자 거절 처리 중 오류가 발생했습니다.', 'User decline error');
   }
 };
+
+export const deleteUser = async (req: Request, res: Response) => {
+  try {
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const result = await authService.deleteUser(authenticatedUser, req.params.id);
+    return res.json(result);
+  } catch (error) {
+    return handleControllerError(res, error, '사용자 삭제 중 오류가 발생했습니다.', 'User delete error');
+  }
+};
