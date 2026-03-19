@@ -38,7 +38,7 @@ function BoardDetailForm({
   'form' | 'isSubmitting' | 'canPinPost' | 'onFormChange' | 'onImageUrlsChange' | 'onPinnedChange'
 >) {
   return (
-    <div className="flex flex-col gap-1 pt-1">
+    <div className="flex flex-col gap-3 pt-1">
       <TextField
         margin="dense"
         label="TITLE"
@@ -47,14 +47,14 @@ function BoardDetailForm({
         value={form.title}
         onChange={onFormChange}
         disabled={isSubmitting}
+        placeholder="제목을 입력해주세요"
       />
       <GlobalImageUpload
         value={form.imageUrl}
         onChange={onImageUrlsChange}
         disabled={isSubmitting}
         maxImages={12}
-        label="BOARD IMAGES"
-        helperText="Add multiple images. The first image becomes the main image used in the card and modal."
+        label="IMAGES"
       />
       <TextField
         margin="dense"
@@ -66,6 +66,7 @@ function BoardDetailForm({
         value={form.content}
         onChange={onFormChange}
         disabled={isSubmitting}
+        placeholder="내용을 입력해주세요"
       />
       {canPinPost && (
         <FormControlLabel
@@ -76,7 +77,7 @@ function BoardDetailForm({
               disabled={isSubmitting}
             />
           }
-          label="Pinned"
+          label="PINNED"
         />
       )}
     </div>
@@ -97,7 +98,13 @@ export default function BoardDetailModal({
   onPinnedChange,
 }: BoardDetailModalProps) {
   return (
-    <GlobalModal open={open} handleClose={handleClose} title={title} actions={actions}>
+    <GlobalModal
+      open={open}
+      handleClose={handleClose}
+      title={title}
+      actions={actions}
+      maxWidth="md"
+    >
       <BoardDetailForm
         key={type}
         form={form}

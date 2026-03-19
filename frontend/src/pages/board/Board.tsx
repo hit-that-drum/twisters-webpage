@@ -575,7 +575,7 @@ export default function Board() {
 
   const addPostActions: TAction[] = [
     {
-      label: isSubmitting ? 'Saving...' : 'Save',
+      label: '저장',
       onClick: () => {
         void handleCreatePost();
       },
@@ -586,7 +586,7 @@ export default function Board() {
 
   const editPostActions: TAction[] = [
     {
-      label: isSubmitting ? 'Updating...' : 'Update',
+      label: '수정',
       onClick: () => {
         void handleUpdatePost();
       },
@@ -1304,7 +1304,7 @@ export default function Board() {
         type="ADD"
         open={openAddDialog}
         handleClose={handleCloseAddDialog}
-        title="ADD POST"
+        title="게시물 등록"
         actions={addPostActions}
         form={newPost}
         isSubmitting={isSubmitting}
@@ -1328,7 +1328,7 @@ export default function Board() {
         type="EDIT"
         open={openEditDialog}
         handleClose={handleCloseEditDialog}
-        title="EDIT POST"
+        title="게시물 수정"
         actions={editPostActions}
         form={editPost}
         isSubmitting={isSubmitting}

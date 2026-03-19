@@ -626,7 +626,7 @@ export default function Notice() {
         type="ADD"
         open={openAddDialog}
         handleClose={handleCloseAddDialog}
-        title="ADD NOTICE"
+        title="공지사항 등록"
         actions={addNoticeActions}
         form={newNotice}
         isSubmitting={isSubmitting}
@@ -649,7 +649,7 @@ export default function Notice() {
         type="EDIT"
         open={openEditDialog}
         handleClose={handleCloseEditDialog}
-        title="EDIT NOTICE"
+        title="공지사항 수정"
         actions={editNoticeActions}
         form={editNotice}
         isSubmitting={isSubmitting}

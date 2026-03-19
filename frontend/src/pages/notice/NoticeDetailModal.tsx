@@ -51,7 +51,10 @@ function NoticeDetailForm({
 
     const lineStart = target.value.lastIndexOf('\n', Math.max(target.selectionStart - 1, 0)) + 1;
     const lineEnd = target.value.indexOf('\n', target.selectionStart);
-    const currentLine = target.value.slice(lineStart, lineEnd === -1 ? target.value.length : lineEnd);
+    const currentLine = target.value.slice(
+      lineStart,
+      lineEnd === -1 ? target.value.length : lineEnd,
+    );
 
     if (event.key === 'Tab') {
       const lineMatch = currentLine.match(BULLET_PREFIX_PATTERN);
@@ -72,8 +75,8 @@ function NoticeDetailForm({
       const nextDepth = event.shiftKey
         ? Math.max(currentDepth - 1, 0)
         : currentPrefix.includes('•')
-          ? Math.min(currentDepth + 1, MAX_BULLET_TAB_DEPTH)
-          : currentDepth;
+        ? Math.min(currentDepth + 1, MAX_BULLET_TAB_DEPTH)
+        : currentDepth;
       const nextPrefix = `${'\t'.repeat(nextDepth)}• `;
       const nextLine = `${nextPrefix}${contentWithoutPrefix}`;
 
@@ -87,17 +90,18 @@ function NoticeDetailForm({
           ? nextPrefix.length
           : previousCaretOffset - currentPrefix.length + nextPrefix.length;
 
-      target.setRangeText(nextLine, lineStart, lineEnd === -1 ? target.value.length : lineEnd, 'start');
+      target.setRangeText(
+        nextLine,
+        lineStart,
+        lineEnd === -1 ? target.value.length : lineEnd,
+        'start',
+      );
       target.setSelectionRange(lineStart + nextCaretOffset, lineStart + nextCaretOffset);
       target.dispatchEvent(new Event('input', { bubbles: true }));
       return;
     }
 
-    if (
-      event.key !== 'Enter' ||
-      event.shiftKey ||
-      target.selectionStart !== target.selectionEnd
-    ) {
+    if (event.key !== 'Enter' || event.shiftKey || target.selectionStart !== target.selectionEnd) {
       return;
     }
 
@@ -113,7 +117,7 @@ function NoticeDetailForm({
   };
 
   return (
-    <div className="flex flex-col gap-1 pt-1">
+    <div className="flex flex-col gap-3 pt-1">
       <TextField
         margin="dense"
         label="TITLE"
@@ -122,14 +126,14 @@ function NoticeDetailForm({
         value={form.title}
         onChange={onFormChange}
         disabled={isSubmitting}
+        placeholder="제목을 입력해주세요"
       />
       <GlobalImageUpload
         value={form.imageUrl ? [form.imageUrl] : []}
         onChange={onImageUrlsChange}
         disabled={isSubmitting}
         maxImages={1}
-        label="NOTICE IMAGE"
-        helperText="Upload one image, drag and drop it, or paste an image URL."
+        label="IMAGE"
       />
       <TextField
         margin="dense"
@@ -141,8 +145,9 @@ function NoticeDetailForm({
         value={form.content}
         onChange={onFormChange}
         onKeyDown={handleContentKeyDown}
-        helperText="Type - then Tab to change into •. Press Tab again to indent (max 3 levels)."
+        helperText="tab키를 사용하면 불렛포인트를 사용 할 수 있습니다(최대 3 depth)"
         disabled={isSubmitting}
+        placeholder="내용을 입력해주세요"
       />
       <FormControlLabel
         control={
@@ -152,7 +157,7 @@ function NoticeDetailForm({
             disabled={isSubmitting}
           />
         }
-        label="고정하기"
+        label="PINNED"
       />
     </div>
   );
@@ -171,7 +176,13 @@ export default function NoticeDetailModal({
   onPinnedChange,
 }: NoticeDetailModalProps) {
   return (
-    <GlobalModal open={open} handleClose={handleClose} title={title} actions={actions}>
+    <GlobalModal
+      open={open}
+      handleClose={handleClose}
+      title={title}
+      actions={actions}
+      maxWidth="md"
+    >
       <NoticeDetailForm
         key={type}
         form={form}
