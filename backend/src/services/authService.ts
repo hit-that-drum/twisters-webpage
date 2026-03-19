@@ -634,6 +634,33 @@ class AuthService {
     };
   }
 
+  async declineUser(rawUserId: unknown) {
+    const userId = Number(rawUserId);
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      throw new HttpError(400, '유효한 사용자 ID가 필요합니다.');
+    }
+
+    const user = await authRepository.findUserApprovalById(userId);
+    if (!user) {
+      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
+    }
+
+    if (normalizeBoolean(user.isAllowed, false)) {
+      throw new HttpError(409, '이미 승인된 사용자는 거절할 수 없습니다.');
+    }
+
+    const isDeleted = await authRepository.deletePendingUserById(userId);
+    if (!isDeleted) {
+      throw new HttpError(409, '사용자 상태가 변경되어 가입 요청을 거절할 수 없습니다. 목록을 새로고침해주세요.');
+    }
+
+    return {
+      message: 'declined',
+      userId,
+    };
+  }
+
   async refreshSession(payload: RefreshSessionDTO) {
     const refreshToken = payload.refreshToken;
 

@@ -238,6 +238,7 @@ export default function AdminPage() {
   const { meInfo, isAuthLoading, logout } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
+  const [decliningUserId, setDecliningUserId] = useState<number | null>(null);
   const [pendingUsers, setPendingUsers] = useState<PendingUserRecord[]>([]);
   const [allUsers, setAllUsers] = useState<AdminUserRecord[]>([]);
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>('all');
@@ -361,6 +362,49 @@ export default function AdminPage() {
         enqueueSnackbar('사용자 승인 중 오류가 발생했습니다.', { variant: 'error' });
       } finally {
         setApprovingUserId(null);
+      }
+    },
+    [canManageUsers, handleExpiredSession, loadUsers],
+  );
+
+  const handleDeclineUser = useCallback(
+    async (userId: number) => {
+      const shouldDecline = window.confirm(
+        '해당 사용자의 가입 요청을 거절하고 대기 중인 계정을 삭제하시겠습니까?',
+      );
+      if (!shouldDecline) {
+        return;
+      }
+
+      setDecliningUserId(userId);
+
+      try {
+        const response = await apiFetch(`/authentication/admin/users/${userId}/decline`, {
+          method: 'PATCH',
+        });
+        const payload = await parseApiResponse(response);
+
+        if (response.status === 401) {
+          handleExpiredSession();
+          return;
+        }
+
+        if (!response.ok) {
+          enqueueSnackbar(`사용자 거절 실패: ${getApiMessage(payload, '알 수 없는 에러')}`, {
+            variant: 'error',
+          });
+          return;
+        }
+
+        enqueueSnackbar(getApiMessage(payload, '사용자 가입 요청이 거절되었습니다.'), {
+          variant: 'success',
+        });
+        await loadUsers();
+      } catch (error) {
+        console.error('User decline error:', error);
+        enqueueSnackbar('사용자 거절 중 오류가 발생했습니다.', { variant: 'error' });
+      } finally {
+        setDecliningUserId(null);
       }
     },
     [canManageUsers, handleExpiredSession, loadUsers],
@@ -534,14 +578,24 @@ export default function AdminPage() {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    disabled={approvingUserId === user.id}
-                    onClick={() => void handleApproveUser(user.id)}
-                    className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {approvingUserId === user.id ? 'Approving...' : 'Approve'}
-                  </button>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      disabled={approvingUserId === user.id || decliningUserId === user.id}
+                      onClick={() => void handleDeclineUser(user.id)}
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {decliningUserId === user.id ? 'Declining...' : 'Decline'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={approvingUserId === user.id || decliningUserId === user.id}
+                      onClick={() => void handleApproveUser(user.id)}
+                      className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {approvingUserId === user.id ? 'Approving...' : 'Approve'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

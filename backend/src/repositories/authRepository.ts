@@ -168,6 +168,11 @@ class AuthRepository {
     return (result.rowCount ?? 0) > 0;
   }
 
+  async deletePendingUserById(userId: number) {
+    const result = await pool.query('DELETE FROM users WHERE id = $1 AND "isAllowed" = FALSE', [userId]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
   async markUnusedResetTokensAsUsed(userId: number) {
     await pool.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL', [
       userId,

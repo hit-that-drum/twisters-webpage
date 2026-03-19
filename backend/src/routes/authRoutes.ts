@@ -41,5 +41,11 @@ router.patch(
   requireAdmin,
   authController.approveUser,
 );
+router.patch(
+  '/admin/users/:id/decline',
+  passport.authenticate('jwt', { session: false }),
+  requireAdmin,
+  authController.declineUser,
+);
 
 export default router;

@@ -211,3 +211,12 @@ export const approveUser = async (req: Request, res: Response) => {
     return handleControllerError(res, error, '사용자 승인 처리 중 오류가 발생했습니다.', 'User approve error');
   }
 };
+
+export const declineUser = async (req: Request, res: Response) => {
+  try {
+    const result = await authService.declineUser(req.params.id);
+    return res.json(result);
+  } catch (error) {
+    return handleControllerError(res, error, '사용자 거절 처리 중 오류가 발생했습니다.', 'User decline error');
+  }
+};
