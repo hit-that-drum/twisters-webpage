@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import EditDeleteButton from '@/common/components/EditDeleteButton';
 import { apiFetch } from '@/common/lib/api/apiClient';
 import { useAuth } from '@/features';
 import GlobalButton from '@/common/components/GlobalButton';
+import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
+import AdminUserDetailModal, { type AdminUserFormState } from './AdminUserDetailModal';
 
 interface PendingUserRecord {
   id: number;
@@ -233,13 +235,24 @@ const formatCount = (count: number) => {
   return countFormatter.format(count);
 };
 
+const EMPTY_ADMIN_USER_FORM: AdminUserFormState = {
+  name: '',
+  email: '',
+  role: 'member',
+  status: 'active',
+};
+
 export default function AdminPage() {
   const navigate = useNavigate();
-  const { meInfo, isAuthLoading, logout } = useAuth();
+  const { meInfo, isAuthLoading, logout, refreshMeInfo } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
   const [decliningUserId, setDecliningUserId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [editUserForm, setEditUserForm] = useState<AdminUserFormState>(EMPTY_ADMIN_USER_FORM);
   const [pendingUsers, setPendingUsers] = useState<PendingUserRecord[]>([]);
   const [allUsers, setAllUsers] = useState<AdminUserRecord[]>([]);
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>('all');
@@ -411,6 +424,127 @@ export default function AdminPage() {
     [canManageUsers, handleExpiredSession, loadUsers],
   );
 
+  const handleOpenEditDialog = useCallback(
+    (user: AdminUserRecord) => {
+      setEditingUserId(user.id);
+      setEditUserForm({
+        name: user.name,
+        email: user.email,
+        role: user.isAdmin ? 'admin' : 'member',
+        status: user.isAllowed ? 'active' : 'inactive',
+      });
+      setOpenEditDialog(true);
+    },
+    [canManageUsers],
+  );
+
+  const handleCloseEditDialog = useCallback(
+    (event: object, reason: ModalCloseReason) => {
+      void event;
+      void reason;
+
+      if (isSubmitting) {
+        return;
+      }
+
+      setOpenEditDialog(false);
+      setEditingUserId(null);
+      setEditUserForm(EMPTY_ADMIN_USER_FORM);
+    },
+    [isSubmitting],
+  );
+
+  const handleEditFormChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const { name, value } = event.target;
+      setEditUserForm((previous) => ({
+        ...previous,
+        [name]: value,
+      }));
+    },
+    [],
+  );
+
+  const handleUpdateUser = useCallback(async () => {
+    if (!canManageUsers) {
+      enqueueSnackbar('관리자 권한이 필요합니다.', { variant: 'error' });
+      return;
+    }
+
+    if (editingUserId === null) {
+      enqueueSnackbar('수정할 사용자를 찾을 수 없습니다.', { variant: 'error' });
+      return;
+    }
+
+    const normalizedName = editUserForm.name.trim();
+    const normalizedEmail = editUserForm.email.trim().toLowerCase();
+
+    if (!normalizedName || !normalizedEmail) {
+      enqueueSnackbar('이름과 이메일을 모두 입력해주세요.', { variant: 'error' });
+      return;
+    }
+
+    if (!normalizedEmail.includes('@')) {
+      enqueueSnackbar('이메일 형식이 올바르지 않습니다.', { variant: 'error' });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await apiFetch(`/authentication/admin/users/${editingUserId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: normalizedName,
+          email: normalizedEmail,
+          isAdmin: editUserForm.role === 'admin',
+          isAllowed: editUserForm.status === 'active',
+        }),
+      });
+      const payload = await parseApiResponse(response);
+
+      if (response.status === 401) {
+        handleExpiredSession();
+        return;
+      }
+
+      if (!response.ok) {
+        enqueueSnackbar(`사용자 수정 실패: ${getApiMessage(payload, '알 수 없는 에러')}`, {
+          variant: 'error',
+        });
+        return;
+      }
+
+      enqueueSnackbar(getApiMessage(payload, '사용자 정보가 수정되었습니다.'), {
+        variant: 'success',
+      });
+      setOpenEditDialog(false);
+      setEditingUserId(null);
+      setEditUserForm(EMPTY_ADMIN_USER_FORM);
+
+      await Promise.all([
+        loadUsers(),
+        meInfo?.id === editingUserId ? refreshMeInfo() : Promise.resolve(null),
+      ]);
+    } catch (error) {
+      console.error('User update error:', error);
+      enqueueSnackbar('사용자 수정 중 오류가 발생했습니다.', { variant: 'error' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    canManageUsers,
+    editUserForm.email,
+    editUserForm.name,
+    editUserForm.role,
+    editUserForm.status,
+    editingUserId,
+    handleExpiredSession,
+    loadUsers,
+    meInfo?.id,
+    refreshMeInfo,
+  ]);
+
   const handleDeleteUser = useCallback(
     async (user: AdminUserRecord) => {
       if (meInfo?.id === user.id) {
@@ -513,6 +647,17 @@ export default function AdminPage() {
   const handleAddNewUser = () => {
     console.log('handleAddNewUser');
   };
+
+  const editModalActions: TAction[] = [
+    {
+      label: isSubmitting ? 'Updating...' : 'Update',
+      onClick: () => {
+        void handleUpdateUser();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting,
+    },
+  ];
 
   if (isAuthLoading) {
     return (
@@ -778,9 +923,7 @@ export default function AdminPage() {
                         <td className="px-6 py-4 text-right">
                           <EditDeleteButton
                             onEditClick={() => {
-                              enqueueSnackbar('사용자 편집 기능은 준비 중입니다.', {
-                                variant: 'info',
-                              });
+                              handleOpenEditDialog(user);
                             }}
                             onDeleteClick={() => {
                               void handleDeleteUser(user);
@@ -826,6 +969,17 @@ export default function AdminPage() {
           </div>
         </div>
       </section>
+
+      <AdminUserDetailModal
+        open={openEditDialog}
+        handleClose={handleCloseEditDialog}
+        title="EDIT USER"
+        actions={editModalActions}
+        form={editUserForm}
+        isSubmitting={isSubmitting}
+        disablePrivilegeControls={meInfo?.id === editingUserId}
+        onFormChange={handleEditFormChange}
+      />
     </main>
   );
 }

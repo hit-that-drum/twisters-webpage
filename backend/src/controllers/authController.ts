@@ -3,6 +3,7 @@ import passport from '../config/passport.js';
 import { authService } from '../services/authService.js';
 import { type AuthenticatedRequest } from '../types/common.types.js';
 import {
+  type AdminUserMutationDTO,
   type KakaoAuthDTO,
   type GoogleAuthDTO,
   type LocalAuthUser,
@@ -228,5 +229,16 @@ export const deleteUser = async (req: Request, res: Response) => {
     return res.json(result);
   } catch (error) {
     return handleControllerError(res, error, '사용자 삭제 중 오류가 발생했습니다.', 'User delete error');
+  }
+};
+
+export const updateUser = async (req: Request, res: Response) => {
+  try {
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const payload = req.body as AdminUserMutationDTO;
+    const result = await authService.updateUser(authenticatedUser, req.params.id, payload);
+    return res.json(result);
+  } catch (error) {
+    return handleControllerError(res, error, '사용자 정보 수정 중 오류가 발생했습니다.', 'User update error');
   }
 };

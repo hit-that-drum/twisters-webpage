@@ -16,6 +16,13 @@ export interface SignUpDTO {
   password?: string;
 }
 
+export interface AdminUserMutationDTO {
+  name?: unknown;
+  email?: unknown;
+  isAdmin?: unknown;
+  isAllowed?: unknown;
+}
+
 export interface MeUser {
   id: number;
   name: string;

@@ -36,6 +36,12 @@ router.get(
   authController.getAdminUsers,
 );
 router.patch(
+  '/admin/users/:id',
+  passport.authenticate('jwt', { session: false }),
+  requireAdmin,
+  authController.updateUser,
+);
+router.patch(
   '/admin/users/:id/approve',
   passport.authenticate('jwt', { session: false }),
   requireAdmin,

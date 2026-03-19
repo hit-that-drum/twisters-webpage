@@ -215,6 +215,52 @@ class AuthRepository {
     }
   }
 
+  async updateManagedUserById(
+    userId: number,
+    payload: { name: string; email: string; isAdmin: boolean; isAllowed: boolean },
+    protectLastActiveAdmin: boolean,
+  ) {
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      if (protectLastActiveAdmin) {
+        const activeAdminsResult = await client.query<{ id: number }>(
+          'SELECT id FROM users WHERE "isAdmin" = TRUE AND "isAllowed" = TRUE FOR UPDATE',
+        );
+
+        if (activeAdminsResult.rows.length <= 1) {
+          await client.query('ROLLBACK');
+          return 'last_active_admin' as const;
+        }
+      }
+
+      const updateResult = await client.query(
+        'UPDATE users SET name = $1, email = $2, "isAdmin" = $3, "isAllowed" = $4 WHERE id = $5',
+        [payload.name, payload.email, payload.isAdmin, payload.isAllowed, userId],
+      );
+      await client.query('COMMIT');
+
+      if ((updateResult.rowCount ?? 0) === 0) {
+        return 'not_found' as const;
+      }
+
+      return 'updated' as const;
+    } catch (error) {
+      await client.query('ROLLBACK');
+
+      const pgError = error as { code?: string };
+      if (pgError.code === '23505') {
+        return 'email_conflict' as const;
+      }
+
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async markUnusedResetTokensAsUsed(userId: number) {
     await pool.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL', [
       userId,
