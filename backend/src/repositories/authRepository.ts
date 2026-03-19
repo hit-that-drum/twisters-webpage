@@ -19,6 +19,8 @@ class AuthRepository {
     if (!ensureUsersSchemaPromise) {
       ensureUsersSchemaPromise = (async () => {
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isTest" BOOLEAN NOT NULL DEFAULT FALSE');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "profileImage" TEXT');
+        await pool.query('ALTER TABLE users ALTER COLUMN "profileImage" TYPE TEXT');
       })().catch((error) => {
         ensureUsersSchemaPromise = null;
         throw error;
@@ -41,7 +43,7 @@ class AuthRepository {
   async findMeById(userId: number) {
     await this.ensureUsersSchema();
     const result = await pool.query<MeUserRow>(
-      'SELECT id, name, email, "isAdmin", "isTest" FROM users WHERE id = $1',
+      'SELECT id, name, email, "profileImage", "isAdmin", "isTest" FROM users WHERE id = $1',
       [userId],
     );
 
@@ -94,6 +96,7 @@ class AuthRepository {
   }
 
   async updateGoogleProfileByUserId(userId: number, googleId: string, profileImage: string | null) {
+    await this.ensureUsersSchema();
     await pool.query('UPDATE users SET google_id = $2, "profileImage" = $3 WHERE id = $1', [
       userId,
       googleId,
@@ -116,11 +119,22 @@ class AuthRepository {
   }
 
   async updateKakaoProfileByUserId(userId: number, kakaoId: string, profileImage: string | null) {
+    await this.ensureUsersSchema();
     await pool.query('UPDATE users SET kakao_id = $2, "profileImage" = $3 WHERE id = $1', [
       userId,
       kakaoId,
       profileImage,
     ]);
+  }
+
+  async updateProfileImageByUserId(userId: number, profileImage: string | null) {
+    await this.ensureUsersSchema();
+    const result = await pool.query('UPDATE users SET "profileImage" = $2 WHERE id = $1', [
+      userId,
+      profileImage,
+    ]);
+
+    return (result.rowCount ?? 0) > 0;
   }
 
   async findUserEmailByEmail(email: string) {

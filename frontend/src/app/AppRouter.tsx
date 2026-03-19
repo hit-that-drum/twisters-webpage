@@ -3,6 +3,7 @@ import AppLayout from '@/app/AppLayout';
 import { useAuth } from '@/features';
 import { getAccessToken } from '@/common/lib/auth/authStorage';
 import { AdminPage, Board, Home, Login, Member, MyPage, Notice, Settlement } from '@/pages';
+import Flowchart from '@/pages/flowchart/Flowchart';
 
 function RootRedirect() {
   const { meInfo, isAuthLoading } = useAuth();
@@ -41,6 +42,7 @@ export default function AppRouter() {
           <Route path="/settlement" element={<Settlement />} />
           <Route path="/board" element={<Board />} />
           <Route path="/mypage" element={<MyPage />} />
+          <Route path="/flowchart" element={<Flowchart />} />
           <Route path="/admin" element={<AdminPage />} />
         </Route>
       </Routes>

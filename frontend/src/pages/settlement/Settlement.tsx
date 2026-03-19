@@ -1,26 +1,22 @@
 import {
-  memo,
   type ChangeEvent,
   type MouseEvent,
+  memo,
   useCallback,
   useEffect,
   useMemo,
   useState,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  TextField,
-  ToggleButton,
-  ToggleButtonGroup,
-} from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
+import { EditDeleteButton, GlobalButton } from '@/common/components';
+import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
+import SettlementDetailModal, {
+  type SettlementAmountType,
+  type SettlementFormState,
+} from './SettlementDetailModal';
 
 interface SettlementRecord {
   id: number;
@@ -29,16 +25,6 @@ interface SettlementRecord {
   amount: number;
   relation: string;
 }
-
-interface SettlementFormState {
-  date: string;
-  item: string;
-  amountType: SettlementAmountType;
-  amount: string;
-  relation: string;
-}
-
-type SettlementAmountType = 'deposit' | 'withdraw';
 
 interface SettlementPayload {
   date: string;
@@ -209,20 +195,18 @@ const SettlementGrid = memo(function SettlementGrid({
 }: SettlementGridProps) {
   return (
     <>
-      <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-8 md:px-10">
+      <main className="mx-auto w-full flex-1 px-4 py-8 md:px-10">
         <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-          <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900">Settlement</h1>
+          <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900">
+            SETTLEMENT
+          </h1>
 
           {canManageSettlements && (
-            <button
-              type="button"
+            <GlobalButton
               onClick={onOpenAddDialog}
-              className="flex h-12 min-w-[160px] items-center justify-center gap-2 rounded-xl px-6 text-base font-bold tracking-wide text-black shadow-lg transition-all hover:brightness-95"
-              style={{ backgroundColor: '#FFD700', boxShadow: '0 10px 24px rgba(255, 215, 0, 0.2)' }}
-            >
-              <span aria-hidden="true">⊕</span>
-              <span className="truncate">ADD SETTLEMENT</span>
-            </button>
+              label="ADD SETTLEMENT"
+              iconBasicMappingType="ADD"
+            />
           )}
         </div>
 
@@ -231,16 +215,28 @@ const SettlementGrid = memo(function SettlementGrid({
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="bg-slate-50">
-                  <th scope="col" className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500">
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500"
+                  >
                     날짜
                   </th>
-                  <th scope="col" className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500">
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500"
+                  >
                     항목
                   </th>
-                  <th scope="col" className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500">
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500"
+                  >
                     금액
                   </th>
-                  <th scope="col" className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500">
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-500"
+                  >
                     Relation
                   </th>
                   <th
@@ -255,19 +251,26 @@ const SettlementGrid = memo(function SettlementGrid({
               <tbody className="divide-y divide-slate-100">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-sm font-medium text-slate-500">
+                    <td
+                      colSpan={5}
+                      className="px-6 py-8 text-center text-sm font-medium text-slate-500"
+                    >
                       정산 내역을 불러오는 중입니다.
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-sm font-medium text-slate-500">
+                    <td
+                      colSpan={5}
+                      className="px-6 py-8 text-center text-sm font-medium text-slate-500"
+                    >
                       등록된 정산 내역이 없습니다.
                     </td>
                   </tr>
                 ) : (
                   rows.map((row) => {
-                    const relationLabel = row.relation.trim() || (row.amount < 0 ? 'Expense' : 'Income');
+                    const relationLabel =
+                      row.relation.trim() || (row.amount < 0 ? 'Expense' : 'Income');
                     const relationClassName =
                       row.amount < 0
                         ? 'bg-red-100 text-red-700'
@@ -293,24 +296,13 @@ const SettlementGrid = memo(function SettlementGrid({
                         </td>
                         <td className="space-x-2 px-6 py-5 text-right">
                           {canManageSettlements ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => onEdit(row)}
-                                className="text-sm font-bold text-amber-500 transition-colors hover:text-amber-600"
-                              >
-                                Edit
-                              </button>
-                              <span className="text-slate-300">|</span>
-                              <button
-                                type="button"
-                                disabled={deletingSettlementId === row.id}
-                                onClick={() => void onDelete(row.id)}
-                                className="text-sm font-bold text-red-500 transition-colors hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {deletingSettlementId === row.id ? 'Deleting...' : 'Delete'}
-                              </button>
-                            </>
+                            <EditDeleteButton
+                              onEditClick={() => onEdit(row)}
+                              onDeleteClick={() => {
+                                void onDelete(row.id);
+                              }}
+                              isDeleting={deletingSettlementId === row.id}
+                            />
                           ) : (
                             <span className="text-sm text-slate-300">-</span>
                           )}
@@ -327,7 +319,10 @@ const SettlementGrid = memo(function SettlementGrid({
         <div className="mt-6 flex flex-col items-center justify-between gap-6 lg:flex-row">
           <div
             className="w-full rounded-xl border px-6 py-4 lg:w-auto"
-            style={{ backgroundColor: 'rgba(255, 215, 0, 0.05)', borderColor: 'rgba(255, 215, 0, 0.2)' }}
+            style={{
+              backgroundColor: 'rgba(255, 215, 0, 0.05)',
+              borderColor: 'rgba(255, 215, 0, 0.2)',
+            }}
           >
             <h3 className="text-lg font-medium text-slate-700">
               합계
@@ -393,17 +388,23 @@ const SettlementGrid = memo(function SettlementGrid({
       <section className="mx-auto w-full max-w-[1200px] px-4 pb-12 md:px-10">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-6">
-            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">총 수입</p>
+            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">
+              총 수입
+            </p>
             <p className="text-2xl font-black text-emerald-500">{formatAmount(totalIncome)}</p>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-6">
-            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">총 지출</p>
+            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">
+              총 지출
+            </p>
             <p className="text-2xl font-black text-red-500">{formatAmount(totalExpense)}</p>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-6">
-            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">이월 잔액</p>
+            <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">
+              이월 잔액
+            </p>
             <p className="text-2xl font-black" style={{ color: '#FFD700' }}>
               {formatAmount(carryOverAmount)}
             </p>
@@ -411,245 +412,6 @@ const SettlementGrid = memo(function SettlementGrid({
         </div>
       </section>
     </>
-  );
-});
-
-interface AddSettlementDialogProps {
-  open: boolean;
-  isSubmitting: boolean;
-  onClose: () => void;
-  onSubmit: (payload: SettlementPayload) => Promise<void>;
-}
-
-const AddSettlementDialog = memo(function AddSettlementDialog({
-  open,
-  isSubmitting,
-  onClose,
-  onSubmit,
-}: AddSettlementDialogProps) {
-  const [form, setForm] = useState<SettlementFormState>(() => createDefaultForm());
-
-  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.target;
-    setForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
-  };
-
-  const handleSubmit = async () => {
-    const payloadData = buildSettlementPayload(form);
-    if ('error' in payloadData) {
-      enqueueSnackbar(payloadData.error, { variant: 'error' });
-      return;
-    }
-
-    await onSubmit(payloadData.value);
-  };
-
-  const handleAmountTypeChange = (
-    _event: MouseEvent<HTMLElement>,
-    value: SettlementAmountType | null,
-  ) => {
-    if (!value) {
-      return;
-    }
-
-    setForm((previous) => ({
-      ...previous,
-      amountType: value,
-    }));
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Add Settlement</DialogTitle>
-      <DialogContent>
-        <TextField
-          margin="dense"
-          type="date"
-          label="Date"
-          name="date"
-          fullWidth
-          InputLabelProps={{ shrink: true }}
-          value={form.date}
-          onChange={handleChange}
-        />
-        <TextField
-          margin="dense"
-          label="Item"
-          name="item"
-          fullWidth
-          value={form.item}
-          onChange={handleChange}
-        />
-        <div className="mt-3">
-          <p className="mb-1.5 text-sm font-semibold text-slate-600">금액 구분</p>
-          <ToggleButtonGroup
-            exclusive
-            fullWidth
-            size="small"
-            color="primary"
-            value={form.amountType}
-            onChange={handleAmountTypeChange}
-            aria-label="amount type"
-          >
-            <ToggleButton value="deposit">입금</ToggleButton>
-            <ToggleButton value="withdraw">출금</ToggleButton>
-          </ToggleButtonGroup>
-        </div>
-        <TextField
-          margin="dense"
-          type="number"
-          label="Amount"
-          name="amount"
-          fullWidth
-          inputProps={{ min: 0, step: 1 }}
-          value={form.amount}
-          onChange={handleChange}
-        />
-        <TextField
-          margin="dense"
-          label="Relation"
-          name="relation"
-          fullWidth
-          value={form.relation}
-          onChange={handleChange}
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={isSubmitting}>
-          Cancel
-        </Button>
-        <Button onClick={() => void handleSubmit()} variant="contained" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : 'Save'}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-});
-
-interface EditSettlementDialogProps {
-  open: boolean;
-  isSubmitting: boolean;
-  record: SettlementRecord | null;
-  onClose: () => void;
-  onSubmit: (settlementId: number, payload: SettlementPayload) => Promise<void>;
-}
-
-const EditSettlementDialog = memo(function EditSettlementDialog({
-  open,
-  isSubmitting,
-  record,
-  onClose,
-  onSubmit,
-}: EditSettlementDialogProps) {
-  const [form, setForm] = useState<SettlementFormState>(() =>
-    record ? toFormStateFromRecord(record) : createDefaultForm(),
-  );
-
-  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.target;
-    setForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
-  };
-
-  const handleSubmit = async () => {
-    if (!record) {
-      enqueueSnackbar('수정할 정산 내역을 찾을 수 없습니다.', { variant: 'error' });
-      return;
-    }
-
-    const payloadData = buildSettlementPayload(form);
-    if ('error' in payloadData) {
-      enqueueSnackbar(payloadData.error, { variant: 'error' });
-      return;
-    }
-
-    await onSubmit(record.id, payloadData.value);
-  };
-
-  const handleAmountTypeChange = (
-    _event: MouseEvent<HTMLElement>,
-    value: SettlementAmountType | null,
-  ) => {
-    if (!value) {
-      return;
-    }
-
-    setForm((previous) => ({
-      ...previous,
-      amountType: value,
-    }));
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Edit Settlement</DialogTitle>
-      <DialogContent>
-        <TextField
-          margin="dense"
-          type="date"
-          label="Date"
-          name="date"
-          fullWidth
-          InputLabelProps={{ shrink: true }}
-          value={form.date}
-          onChange={handleChange}
-        />
-        <TextField
-          margin="dense"
-          label="Item"
-          name="item"
-          fullWidth
-          value={form.item}
-          onChange={handleChange}
-        />
-        <div className="mt-3">
-          <p className="mb-1.5 text-sm font-semibold text-slate-600">금액 구분</p>
-          <ToggleButtonGroup
-            exclusive
-            fullWidth
-            size="small"
-            color="primary"
-            value={form.amountType}
-            onChange={handleAmountTypeChange}
-            aria-label="amount type"
-          >
-            <ToggleButton value="deposit">입금</ToggleButton>
-            <ToggleButton value="withdraw">출금</ToggleButton>
-          </ToggleButtonGroup>
-        </div>
-        <TextField
-          margin="dense"
-          type="number"
-          label="Amount"
-          name="amount"
-          fullWidth
-          inputProps={{ min: 0, step: 1 }}
-          value={form.amount}
-          onChange={handleChange}
-        />
-        <TextField
-          margin="dense"
-          label="Relation"
-          name="relation"
-          fullWidth
-          value={form.relation}
-          onChange={handleChange}
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={isSubmitting}>
-          Cancel
-        </Button>
-        <Button onClick={() => void handleSubmit()} variant="contained" disabled={isSubmitting}>
-          {isSubmitting ? 'Updating...' : 'Update'}
-        </Button>
-      </DialogActions>
-    </Dialog>
   );
 });
 
@@ -662,9 +424,13 @@ export default function Settlement() {
   const [deletingSettlementId, setDeletingSettlementId] = useState<number | null>(null);
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [addDialogEpoch, setAddDialogEpoch] = useState(0);
-  const [editDialogEpoch, setEditDialogEpoch] = useState(0);
   const [editingRecord, setEditingRecord] = useState<SettlementRecord | null>(null);
+  const [addSettlementForm, setAddSettlementForm] = useState<SettlementFormState>(() =>
+    createDefaultForm(),
+  );
+  const [editSettlementForm, setEditSettlementForm] = useState<SettlementFormState>(() =>
+    createDefaultForm(),
+  );
 
   const canManageSettlements = meInfo?.isAdmin === true;
 
@@ -727,8 +493,8 @@ export default function Settlement() {
             typeof record.amount === 'number'
               ? record.amount
               : typeof record.amount === 'string'
-                ? Number(record.amount)
-                : NaN;
+              ? Number(record.amount)
+              : NaN;
 
           if (
             typeof record.id !== 'number' ||
@@ -768,11 +534,14 @@ export default function Settlement() {
       return;
     }
 
-    setAddDialogEpoch((previous) => previous + 1);
+    setAddSettlementForm(createDefaultForm());
     setOpenAddDialog(true);
   };
 
-  const handleCloseAddDialog = () => {
+  const handleCloseAddDialog = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+
     if (isSubmitting) {
       return;
     }
@@ -787,13 +556,16 @@ export default function Settlement() {
       }
 
       setEditingRecord(record);
-      setEditDialogEpoch((previous) => previous + 1);
+      setEditSettlementForm(toFormStateFromRecord(record));
       setOpenEditDialog(true);
     },
     [requireAdminAction],
   );
 
-  const handleCloseEditDialog = () => {
+  const handleCloseEditDialog = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+
     if (isSubmitting) {
       return;
     }
@@ -802,8 +574,62 @@ export default function Settlement() {
     setEditingRecord(null);
   };
 
-  const handleCreateSettlement = async (formPayload: SettlementPayload) => {
+  const handleChangeAddSettlementForm = (
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { name, value } = event.target;
+    setAddSettlementForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
+
+  const handleChangeEditSettlementForm = (
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { name, value } = event.target;
+    setEditSettlementForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
+
+  const handleAddAmountTypeChange = (
+    _event: MouseEvent<HTMLElement>,
+    value: SettlementAmountType | null,
+  ) => {
+    if (!value) {
+      return;
+    }
+
+    setAddSettlementForm((previous) => ({
+      ...previous,
+      amountType: value,
+    }));
+  };
+
+  const handleEditAmountTypeChange = (
+    _event: MouseEvent<HTMLElement>,
+    value: SettlementAmountType | null,
+  ) => {
+    if (!value) {
+      return;
+    }
+
+    setEditSettlementForm((previous) => ({
+      ...previous,
+      amountType: value,
+    }));
+  };
+
+  const handleCreateSettlement = async () => {
     if (!requireAdminAction()) {
+      return;
+    }
+
+    const payloadData = buildSettlementPayload(addSettlementForm);
+    if ('error' in payloadData) {
+      enqueueSnackbar(payloadData.error, { variant: 'error' });
       return;
     }
 
@@ -812,7 +638,7 @@ export default function Settlement() {
     try {
       const response = await apiFetch('/settlement', {
         method: 'POST',
-        body: JSON.stringify(formPayload),
+        body: JSON.stringify(payloadData.value),
       });
       const responsePayload = await parseApiResponse(response);
 
@@ -846,17 +672,28 @@ export default function Settlement() {
     }
   };
 
-  const handleUpdateSettlement = async (settlementId: number, formPayload: SettlementPayload) => {
+  const handleUpdateSettlement = async () => {
     if (!requireAdminAction()) {
+      return;
+    }
+
+    if (!editingRecord) {
+      enqueueSnackbar('수정할 정산 내역을 찾을 수 없습니다.', { variant: 'error' });
+      return;
+    }
+
+    const payloadData = buildSettlementPayload(editSettlementForm);
+    if ('error' in payloadData) {
+      enqueueSnackbar(payloadData.error, { variant: 'error' });
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const response = await apiFetch(`/settlement/${settlementId}`, {
+      const response = await apiFetch(`/settlement/${editingRecord.id}`, {
         method: 'PUT',
-        body: JSON.stringify(formPayload),
+        body: JSON.stringify(payloadData.value),
       });
       const responsePayload = await parseApiResponse(response);
 
@@ -938,6 +775,28 @@ export default function Settlement() {
     [loadSettlements, logout, navigate, requireAdminAction],
   );
 
+  const addSettlementActions: TAction[] = [
+    {
+      label: isSubmitting ? 'Saving...' : 'Save',
+      onClick: () => {
+        void handleCreateSettlement();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting,
+    },
+  ];
+
+  const editSettlementActions: TAction[] = [
+    {
+      label: isSubmitting ? 'Updating...' : 'Update',
+      onClick: () => {
+        void handleUpdateSettlement();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting,
+    },
+  ];
+
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
   const [page, setPage] = useState(0);
 
@@ -993,7 +852,11 @@ export default function Settlement() {
         canGoPrevious={page > 0}
         canGoNext={page < maxPage}
         onRowsPerPageChange={(nextRowsPerPage) => {
-          if (!ROWS_PER_PAGE_OPTIONS.includes(nextRowsPerPage as (typeof ROWS_PER_PAGE_OPTIONS)[number])) {
+          if (
+            !ROWS_PER_PAGE_OPTIONS.includes(
+              nextRowsPerPage as (typeof ROWS_PER_PAGE_OPTIONS)[number],
+            )
+          ) {
             return;
           }
 
@@ -1008,21 +871,28 @@ export default function Settlement() {
         }}
       />
 
-      <AddSettlementDialog
-        key={`add-${addDialogEpoch}`}
+      <SettlementDetailModal
+        type="ADD"
         open={openAddDialog}
+        handleClose={handleCloseAddDialog}
+        title="ADD SETTLEMENT"
+        actions={addSettlementActions}
+        form={addSettlementForm}
         isSubmitting={isSubmitting}
-        onClose={handleCloseAddDialog}
-        onSubmit={handleCreateSettlement}
+        onFormChange={handleChangeAddSettlementForm}
+        onAmountTypeChange={handleAddAmountTypeChange}
       />
 
-      <EditSettlementDialog
-        key={`edit-${editDialogEpoch}`}
+      <SettlementDetailModal
+        type="EDIT"
         open={openEditDialog}
+        handleClose={handleCloseEditDialog}
+        title="EDIT SETTLEMENT"
+        actions={editSettlementActions}
+        form={editSettlementForm}
         isSubmitting={isSubmitting}
-        record={editingRecord}
-        onClose={handleCloseEditDialog}
-        onSubmit={handleUpdateSettlement}
+        onFormChange={handleChangeEditSettlementForm}
+        onAmountTypeChange={handleEditAmountTypeChange}
       />
     </>
   );

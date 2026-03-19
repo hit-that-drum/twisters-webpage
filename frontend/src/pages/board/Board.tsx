@@ -1,18 +1,24 @@
-import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  TextField,
-} from '@mui/material';
+  type CSSProperties,
+  type ChangeEvent,
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
+import { EditDeleteButton, GlobalButton } from '@/common/components';
+import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
+import BoardDetailModal, { type BoardFormState } from './BoardDetailModal';
+import BoardImageModal from './BoardImageModal';
+import { AiTwotonePushpin } from 'react-icons/ai';
+import { IoPersonCircleSharp } from 'react-icons/io5';
+import { FaClock } from 'react-icons/fa';
+import { IoIosArrowBack, IoIosArrowDown, IoIosArrowForward, IoIosArrowUp } from 'react-icons/io';
 
 interface BoardPostItem {
   id: number;
@@ -22,6 +28,7 @@ interface BoardPostItem {
   createDate: string;
   updateUser: string;
   updateDate: string;
+  imageUrl: string[];
   content: string;
   pinned: boolean;
 }
@@ -38,7 +45,7 @@ interface BoardCommentItem {
 
 type BoardSortOption = 'latest' | 'oldest' | 'updated' | 'pinned';
 
-const DEFAULT_VISIBLE_POSTS = 3;
+const DEFAULT_VISIBLE_POSTS = 5;
 
 const BOARD_SORT_OPTIONS: Array<{ value: BoardSortOption; label: string }> = [
   { value: 'latest', label: 'Latest' },
@@ -52,19 +59,16 @@ const BOARD_IMAGE_PRESETS = [
     alt: 'Community board post visual',
     gradient:
       'linear-gradient(135deg, rgba(26,54,93,0.95) 0%, rgba(60,114,178,0.82) 55%, rgba(178,214,242,0.75) 100%)',
-    symbol: '🗂',
   },
   {
     alt: 'Discussion and policy visual',
     gradient:
       'linear-gradient(135deg, rgba(26,49,66,0.96) 0%, rgba(74,104,129,0.86) 55%, rgba(191,211,230,0.75) 100%)',
-    symbol: '📋',
   },
   {
     alt: 'Project and maintenance visual',
     gradient:
       'linear-gradient(135deg, rgba(59,62,82,0.95) 0%, rgba(109,130,171,0.84) 54%, rgba(236,223,170,0.76) 100%)',
-    symbol: '🛠',
   },
 ];
 
@@ -141,26 +145,26 @@ const formatDateTime = (rawDate: string) => {
   return parsedDate.toLocaleString();
 };
 
-const extractPreviewLines = (content: string, maxLines = 3) => {
-  const byLine = content
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+const COLLAPSED_POST_CONTENT_STYLE: CSSProperties = {
+  display: '-webkit-box',
+  overflow: 'hidden',
+  WebkitBoxOrient: 'vertical',
+  WebkitLineClamp: 5,
+};
 
-  if (byLine.length > 0) {
-    return byLine.slice(0, maxLines);
+const normalizeImageUrlList = (rawValue: unknown): string[] => {
+  if (Array.isArray(rawValue)) {
+    return rawValue
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
   }
 
-  const bySentence = (content.match(/[^.!?]+[.!?]?/g) ?? [])
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  if (bySentence.length > 0) {
-    return bySentence.slice(0, maxLines);
+  if (typeof rawValue === 'string' && rawValue.trim()) {
+    return [rawValue.trim()];
   }
 
-  const trimmed = content.trim();
-  return trimmed ? [trimmed] : [];
+  return [];
 };
 
 const parseBoardPosts = (payload: unknown): BoardPostItem[] => {
@@ -182,6 +186,7 @@ const parseBoardPosts = (payload: unknown): BoardPostItem[] => {
         createDate?: unknown;
         updateUser?: unknown;
         updateDate?: unknown;
+        imageUrl?: unknown;
         content?: unknown;
         pinned?: unknown;
       };
@@ -212,6 +217,8 @@ const parseBoardPosts = (payload: unknown): BoardPostItem[] => {
       const normalizedPinned =
         row.pinned === true || row.pinned === 1 || row.pinned === '1' || row.pinned === 'true';
 
+      const normalizedImageUrl = normalizeImageUrlList(row.imageUrl);
+
       return {
         id: row.id,
         authorId: normalizedAuthorId,
@@ -220,6 +227,7 @@ const parseBoardPosts = (payload: unknown): BoardPostItem[] => {
         createDate: row.createDate,
         updateUser: normalizedUpdateUser,
         updateDate: normalizedUpdateDate,
+        imageUrl: normalizedImageUrl,
         content: row.content,
         pinned: normalizedPinned,
       } satisfies BoardPostItem;
@@ -317,17 +325,23 @@ export default function Board() {
   const [loadingCommentsPostIds, setLoadingCommentsPostIds] = useState<number[]>([]);
   const [submittingCommentPostId, setSubmittingCommentPostId] = useState<number | null>(null);
   const [deletingCommentKey, setDeletingCommentKey] = useState<string | null>(null);
+  const [currentImageIndexByPost, setCurrentImageIndexByPost] = useState<Record<number, number>>(
+    {},
+  );
+  const [imageModalPostId, setImageModalPostId] = useState<number | null>(null);
 
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
-  const [newPost, setNewPost] = useState({
+  const [newPost, setNewPost] = useState<BoardFormState>({
     title: '',
+    imageUrl: [],
     content: '',
     pinned: false,
   });
-  const [editPost, setEditPost] = useState({
+  const [editPost, setEditPost] = useState<BoardFormState>({
     title: '',
+    imageUrl: [],
     content: '',
     pinned: false,
   });
@@ -399,7 +413,9 @@ export default function Board() {
       const normalizedPosts = parseBoardPosts(payload);
       setBoardPosts(normalizedPosts);
       setVisiblePostCount(DEFAULT_VISIBLE_POSTS);
-      setExpandedPostIds([]);
+      setExpandedPostIds(normalizedPosts.filter((post) => post.pinned).map((post) => post.id));
+      setCurrentImageIndexByPost({});
+      setImageModalPostId(null);
       setCommentsByPost({});
       setCommentDraftByPost({});
       setLoadingCommentsPostIds([]);
@@ -484,10 +500,14 @@ export default function Board() {
       return;
     }
 
+    setNewPost({ title: '', imageUrl: [], content: '', pinned: false });
     setOpenAddDialog(true);
   };
 
-  const handleCloseAddDialog = () => {
+  const handleCloseAddDialog = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+
     if (isSubmitting) {
       return;
     }
@@ -508,19 +528,33 @@ export default function Board() {
     setEditingPostId(post.id);
     setEditPost({
       title: post.title,
+      imageUrl: post.imageUrl,
       content: post.content,
       pinned: post.pinned,
     });
     setOpenEditDialog(true);
   };
 
-  const handleCloseEditDialog = () => {
+  const handleCloseEditDialog = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+
     if (isSubmitting) {
       return;
     }
 
     setOpenEditDialog(false);
     setEditingPostId(null);
+  };
+
+  const handleOpenImageModal = (postId: number) => {
+    setImageModalPostId(postId);
+  };
+
+  const handleCloseImageModal = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+    setImageModalPostId(null);
   };
 
   const handleChangeNewPost = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -539,6 +573,28 @@ export default function Board() {
     }));
   };
 
+  const addPostActions: TAction[] = [
+    {
+      label: '저장',
+      onClick: () => {
+        void handleCreatePost();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting,
+    },
+  ];
+
+  const editPostActions: TAction[] = [
+    {
+      label: '수정',
+      onClick: () => {
+        void handleUpdatePost();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting,
+    },
+  ];
+
   const handleCreatePost = async () => {
     if (!requireAuthenticatedAction()) {
       return;
@@ -554,10 +610,12 @@ export default function Board() {
     setIsSubmitting(true);
 
     try {
-      const requestBody: { title: string; content: string; pinned?: boolean } = {
-        title,
-        content,
-      };
+      const requestBody: { title: string; imageUrl: string[]; content: string; pinned?: boolean } =
+        {
+          imageUrl: newPost.imageUrl,
+          title,
+          content,
+        };
 
       if (canPinPost) {
         requestBody.pinned = newPost.pinned;
@@ -583,7 +641,7 @@ export default function Board() {
 
       enqueueSnackbar(getApiMessage(payload, '게시글이 등록되었습니다.'), { variant: 'success' });
       setOpenAddDialog(false);
-      setNewPost({ title: '', content: '', pinned: false });
+      setNewPost({ title: '', imageUrl: [], content: '', pinned: false });
       await loadBoardPosts();
     } catch (error) {
       console.error('Board post create error:', error);
@@ -613,10 +671,12 @@ export default function Board() {
     setIsSubmitting(true);
 
     try {
-      const requestBody: { title: string; content: string; pinned?: boolean } = {
-        title,
-        content,
-      };
+      const requestBody: { title: string; imageUrl: string[]; content: string; pinned?: boolean } =
+        {
+          imageUrl: editPost.imageUrl,
+          title,
+          content,
+        };
 
       if (canPinPost) {
         requestBody.pinned = editPost.pinned;
@@ -801,6 +861,49 @@ export default function Board() {
     setVisiblePostCount((previous) => previous + DEFAULT_VISIBLE_POSTS);
   };
 
+  const handleMovePostImage = (postId: number, totalImages: number, direction: 'next' | 'prev') => {
+    if (totalImages <= 1) {
+      return;
+    }
+
+    setCurrentImageIndexByPost((previous) => {
+      const currentIndex = previous[postId] ?? 0;
+      const nextIndex =
+        direction === 'next'
+          ? (currentIndex + 1) % totalImages
+          : (currentIndex - 1 + totalImages) % totalImages;
+
+      return {
+        ...previous,
+        [postId]: nextIndex,
+      };
+    });
+  };
+
+  const handleSelectPostImage = (postId: number, imageIndex: number) => {
+    setCurrentImageIndexByPost((previous) => ({
+      ...previous,
+      [postId]: imageIndex,
+    }));
+  };
+
+  const imageModalPost = useMemo(
+    () => boardPosts.find((post) => post.id === imageModalPostId) ?? null,
+    [boardPosts, imageModalPostId],
+  );
+  const imageModalCurrentIndex = imageModalPost
+    ? (currentImageIndexByPost[imageModalPost.id] ?? 0) %
+      Math.max(imageModalPost.imageUrl.length, 1)
+    : 0;
+
+  useEffect(() => {
+    displayedPosts.forEach((post) => {
+      if (post.pinned && commentsByPost[post.id] === undefined) {
+        void loadBoardComments(post.id);
+      }
+    });
+  }, [commentsByPost, displayedPosts, loadBoardComments]);
+
   const togglePostExpand = (postId: number) => {
     setExpandedPostIds((previous) => {
       const isExpanded = previous.includes(postId);
@@ -818,26 +921,20 @@ export default function Board() {
 
   return (
     <main className="flex flex-1 flex-col items-center px-3 py-6 sm:px-4 sm:py-8 lg:px-20">
-      <div className="layout-content-container flex w-full max-w-[1024px] flex-col gap-5 sm:gap-6">
+      <div className="layout-content-container flex w-full flex-col gap-5 sm:gap-6">
         <div className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-3 sm:gap-4 sm:pb-4 md:flex-row md:items-end">
           <div className="flex flex-col gap-1">
             <h1 className="text-3xl font-black leading-tight tracking-tight text-slate-900 sm:text-4xl">
-              Board
+              BOARD
             </h1>
-            <p className="text-sm font-normal text-slate-500 sm:text-base">
-              Team discussions, updates, and collaboration notes
-            </p>
           </div>
 
           {canCreatePost && (
-            <button
-              type="button"
+            <GlobalButton
               onClick={handleOpenAddDialog}
-              className="flex h-10 min-w-[124px] items-center justify-center gap-2 rounded-xl bg-amber-300 px-4 text-xs font-black uppercase tracking-wider text-slate-900 shadow-lg shadow-amber-200 transition-all hover:bg-amber-200 sm:h-12 sm:min-w-[140px] sm:px-6 sm:text-sm"
-            >
-              <span aria-hidden="true">⊕</span>
-              <span>Add Post</span>
-            </button>
+              label="Add Post"
+              iconBasicMappingType="ADD"
+            />
           )}
         </div>
 
@@ -891,13 +988,24 @@ export default function Board() {
             </div>
           ) : (
             displayedPosts.map((post, index) => {
-              const previewLines = extractPreviewLines(post.content, 3);
               const imagePreset = BOARD_IMAGE_PRESETS[index % BOARD_IMAGE_PRESETS.length];
-              const isExpanded = expandedPostIds.includes(post.id);
+              const isExpanded = post.pinned || expandedPostIds.includes(post.id);
+              const postContent = post.content.trim() || '내용이 없습니다.';
               const canEditOrDelete = canMutatePost(post);
               const comments = commentsByPost[post.id] ?? [];
               const isLoadingComments = loadingCommentsPostIds.includes(post.id);
               const commentDraft = commentDraftByPost[post.id] ?? '';
+              const currentImageIndex = currentImageIndexByPost[post.id] ?? 0;
+              const safeImageIndex =
+                post.imageUrl.length > 0 ? currentImageIndex % post.imageUrl.length : 0;
+              const activeImageUrl = post.imageUrl[safeImageIndex] ?? null;
+              const imageStyle = activeImageUrl
+                ? {
+                    backgroundImage: `linear-gradient(140deg, rgba(15,23,42,0.1) 0%, rgba(15,23,42,0.36) 100%), url(${activeImageUrl})`,
+                  }
+                : {
+                    background: imagePreset.gradient,
+                  };
 
               return (
                 <article key={post.id} className="group">
@@ -908,114 +1016,188 @@ export default function Board() {
                         : 'border border-slate-200 shadow-sm hover:shadow-md'
                     }`}
                   >
-                    <div
-                      role="img"
-                      aria-label={imagePreset.alt}
-                      className="relative aspect-video w-full overflow-hidden bg-center bg-no-repeat xl:w-72 xl:flex-shrink-0"
-                      style={{ background: imagePreset.gradient }}
-                    >
-                      <div className="flex h-full w-full items-end bg-black/5 p-3 sm:p-4">
-                        <span className="text-3xl drop-shadow-sm sm:text-4xl" aria-hidden="true">
-                          {imagePreset.symbol}
-                        </span>
+                    <div className="flex flex-col border-r border-gray-300 bg-white xl:w-[282px] xl:min-w-[282px] xl:flex-shrink-0">
+                      <div
+                        role={post.imageUrl.length > 0 ? 'button' : 'img'}
+                        aria-label={imagePreset.alt}
+                        aria-haspopup={post.imageUrl.length > 0 ? 'dialog' : undefined}
+                        tabIndex={post.imageUrl.length > 0 ? 0 : undefined}
+                        onClick={(event) => {
+                          if (post.imageUrl.length === 0) {
+                            return;
+                          }
+
+                          if (event.target instanceof Element && event.target.closest('button')) {
+                            return;
+                          }
+
+                          handleOpenImageModal(post.id);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.target !== event.currentTarget || post.imageUrl.length === 0) {
+                            return;
+                          }
+
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            handleOpenImageModal(post.id);
+                          }
+                        }}
+                        className={`relative min-h-[282px] overflow-hidden bg-center bg-cover bg-no-repeat ${
+                          post.imageUrl.length > 0
+                            ? 'cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset'
+                            : ''
+                        }`}
+                        style={imageStyle}
+                      >
+                        {post.pinned && (
+                          <div className="absolute left-3 top-3 sm:left-4 sm:top-4">
+                            <span className="flex items-center gap-1 rounded bg-amber-300 px-2 py-1 text-[10px] font-black uppercase text-slate-900 shadow-sm">
+                              <AiTwotonePushpin size="20px" color="white" />
+                            </span>
+                          </div>
+                        )}
+
+                        {post.imageUrl.length > 0 && (
+                          <div className="pointer-events-none absolute right-3 top-3 sm:right-4 sm:top-4">
+                            <div className="rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-sm backdrop-blur-sm">
+                              {`${safeImageIndex + 1}/${post.imageUrl.length}`}
+                            </div>
+                          </div>
+                        )}
+
+                        {post.imageUrl.length > 1 && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleMovePostImage(post.id, post.imageUrl.length, 'prev');
+                              }}
+                              className="absolute left-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-lg font-bold text-white backdrop-blur-sm transition hover:bg-black/60"
+                              aria-label="Previous image"
+                            >
+                              <IoIosArrowBack />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleMovePostImage(post.id, post.imageUrl.length, 'next');
+                              }}
+                              className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-lg font-bold text-white backdrop-blur-sm transition hover:bg-black/60"
+                              aria-label="Next image"
+                            >
+                              <IoIosArrowForward />
+                            </button>
+                          </>
+                        )}
                       </div>
 
-                      {post.pinned && (
-                        <div className="absolute left-3 top-3 sm:left-4 sm:top-4">
-                          <span className="flex items-center gap-1 rounded bg-amber-300 px-2 py-1 text-[10px] font-black uppercase text-slate-900 shadow-sm">
-                            <span aria-hidden="true" className="text-[11px]">
-                              📌
-                            </span>
-                            Pinned
-                          </span>
+                      {isExpanded && (
+                        <div
+                          className="grid grid-cols-4 gap-2 border-t border-slate-200 p-3"
+                          aria-label={`${post.title} image thumbnails`}
+                        >
+                          {post.imageUrl.map((imageUrl, imageIndex) => (
+                            <button
+                              key={`${post.id}-thumb-${imageIndex}`}
+                              type="button"
+                              onClick={() => handleSelectPostImage(post.id, imageIndex)}
+                              className={`overflow-hidden rounded-lg border-2 transition ${
+                                safeImageIndex === imageIndex
+                                  ? 'border-blue-500 shadow-sm shadow-blue-200/70'
+                                  : 'border-transparent opacity-70 hover:opacity-100'
+                              }`}
+                              aria-label={`Select image ${imageIndex + 1} for ${post.title}`}
+                              aria-pressed={safeImageIndex === imageIndex}
+                            >
+                              <img
+                                src={imageUrl}
+                                alt={`${post.title} thumbnail ${imageIndex + 1}`}
+                                className="aspect-square w-full object-cover"
+                              />
+                            </button>
+                          ))}
                         </div>
                       )}
                     </div>
 
-                    <div className="flex flex-1 flex-col justify-between p-4 sm:p-5 md:p-6">
-                      <div className="flex flex-col gap-2.5 sm:gap-3">
-                        <div className="flex items-start justify-between gap-3 sm:gap-4">
-                          <h3 className="text-lg font-bold leading-tight text-slate-900 transition-colors group-hover:text-blue-700 sm:text-xl">
+                    <div className="flex flex-1 flex-col justify-end p-6">
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-start justify-between gap-4">
+                          <h3 className="text-xl font-bold leading-tight text-slate-900 transition-colors">
                             {post.title}
                           </h3>
 
-                          {canEditOrDelete && (
-                            <div className="flex gap-1.5 sm:gap-2">
-                              <button
-                                type="button"
-                                title="Edit post"
-                                aria-label="Edit post"
-                                onClick={() => handleOpenEditDialog(post)}
-                                className="flex size-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-blue-100 hover:text-blue-700 sm:size-9"
-                              >
-                                <span aria-hidden="true" className="text-sm sm:text-base">
-                                  ✎
-                                </span>
-                              </button>
-
-                              <button
-                                type="button"
-                                title="Delete post"
-                                aria-label="Delete post"
-                                disabled={deletingPostId === post.id}
-                                onClick={() => void handleDeletePost(post)}
-                                className="flex size-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-red-100 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60 sm:size-9"
-                              >
-                                <span aria-hidden="true" className="text-sm sm:text-base">
-                                  {deletingPostId === post.id ? '…' : '🗑'}
-                                </span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 sm:text-sm">
-                          <span aria-hidden="true">👤</span>
-                          <span>Posted by {post.createUser}</span>
-                          <span className="mx-1" aria-hidden="true">
-                            •
-                          </span>
-                          <span aria-hidden="true">⏱</span>
-                          <span>{formatRelativeTime(post.createDate)}</span>
-                        </div>
-
-                        <ul className="space-y-2 text-sm text-slate-600">
-                          {(previewLines.length > 0 ? previewLines : ['내용이 없습니다.']).map((line, lineIndex) => (
-                            <li key={`${post.id}-line-${lineIndex}`} className="flex items-start gap-2">
-                              <span className="mt-1 text-amber-500" aria-hidden="true">
+                          <div className="flex gap-5">
+                            <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-500">
+                              <span aria-hidden="true">
+                                <IoPersonCircleSharp size="20px" />
+                              </span>
+                              <span>Posted by {post.createUser}</span>
+                              <span className="mx-1" aria-hidden="true">
                                 •
                               </span>
-                              <span>{line}</span>
-                            </li>
-                          ))}
-                        </ul>
-
-                        <button
-                          type="button"
-                          onClick={() => togglePostExpand(post.id)}
-                          className="w-fit text-sm font-semibold text-blue-700 transition-colors hover:text-blue-800"
-                          aria-expanded={isExpanded}
-                          aria-controls={`board-post-content-${post.id}`}
-                        >
-                          {isExpanded ? 'Hide full post' : 'Read full post'}
-                        </button>
-
-                        {isExpanded && (
-                          <div id={`board-post-content-${post.id}`} className="space-y-3">
-                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                              <p className="whitespace-pre-wrap">{post.content}</p>
+                              <span aria-hidden="true">
+                                <FaClock size="16px" />
+                              </span>
+                              <span>{formatRelativeTime(post.createDate)}</span>
                             </div>
+                            {canEditOrDelete && (
+                              <EditDeleteButton
+                                onEditClick={() => handleOpenEditDialog(post)}
+                                onDeleteClick={() => {
+                                  void handleDeletePost(post);
+                                }}
+                                isDeleting={deletingPostId === post.id}
+                              />
+                            )}
+                          </div>
+                        </div>
 
+                        <div id={`board-post-content-${post.id}`} className="space-y-3">
+                          <div className="relative min-h-[142px] rounded-lg border border-slate-200 bg-slate-50 p-3 pr-14 text-sm text-slate-700">
+                            {!post.pinned && (
+                              <button
+                                type="button"
+                                onClick={() => togglePostExpand(post.id)}
+                                className="absolute right-3 top-3 inline-flex size-8 items-center justify-center transition-colors hover:cursor-pointer"
+                                aria-expanded={isExpanded}
+                                aria-controls={`board-post-content-${post.id}`}
+                                aria-label={
+                                  isExpanded ? 'Collapse post content' : 'Expand post content'
+                                }
+                              >
+                                {isExpanded ? (
+                                  <IoIosArrowUp size="22px" />
+                                ) : (
+                                  <IoIosArrowDown size="22px" />
+                                )}
+                              </button>
+                            )}
+
+                            <p
+                              className="whitespace-pre-wrap break-words leading-relaxed"
+                              style={isExpanded ? undefined : COLLAPSED_POST_CONTENT_STYLE}
+                            >
+                              {postContent}
+                            </p>
+                          </div>
+
+                          {isExpanded && (
                             <div className="rounded-lg border border-slate-200 bg-white p-3">
                               <div className="mb-2 flex items-center justify-between">
                                 <p className="text-sm font-bold text-slate-800">Comments</p>
-                                <span className="text-xs font-medium text-slate-500">{comments.length}</span>
+                                <span className="text-xs font-medium text-slate-500">
+                                  {comments.length}
+                                </span>
                               </div>
 
                               {isLoadingComments ? (
                                 <p className="text-sm text-slate-500">댓글을 불러오는 중입니다.</p>
                               ) : comments.length === 0 ? (
-                                <p className="text-sm text-slate-500">첫 댓글을 남겨보세요.</p>
+                                <p className="text-sm text-slate-500 pb-2">첫 댓글을 남겨보세요.</p>
                               ) : (
                                 <ul className="mb-3 space-y-2">
                                   {comments.map((comment) => {
@@ -1029,24 +1211,30 @@ export default function Board() {
                                       >
                                         <div className="mb-1 flex items-start justify-between gap-2">
                                           <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-                                            <span className="font-semibold text-slate-700">{comment.authorName}</span>
+                                            <span className="font-semibold text-slate-700">
+                                              {comment.authorName}
+                                            </span>
                                             <span aria-hidden="true">•</span>
                                             <span>{formatRelativeTime(comment.createdAt)}</span>
                                           </div>
 
                                           {canDelete && (
-                                            <button
-                                              type="button"
-                                              onClick={() => void handleDeleteComment(post.id, comment)}
-                                              disabled={deletingCommentKey === commentDeleteKey}
-                                              className="text-xs font-semibold text-red-600 transition-colors hover:text-red-700 disabled:opacity-60"
-                                            >
-                                              {deletingCommentKey === commentDeleteKey ? 'Deleting...' : 'Delete'}
-                                            </button>
+                                            <EditDeleteButton
+                                              isExisteEditButton={false}
+                                              onDeleteClick={() =>
+                                                void handleDeleteComment(post.id, comment)
+                                              }
+                                              isDeleting={deletingCommentKey === commentDeleteKey}
+                                              isDeleteDisabled={
+                                                deletingCommentKey === commentDeleteKey
+                                              }
+                                            />
                                           )}
                                         </div>
 
-                                        <p className="whitespace-pre-wrap text-sm text-slate-700">{comment.content}</p>
+                                        <p className="whitespace-pre-wrap text-sm text-slate-700">
+                                          {comment.content}
+                                        </p>
                                       </li>
                                     );
                                   })}
@@ -1057,7 +1245,9 @@ export default function Board() {
                                 <div className="space-y-2">
                                   <textarea
                                     value={commentDraft}
-                                    onChange={(event) => handleCommentDraftChange(post.id, event.target.value)}
+                                    onChange={(event) =>
+                                      handleCommentDraftChange(post.id, event.target.value)
+                                    }
                                     rows={3}
                                     placeholder="댓글을 입력하세요"
                                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500"
@@ -1069,19 +1259,23 @@ export default function Board() {
                                       disabled={submittingCommentPostId === post.id}
                                       className="rounded-md bg-slate-800 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:opacity-60"
                                     >
-                                      {submittingCommentPostId === post.id ? 'Saving...' : 'Add Comment'}
+                                      {submittingCommentPostId === post.id
+                                        ? 'Saving...'
+                                        : 'Add Comment'}
                                     </button>
                                   </div>
                                 </div>
                               ) : (
-                                <p className="text-sm text-slate-500">댓글을 작성하려면 로그인하세요.</p>
+                                <p className="text-sm text-slate-500">
+                                  댓글을 작성하려면 로그인하세요.
+                                </p>
                               )}
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
 
-                        <p className="text-xs font-medium text-slate-400">
-                          Updated: {post.updateUser} · {formatDateTime(post.updateDate)}
+                        <p className="text-xs font-medium text-slate-400 mt-4">
+                          Updated by {post.updateUser} · {formatDateTime(post.updateDate)}
                         </p>
                       </div>
                     </div>
@@ -1106,101 +1300,82 @@ export default function Board() {
         )}
       </div>
 
-      <Dialog open={openAddDialog} onClose={handleCloseAddDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Add Post</DialogTitle>
-        <DialogContent>
-          <TextField
-            margin="dense"
-            label="Title"
-            name="title"
-            fullWidth
-            value={newPost.title}
-            onChange={handleChangeNewPost}
-          />
-          <TextField
-            margin="dense"
-            label="Content"
-            name="content"
-            fullWidth
-            multiline
-            minRows={5}
-            value={newPost.content}
-            onChange={handleChangeNewPost}
-          />
-          {canPinPost && (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={newPost.pinned}
-                  onChange={(event) =>
-                    setNewPost((previous) => ({
-                      ...previous,
-                      pinned: event.target.checked,
-                    }))
-                  }
-                />
-              }
-              label="Pinned"
-            />
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseAddDialog} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button onClick={() => void handleCreatePost()} variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <BoardDetailModal
+        type="ADD"
+        open={openAddDialog}
+        handleClose={handleCloseAddDialog}
+        title="게시물 등록"
+        actions={addPostActions}
+        form={newPost}
+        isSubmitting={isSubmitting}
+        canPinPost={canPinPost}
+        onFormChange={handleChangeNewPost}
+        onImageUrlsChange={(value) => {
+          setNewPost((previous) => ({
+            ...previous,
+            imageUrl: value,
+          }));
+        }}
+        onPinnedChange={(checked) => {
+          setNewPost((previous) => ({
+            ...previous,
+            pinned: checked,
+          }));
+        }}
+      />
 
-      <Dialog open={openEditDialog} onClose={handleCloseEditDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Edit Post</DialogTitle>
-        <DialogContent>
-          <TextField
-            margin="dense"
-            label="Title"
-            name="title"
-            fullWidth
-            value={editPost.title}
-            onChange={handleChangeEditPost}
-          />
-          <TextField
-            margin="dense"
-            label="Content"
-            name="content"
-            fullWidth
-            multiline
-            minRows={5}
-            value={editPost.content}
-            onChange={handleChangeEditPost}
-          />
-          {canPinPost && (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={editPost.pinned}
-                  onChange={(event) =>
-                    setEditPost((previous) => ({
-                      ...previous,
-                      pinned: event.target.checked,
-                    }))
-                  }
-                />
-              }
-              label="Pinned"
-            />
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseEditDialog} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button onClick={() => void handleUpdatePost()} variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? 'Updating...' : 'Update'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <BoardDetailModal
+        type="EDIT"
+        open={openEditDialog}
+        handleClose={handleCloseEditDialog}
+        title="게시물 수정"
+        actions={editPostActions}
+        form={editPost}
+        isSubmitting={isSubmitting}
+        canPinPost={canPinPost}
+        onFormChange={handleChangeEditPost}
+        onImageUrlsChange={(value) => {
+          setEditPost((previous) => ({
+            ...previous,
+            imageUrl: value,
+          }));
+        }}
+        onPinnedChange={(checked) => {
+          setEditPost((previous) => ({
+            ...previous,
+            pinned: checked,
+          }));
+        }}
+      />
+
+      <BoardImageModal
+        open={imageModalPost !== null}
+        handleClose={handleCloseImageModal}
+        title={imageModalPost?.title ?? 'BOARD IMAGE'}
+        images={imageModalPost?.imageUrl ?? []}
+        currentIndex={imageModalCurrentIndex}
+        onPrevious={() => {
+          if (!imageModalPost) {
+            return;
+          }
+
+          handleMovePostImage(imageModalPost.id, imageModalPost.imageUrl.length, 'prev');
+        }}
+        onNext={() => {
+          if (!imageModalPost) {
+            return;
+          }
+
+          handleMovePostImage(imageModalPost.id, imageModalPost.imageUrl.length, 'next');
+        }}
+        onSelectImage={(index) => {
+          if (!imageModalPost) {
+            return;
+          }
+
+          handleSelectPostImage(imageModalPost.id, index);
+        }}
+      />
     </main>
   );
 }

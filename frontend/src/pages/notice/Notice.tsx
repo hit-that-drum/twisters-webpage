@@ -1,18 +1,14 @@
 import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  TextField,
-} from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
+import { EditDeleteButton, GlobalButton } from '@/common/components';
+import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
+import NoticeDetailModal, { type NoticeFormState } from './NoticeDetailModal';
+import { AiTwotonePushpin } from 'react-icons/ai';
+import { IoPersonCircleSharp } from 'react-icons/io5';
+import { FaClock } from 'react-icons/fa';
 
 interface NoticeItem {
   id: number;
@@ -21,30 +17,28 @@ interface NoticeItem {
   createDate: string;
   updateUser: string;
   updateDate: string;
+  imageUrl: string | null;
   content: string;
   pinned: boolean;
 }
 
-const DEFAULT_VISIBLE_NOTICES = 3;
+const DEFAULT_VISIBLE_NOTICES = 5;
 
 const NOTICE_IMAGE_PRESETS = [
   {
     alt: 'Community meeting visual',
     gradient:
       'linear-gradient(135deg, rgba(26,54,93,0.95) 0%, rgba(60,114,178,0.82) 55%, rgba(178,214,242,0.75) 100%)',
-    symbol: '🏛',
   },
   {
     alt: 'Parking zone visual',
     gradient:
       'linear-gradient(135deg, rgba(26,49,66,0.96) 0%, rgba(74,104,129,0.86) 55%, rgba(191,211,230,0.75) 100%)',
-    symbol: '🅿',
   },
   {
     alt: 'Maintenance and tools visual',
     gradient:
       'linear-gradient(135deg, rgba(59,62,82,0.95) 0%, rgba(109,130,171,0.84) 54%, rgba(236,223,170,0.76) 100%)',
-    symbol: '🛠',
   },
 ];
 
@@ -86,28 +80,6 @@ const formatDateTime = (rawDate: string) => {
   return parsedDate.toLocaleString();
 };
 
-const extractPreviewLines = (content: string, maxLines = 3) => {
-  const byLine = content
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  if (byLine.length > 0) {
-    return byLine.slice(0, maxLines);
-  }
-
-  const bySentence = (content.match(/[^.!?]+[.!?]?/g) ?? [])
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  if (bySentence.length > 0) {
-    return bySentence.slice(0, maxLines);
-  }
-
-  const trimmed = content.trim();
-  return trimmed ? [trimmed] : [];
-};
-
 const parseNoticeList = (payload: unknown): NoticeItem[] => {
   if (!Array.isArray(payload)) {
     return [];
@@ -126,6 +98,7 @@ const parseNoticeList = (payload: unknown): NoticeItem[] => {
         createDate?: unknown;
         updateUser?: unknown;
         updateDate?: unknown;
+        imageUrl?: unknown;
         content?: unknown;
         pinned?: unknown;
       };
@@ -141,10 +114,7 @@ const parseNoticeList = (payload: unknown): NoticeItem[] => {
       }
 
       const normalizedPinned =
-        row.pinned === true ||
-        row.pinned === 1 ||
-        row.pinned === '1' ||
-        row.pinned === 'true';
+        row.pinned === true || row.pinned === 1 || row.pinned === '1' || row.pinned === 'true';
 
       const normalizedUpdateUser =
         typeof row.updateUser === 'string' && row.updateUser.trim().length > 0
@@ -156,6 +126,11 @@ const parseNoticeList = (payload: unknown): NoticeItem[] => {
           ? row.updateDate
           : row.createDate;
 
+      const normalizedImageUrl =
+        typeof row.imageUrl === 'string' && row.imageUrl.trim().length > 0
+          ? row.imageUrl.trim()
+          : null;
+
       return {
         id: row.id,
         title: row.title,
@@ -163,6 +138,7 @@ const parseNoticeList = (payload: unknown): NoticeItem[] => {
         createDate: row.createDate,
         updateUser: normalizedUpdateUser,
         updateDate: normalizedUpdateDate,
+        imageUrl: normalizedImageUrl,
         content: row.content,
         pinned: normalizedPinned,
       } satisfies NoticeItem;
@@ -210,20 +186,21 @@ export default function Notice() {
   const { meInfo, logout } = useAuth();
   const [noticeList, setNoticeList] = useState<NoticeItem[]>([]);
   const [visibleNoticeCount, setVisibleNoticeCount] = useState(DEFAULT_VISIBLE_NOTICES);
-  const [expandedNoticeIds, setExpandedNoticeIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingNoticeId, setDeletingNoticeId] = useState<number | null>(null);
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [editingNoticeId, setEditingNoticeId] = useState<number | null>(null);
-  const [newNotice, setNewNotice] = useState({
+  const [newNotice, setNewNotice] = useState<NoticeFormState>({
     title: '',
+    imageUrl: '',
     content: '',
     pinned: false,
   });
-  const [editNotice, setEditNotice] = useState({
+  const [editNotice, setEditNotice] = useState<NoticeFormState>({
     title: '',
+    imageUrl: '',
     content: '',
     pinned: false,
   });
@@ -245,7 +222,6 @@ export default function Notice() {
       const normalizedList = parseNoticeList(payload);
       setNoticeList(normalizedList);
       setVisibleNoticeCount(DEFAULT_VISIBLE_NOTICES);
-      setExpandedNoticeIds([]);
     } catch (error) {
       console.error('Notice list fetch error:', error);
       enqueueSnackbar('공지사항을 불러오는 중 오류가 발생했습니다.', { variant: 'error' });
@@ -285,10 +261,14 @@ export default function Notice() {
       return;
     }
 
+    setNewNotice({ title: '', imageUrl: '', content: '', pinned: false });
     setOpenAddDialog(true);
   };
 
-  const handleCloseAddDialog = () => {
+  const handleCloseAddDialog = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+
     if (isSubmitting) {
       return;
     }
@@ -304,13 +284,17 @@ export default function Notice() {
     setEditingNoticeId(notice.id);
     setEditNotice({
       title: notice.title,
+      imageUrl: notice.imageUrl ?? '',
       content: notice.content,
       pinned: notice.pinned,
     });
     setOpenEditDialog(true);
   };
 
-  const handleCloseEditDialog = () => {
+  const handleCloseEditDialog = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+
     if (isSubmitting) {
       return;
     }
@@ -335,6 +319,28 @@ export default function Notice() {
     }));
   };
 
+  const addNoticeActions: TAction[] = [
+    {
+      label: '저장',
+      onClick: () => {
+        void handleCreateNotice();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting,
+    },
+  ];
+
+  const editNoticeActions: TAction[] = [
+    {
+      label: '수정',
+      onClick: () => {
+        void handleUpdateNotice();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting,
+    },
+  ];
+
   const handleCreateNotice = async () => {
     if (!requireAuthForMutation()) {
       return;
@@ -355,6 +361,7 @@ export default function Notice() {
         method: 'POST',
         body: JSON.stringify({
           title,
+          imageUrl: newNotice.imageUrl.trim() || null,
           content,
           pinned: newNotice.pinned,
         }),
@@ -377,7 +384,7 @@ export default function Notice() {
 
       enqueueSnackbar(getApiMessage(payload, '공지사항이 등록되었습니다.'), { variant: 'success' });
       setOpenAddDialog(false);
-      setNewNotice({ title: '', content: '', pinned: false });
+      setNewNotice({ title: '', imageUrl: '', content: '', pinned: false });
       await loadNotices();
     } catch (error) {
       console.error('Notice create error:', error);
@@ -412,6 +419,7 @@ export default function Notice() {
         method: 'PUT',
         body: JSON.stringify({
           title,
+          imageUrl: editNotice.imageUrl.trim() || null,
           content,
           pinned: editNotice.pinned,
         }),
@@ -490,36 +498,22 @@ export default function Notice() {
     setVisibleNoticeCount((previous) => previous + DEFAULT_VISIBLE_NOTICES);
   };
 
-  const toggleNoticeExpand = (noticeId: number) => {
-    setExpandedNoticeIds((previous) => {
-      if (previous.includes(noticeId)) {
-        return previous.filter((id) => id !== noticeId);
-      }
-
-      return [...previous, noticeId];
-    });
-  };
-
   return (
     <main className="flex flex-1 flex-col items-center px-4 py-8 lg:px-20">
-      <div className="layout-content-container flex w-full max-w-[1024px] flex-col gap-6">
+      <div className="layout-content-container flex w-full flex-col gap-6">
         <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-4 md:flex-row md:items-end">
           <div className="flex flex-col gap-1">
-            <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900">Notices</h1>
-            <p className="text-base font-normal text-slate-500">
-              Important updates and announcements for the community
-            </p>
+            <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900">
+              NOTICE
+            </h1>
           </div>
 
           {canManageNotices && (
-            <button
-              type="button"
+            <GlobalButton
               onClick={handleOpenAddDialog}
-              className="flex h-12 min-w-[140px] items-center justify-center gap-2 rounded-xl bg-amber-300 px-6 text-sm font-black uppercase tracking-wider text-slate-900 shadow-lg shadow-amber-200 transition-all hover:bg-amber-200"
-            >
-              <span aria-hidden="true">⊕</span>
-              <span>Add Notice</span>
-            </button>
+              label="Add Notice"
+              iconBasicMappingType="ADD"
+            />
           )}
         </div>
 
@@ -534,9 +528,14 @@ export default function Notice() {
             </div>
           ) : (
             displayedNotices.map((notice, index) => {
-              const previewLines = extractPreviewLines(notice.content, 3);
               const imagePreset = NOTICE_IMAGE_PRESETS[index % NOTICE_IMAGE_PRESETS.length];
-              const isExpanded = expandedNoticeIds.includes(notice.id);
+              const imageStyle = notice.imageUrl
+                ? {
+                    backgroundImage: `linear-gradient(140deg, rgba(15,23,42,0.1) 0%, rgba(15,23,42,0.36) 100%), url(${notice.imageUrl})`,
+                  }
+                : {
+                    background: imagePreset.gradient,
+                  };
 
               return (
                 <article key={notice.id} className="group">
@@ -547,107 +546,60 @@ export default function Notice() {
                         : 'border border-slate-200 shadow-sm hover:shadow-md'
                     }`}
                   >
-                    <div
-                      role="img"
-                      aria-label={imagePreset.alt}
-                      className="relative aspect-video w-full overflow-hidden bg-center bg-no-repeat xl:w-72 xl:flex-shrink-0"
-                      style={{ background: imagePreset.gradient }}
-                    >
-                      <div className="flex h-full w-full items-end bg-black/5 p-4">
-                        <span className="text-4xl drop-shadow-sm" aria-hidden="true">
-                          {imagePreset.symbol}
-                        </span>
-                      </div>
-
-                      {notice.pinned && (
-                        <div className="absolute left-4 top-4">
-                          <span className="flex items-center gap-1 rounded bg-amber-300 px-2 py-1 text-[10px] font-black uppercase text-slate-900 shadow-sm">
-                            <span aria-hidden="true" className="text-[11px]">
-                              📌
+                    <div className="flex items-center justify-center border-r border-gray-300">
+                      <div
+                        role="img"
+                        aria-label={imagePreset.alt}
+                        className="relative w-full min-h-[282px] overflow-hidden bg-center bg-cover bg-no-repeat xl:w-[282px] xl:min-w-[282px] xl:flex-shrink-0 xl:self-center"
+                        style={imageStyle}
+                      >
+                        {notice.pinned && (
+                          <div className="absolute left-4 top-4">
+                            <span className="flex items-center gap-1 rounded bg-amber-300 px-1 py-1 text-[10px] font-black uppercase text-slate-900 shadow-sm">
+                              <AiTwotonePushpin size="20px" color="white" />
                             </span>
-                            Pinned
-                          </span>
-                        </div>
-                      )}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex flex-1 flex-col justify-between p-6">
                       <div className="flex flex-col gap-3">
                         <div className="flex items-start justify-between gap-4">
-                          <h3 className="text-xl font-bold leading-tight text-slate-900 transition-colors group-hover:text-blue-700">
+                          <h3 className="text-xl font-bold leading-tight text-slate-900 transition-colors">
                             {notice.title}
                           </h3>
 
                           {canManageNotices && (
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                title="Edit"
-                                aria-label="Edit notice"
-                                onClick={() => handleOpenEditDialog(notice)}
-                                className="flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-blue-100 hover:text-blue-700"
-                              >
-                                <span aria-hidden="true" className="text-base">
-                                  ✎
-                                </span>
-                              </button>
-
-                              <button
-                                type="button"
-                                title="Delete"
-                                aria-label="Delete notice"
-                                disabled={deletingNoticeId === notice.id}
-                                onClick={() => void handleDeleteNotice(notice.id)}
-                                className="flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-red-100 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                <span aria-hidden="true" className="text-base">
-                                  {deletingNoticeId === notice.id ? '…' : '🗑'}
-                                </span>
-                              </button>
-                            </div>
+                            <EditDeleteButton
+                              onEditClick={() => handleOpenEditDialog(notice)}
+                              onDeleteClick={() => {
+                                void handleDeleteNotice(notice.id);
+                              }}
+                              isDeleting={deletingNoticeId === notice.id}
+                            />
                           )}
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-500">
-                          <span aria-hidden="true">👤</span>
+                          <span aria-hidden="true">
+                            <IoPersonCircleSharp size="20px" />
+                          </span>
                           <span>Posted by {notice.createUser}</span>
                           <span className="mx-1">•</span>
-                          <span aria-hidden="true">⏱</span>
+                          <span aria-hidden="true">
+                            <FaClock size="16px" />
+                          </span>
                           <span>{formatRelativeTime(notice.createDate)}</span>
                         </div>
 
-                        <ul className="space-y-2 text-sm text-slate-600">
-                          {(previewLines.length > 0 ? previewLines : ['내용이 없습니다.']).map((line, lineIndex) => (
-                            <li key={`${notice.id}-line-${lineIndex}`} className="flex items-start gap-2">
-                              <span className="mt-1 text-amber-500" aria-hidden="true">
-                                •
-                              </span>
-                              <span>{line}</span>
-                            </li>
-                          ))}
-                        </ul>
-
-                        {notice.content.trim().length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => toggleNoticeExpand(notice.id)}
-                            className="w-fit text-sm font-semibold text-blue-700 transition-colors hover:text-blue-800"
-                            aria-expanded={isExpanded}
-                          >
-                            {isExpanded ? 'Hide full notice' : 'Read full notice'}
-                          </button>
-                        )}
-
-                        {isExpanded && (
-                          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                            <p className="whitespace-pre-wrap">{notice.content}</p>
-                          </div>
-                        )}
-
-                        <p className="text-xs font-medium text-slate-400">
-                          Updated: {notice.updateUser} · {formatDateTime(notice.updateDate)}
-                        </p>
+                        <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 min-h-[122px]">
+                          <p className="whitespace-pre-wrap">{notice.content}</p>
+                        </div>
                       </div>
+                      <p className="text-xs font-medium text-slate-400 mt-4">
+                        Updated by {notice.updateUser} · {formatDateTime(notice.updateDate)}
+                      </p>
                     </div>
                   </div>
                 </article>
@@ -670,97 +622,51 @@ export default function Notice() {
         )}
       </div>
 
-      <Dialog open={openAddDialog} onClose={handleCloseAddDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Add Notice</DialogTitle>
-        <DialogContent>
-          <TextField
-            margin="dense"
-            label="Title"
-            name="title"
-            fullWidth
-            value={newNotice.title}
-            onChange={handleChangeNewNotice}
-          />
-          <TextField
-            margin="dense"
-            label="Content"
-            name="content"
-            fullWidth
-            multiline
-            minRows={5}
-            value={newNotice.content}
-            onChange={handleChangeNewNotice}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={newNotice.pinned}
-                onChange={(event) =>
-                  setNewNotice((previous) => ({
-                    ...previous,
-                    pinned: event.target.checked,
-                  }))
-                }
-              />
-            }
-            label="Pinned"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseAddDialog} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button onClick={handleCreateNotice} variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <NoticeDetailModal
+        type="ADD"
+        open={openAddDialog}
+        handleClose={handleCloseAddDialog}
+        title="공지사항 등록"
+        actions={addNoticeActions}
+        form={newNotice}
+        isSubmitting={isSubmitting}
+        onFormChange={handleChangeNewNotice}
+        onImageUrlsChange={(value) => {
+          setNewNotice((previous) => ({
+            ...previous,
+            imageUrl: value[0] ?? '',
+          }));
+        }}
+        onPinnedChange={(checked) => {
+          setNewNotice((previous) => ({
+            ...previous,
+            pinned: checked,
+          }));
+        }}
+      />
 
-      <Dialog open={openEditDialog} onClose={handleCloseEditDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Edit Notice</DialogTitle>
-        <DialogContent>
-          <TextField
-            margin="dense"
-            label="Title"
-            name="title"
-            fullWidth
-            value={editNotice.title}
-            onChange={handleChangeEditNotice}
-          />
-          <TextField
-            margin="dense"
-            label="Content"
-            name="content"
-            fullWidth
-            multiline
-            minRows={5}
-            value={editNotice.content}
-            onChange={handleChangeEditNotice}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={editNotice.pinned}
-                onChange={(event) =>
-                  setEditNotice((previous) => ({
-                    ...previous,
-                    pinned: event.target.checked,
-                  }))
-                }
-              />
-            }
-            label="Pinned"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseEditDialog} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button onClick={handleUpdateNotice} variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? 'Updating...' : 'Update'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <NoticeDetailModal
+        type="EDIT"
+        open={openEditDialog}
+        handleClose={handleCloseEditDialog}
+        title="공지사항 수정"
+        actions={editNoticeActions}
+        form={editNotice}
+        isSubmitting={isSubmitting}
+        onFormChange={handleChangeEditNotice}
+        onImageUrlsChange={(value) => {
+          setEditNotice((previous) => ({
+            ...previous,
+            imageUrl: value[0] ?? '',
+          }));
+        }}
+        onPinnedChange={(checked) => {
+          setEditNotice((previous) => ({
+            ...previous,
+            pinned: checked,
+          }));
+        }}
+      />
     </main>
   );
 }

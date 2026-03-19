@@ -6,6 +6,7 @@ export interface BoardRow {
   createDate: Date;
   updateUser: string;
   updateDate: Date;
+  imageUrl: string[];
   content: string;
   pinned: boolean | number;
 }
@@ -18,18 +19,21 @@ export interface Board {
   createDate: Date;
   updateUser: string;
   updateDate: Date;
+  imageUrl: string[];
   content: string;
   pinned: boolean;
 }
 
 export interface CreateBoardDTO {
   title?: string;
+  imageUrl?: unknown;
   content?: string;
   pinned?: unknown;
 }
 
 export interface UpdateBoardDTO {
   title?: string;
+  imageUrl?: unknown;
   content?: string;
   pinned?: unknown;
 }
@@ -37,6 +41,7 @@ export interface UpdateBoardDTO {
 export interface BoardMutationPayload {
   authorId: number;
   title: string;
+  imageUrl: string[];
   content: string;
   pinned: boolean;
   auditUser: string;

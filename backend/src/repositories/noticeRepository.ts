@@ -17,6 +17,7 @@ class NoticeRepository {
             "updateUser" VARCHAR(100) NOT NULL,
             "updateDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             content TEXT NOT NULL,
+            "imageUrl" TEXT,
             pinned BOOLEAN NOT NULL DEFAULT FALSE
           )
         `);
@@ -30,9 +31,13 @@ class NoticeRepository {
             "updateUser" VARCHAR(100) NOT NULL,
             "updateDate" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             content TEXT NOT NULL,
+            "imageUrl" TEXT,
             pinned BOOLEAN NOT NULL DEFAULT FALSE
           )
         `);
+
+        await pool.query('ALTER TABLE notice ADD COLUMN IF NOT EXISTS "imageUrl" TEXT');
+        await pool.query('ALTER TABLE test_notice ADD COLUMN IF NOT EXISTS "imageUrl" TEXT');
 
         await pool.query(`
           CREATE OR REPLACE FUNCTION update_notice_updated_at()
@@ -75,7 +80,7 @@ class NoticeRepository {
   async findAll(scope: DataScope) {
     const tableName = getScopedTableNames(scope).notice;
     const result = await pool.query<NoticeRow>(
-      `SELECT id, title, "createUser", "createDate", "updateUser", "updateDate", content, pinned FROM ${tableName} ORDER BY pinned DESC, "createDate" DESC`,
+      `SELECT id, title, "createUser", "createDate", "updateUser", "updateDate", content, "imageUrl", pinned FROM ${tableName} ORDER BY pinned DESC, "createDate" DESC`,
     );
     return result.rows;
   }
@@ -83,16 +88,16 @@ class NoticeRepository {
   async create(scope: DataScope, payload: NoticeMutationPayload) {
     const tableName = getScopedTableNames(scope).notice;
     await pool.query(
-      `INSERT INTO ${tableName} (title, "createUser", "updateUser", content, pinned) VALUES ($1, $2, $3, $4, $5)`,
-      [payload.title, payload.auditUser, payload.auditUser, payload.content, payload.pinned],
+      `INSERT INTO ${tableName} (title, "createUser", "updateUser", content, pinned, "imageUrl") VALUES ($1, $2, $3, $4, $5, $6)`,
+      [payload.title, payload.auditUser, payload.auditUser, payload.content, payload.pinned, payload.imageUrl],
     );
   }
 
   async updateById(scope: DataScope, noticeId: number, payload: NoticeMutationPayload) {
     const tableName = getScopedTableNames(scope).notice;
     const result = await pool.query(
-      `UPDATE ${tableName} SET title = $1, "updateUser" = $2, content = $3, pinned = $4 WHERE id = $5`,
-      [payload.title, payload.auditUser, payload.content, payload.pinned, noticeId],
+      `UPDATE ${tableName} SET title = $1, "updateUser" = $2, content = $3, pinned = $4, "imageUrl" = $5 WHERE id = $6`,
+      [payload.title, payload.auditUser, payload.content, payload.pinned, payload.imageUrl, noticeId],
     );
     return result.rowCount ?? 0;
   }

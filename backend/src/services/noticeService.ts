@@ -9,6 +9,8 @@ import {
 import { type AuthenticatedUser } from '../types/common.types.js';
 import { resolveDataScopeByUser } from '../utils/dataScope.js';
 
+const MAX_INLINE_IMAGE_CHARS = 5_000_000;
+
 const parseNoticeId = (rawNoticeId?: string) => {
   const noticeId = Number(rawNoticeId);
   if (!Number.isInteger(noticeId) || noticeId <= 0) {
@@ -86,14 +88,23 @@ const normalizeNoticeMutationPayload = (
   authenticatedUser: AuthenticatedUser,
 ): NoticeMutationPayload => {
   const title = typeof payload.title === 'string' ? payload.title.trim() : '';
+  const imageUrl =
+    typeof payload.imageUrl === 'string' && payload.imageUrl.trim().length > 0
+      ? payload.imageUrl.trim()
+      : null;
   const content = typeof payload.content === 'string' ? payload.content.trim() : '';
 
   if (!title || !content) {
     throw new HttpError(400, '제목과 내용을 모두 입력해주세요.');
   }
 
+  if (imageUrl && imageUrl.length > MAX_INLINE_IMAGE_CHARS) {
+    throw new HttpError(400, '공지사항 이미지는 5MB 이하 문자열 데이터만 저장할 수 있습니다.');
+  }
+
   return {
     title,
+    imageUrl,
     content,
     pinned: parsePinned(payload.pinned, false),
     auditUser: resolveAuditUser(authenticatedUser),
@@ -106,6 +117,7 @@ class NoticeService {
     const rows = await noticeRepository.findAll(scope);
     return rows.map((row) => ({
       ...row,
+      imageUrl: typeof row.imageUrl === 'string' && row.imageUrl.trim().length > 0 ? row.imageUrl.trim() : null,
       pinned: Boolean(row.pinned),
     }));
   }

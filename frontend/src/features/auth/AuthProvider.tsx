@@ -15,6 +15,7 @@ const parseMeInfo = (payload: unknown): MeInfo | null => {
   const email = (payload as { email?: unknown }).email;
   const rawIsAdmin = (payload as { isAdmin?: unknown }).isAdmin;
   const rawIsTest = (payload as { isTest?: unknown }).isTest;
+  const rawProfileImage = (payload as { profileImage?: unknown }).profileImage;
 
   const normalizedIsAdmin =
     typeof rawIsAdmin === 'boolean'
@@ -36,6 +37,11 @@ const parseMeInfo = (payload: unknown): MeInfo | null => {
             ? false
             : null;
 
+  const normalizedProfileImage =
+    typeof rawProfileImage === 'string' && rawProfileImage.trim().length > 0
+      ? rawProfileImage.trim()
+      : null;
+
   if (
     typeof id !== 'number' ||
     typeof name !== 'string' ||
@@ -50,6 +56,7 @@ const parseMeInfo = (payload: unknown): MeInfo | null => {
     id,
     name,
     email,
+    profileImage: normalizedProfileImage,
     isAdmin: normalizedIsAdmin,
     isTest: normalizedIsTest,
   };

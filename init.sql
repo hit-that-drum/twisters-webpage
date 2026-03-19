@@ -44,7 +44,11 @@ DROP TABLE IF EXISTS public.user_sessions;
 DROP TABLE IF EXISTS public.settlement;
 DROP TABLE IF EXISTS public.password_reset_tokens;
 DROP TABLE IF EXISTS public.notice;
+DROP TABLE IF EXISTS public.board_comments;
+DROP TABLE IF EXISTS public.board;
 DROP TABLE IF EXISTS public.members;
+DROP FUNCTION IF EXISTS public.update_board_comment_updated_at();
+DROP FUNCTION IF EXISTS public.update_board_updated_at();
 DROP FUNCTION IF EXISTS public.update_notice_updated_at();
 --
 -- Name: update_notice_updated_at(); Type: FUNCTION; Schema: public; Owner: -
@@ -55,6 +59,22 @@ CREATE FUNCTION public.update_notice_updated_at() RETURNS trigger
     AS $$
 BEGIN
   NEW."updateDate" = NOW();
+  RETURN NEW;
+END;
+$$;
+CREATE FUNCTION public.update_board_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  NEW."updateDate" = NOW();
+  RETURN NEW;
+END;
+$$;
+CREATE FUNCTION public.update_board_comment_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  NEW."updatedAt" = NOW();
   RETURN NEW;
 END;
 $$;
@@ -109,7 +129,29 @@ CREATE TABLE public.notice (
     "updateUser" character varying(100) NOT NULL,
     "updateDate" timestamp with time zone DEFAULT now() NOT NULL,
     content text NOT NULL,
+    "imageUrl" text,
     pinned boolean DEFAULT false NOT NULL
+);
+CREATE TABLE public.board (
+    id integer NOT NULL,
+    "authorId" integer,
+    title character varying(255) NOT NULL,
+    "createUser" character varying(100) NOT NULL,
+    "createDate" timestamp with time zone DEFAULT now() NOT NULL,
+    "updateUser" character varying(100) NOT NULL,
+    "updateDate" timestamp with time zone DEFAULT now() NOT NULL,
+    "imageUrl" text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    content text NOT NULL,
+    pinned boolean DEFAULT false NOT NULL
+);
+CREATE TABLE public.board_comments (
+    id integer NOT NULL,
+    "boardId" integer NOT NULL,
+    "authorId" integer,
+    "authorName" character varying(100) NOT NULL,
+    content text NOT NULL,
+    "createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+    "updatedAt" timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -119,6 +161,22 @@ CREATE TABLE public.notice (
 
 ALTER TABLE public.notice ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME public.notice_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+ALTER TABLE public.board ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.board_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+ALTER TABLE public.board_comments ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.board_comments_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -225,7 +283,7 @@ CREATE TABLE public.users (
     password character varying(255),
     google_id character varying(255),
     kakao_id character varying(255),
-    "profileImage" character varying(512),
+    "profileImage" text,
     "isAdmin" boolean DEFAULT false NOT NULL,
     "isAllowed" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp with time zone DEFAULT now() NOT NULL

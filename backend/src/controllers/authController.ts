@@ -10,6 +10,7 @@ import {
   type RequestResetDTO,
   type ResetPasswordDTO,
   type SignUpDTO,
+  type UpdateProfileImageDTO,
   type VerifyResetTokenDTO,
 } from '../types/auth.types.js';
 import { handleControllerError } from '../utils/controllerErrorHandler.js';
@@ -65,6 +66,22 @@ export const getMe = async (req: Request, res: Response) => {
     return res.json(me);
   } catch (error) {
     return handleControllerError(res, error, '데이터베이스 조회 중 오류가 발생했습니다.', 'DB 조회 에러');
+  }
+};
+
+export const updateProfileImage = async (req: Request, res: Response) => {
+  try {
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const payload = req.body as UpdateProfileImageDTO;
+    const result = await authService.updateProfileImage(authenticatedUser, payload);
+    return res.json(result);
+  } catch (error) {
+    return handleControllerError(
+      res,
+      error,
+      '프로필 이미지 저장 중 오류가 발생했습니다.',
+      'Profile image update error',
+    );
   }
 };
 

@@ -2,6 +2,7 @@ export interface MeInfo {
   id: number;
   name: string;
   email: string;
+  profileImage: string | null;
   isAdmin: boolean;
   isTest: boolean;
 }

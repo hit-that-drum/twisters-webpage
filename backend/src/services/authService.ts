@@ -20,6 +20,7 @@ import {
   type RequestResetDTO,
   type ResetPasswordDTO,
   type SignUpDTO,
+  type UpdateProfileImageDTO,
   type VerifyResetTokenDTO,
 } from '../types/auth.types.js';
 
@@ -333,8 +334,37 @@ class AuthService {
       id: me.id,
       name: me.name,
       email: me.email,
+      profileImage:
+        typeof me.profileImage === 'string' && me.profileImage.trim().length > 0
+          ? me.profileImage.trim()
+          : null,
       isAdmin: Boolean(me.isAdmin),
       isTest: normalizeBoolean(me.isTest, false),
+    };
+  }
+
+  async updateProfileImage(
+    authenticatedUser: AuthenticatedUser | undefined,
+    payload: UpdateProfileImageDTO,
+  ) {
+    const currentUser = requireAuthenticatedUser(authenticatedUser);
+    const profileImage =
+      typeof payload.profileImage === 'string' && payload.profileImage.trim().length > 0
+        ? payload.profileImage.trim()
+        : null;
+
+    if (profileImage && profileImage.length > 5_000_000) {
+      throw new HttpError(400, '프로필 이미지는 5MB 이하 문자열 데이터만 저장할 수 있습니다.');
+    }
+
+    const updated = await authRepository.updateProfileImageByUserId(currentUser.id, profileImage);
+    if (!updated) {
+      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
+    }
+
+    return {
+      message: '프로필 이미지가 저장되었습니다.',
+      profileImage,
     };
   }
 
