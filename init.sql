@@ -286,6 +286,7 @@ CREATE TABLE public.users (
     "profileImage" text,
     "isAdmin" boolean DEFAULT false NOT NULL,
     "isAllowed" boolean DEFAULT false NOT NULL,
+    "isTest" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -421,8 +422,10 @@ INSERT INTO public.user_sessions (id, user_id, refresh_token_hash, remember_me, 
 -- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-INSERT INTO public.users (id, name, email, password, google_id, "isAdmin", "isAllowed", "createdAt") OVERRIDING SYSTEM VALUE VALUES (1, 'HYE', 'hyeyoungkim3530@gmail.com', '$2b$10$IUXITc0rnVK6mT9IfuW.m.ySSkMKnUuKdBlgY/LjX/y/nyWfn60OK', NULL, true, true, '2026-02-14 04:27:51.063878+00');
-INSERT INTO public.users (id, name, email, password, google_id, "isAdmin", "isAllowed", "createdAt") OVERRIDING SYSTEM VALUE VALUES (2, '얍얍', 'velvetrevelvet91@gmail.com', '$2b$10$BfTFcvkSzk0rZPqzR.KQMepM5vRwsiN.1KbMI33THjfoyqwbubB0.', NULL, false, true, '2026-02-14 04:30:24.581582+00');
+INSERT INTO public.users (id, name, email, password, google_id, "isAdmin", "isAllowed", "isTest", "createdAt") OVERRIDING SYSTEM VALUE VALUES (1, 'HYE', 'hyeyoungkim3530@gmail.com', '$2b$10$IUXITc0rnVK6mT9IfuW.m.ySSkMKnUuKdBlgY/LjX/y/nyWfn60OK', NULL, true, true, false, '2026-02-14 04:27:51.063878+00');
+INSERT INTO public.users (id, name, email, password, google_id, "isAdmin", "isAllowed", "isTest", "createdAt") OVERRIDING SYSTEM VALUE VALUES (2, '얍얍', 'velvetrevelvet91@gmail.com', '$2b$10$BfTFcvkSzk0rZPqzR.KQMepM5vRwsiN.1KbMI33THjfoyqwbubB0.', NULL, false, true, false, '2026-02-14 04:30:24.581582+00');
+INSERT INTO public.users (id, name, email, password, google_id, "isAdmin", "isAllowed", "isTest", "createdAt") OVERRIDING SYSTEM VALUE VALUES (5, 'TEST_ADMIN', 'twistersAdmin@gmail.com', '$2b$10$gkUpYiUcmlw9mer.p6HZg.dnm0lzsMDZrZu1c0fnMliStBXW1c8FO', NULL, true, true, true, NOW());
+INSERT INTO public.users (id, name, email, password, google_id, "isAdmin", "isAllowed", "isTest", "createdAt") OVERRIDING SYSTEM VALUE VALUES (6, 'TEST_MEMBER', 'twistersMember@gmail.com', '$2b$10$IDdvxRaZMvH9qZ2aDYBlRel1KNXcfb9Y3LWkqySIHDEZqMtlv.Pe6', NULL, false, true, true, NOW());
 
 
 --

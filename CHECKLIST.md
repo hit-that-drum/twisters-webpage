@@ -197,4 +197,5 @@
   - ✅ 사용자 삭제 기능 개발
   - ✅ 사용자 정보 수정 기능 개발
 - **(2026.03.23)**
-- ✅ TEST_ADMIN 계정일 때 test_member 계정에서 member query 해오기
+  - ✅ TEST_ADMIN 계정일 때 test_member 계정에서 member query 해오기
+  - ✅ TEST 계정 init.sql에 정보 넣기 
