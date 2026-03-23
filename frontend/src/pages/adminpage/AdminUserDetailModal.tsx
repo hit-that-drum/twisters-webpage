@@ -29,6 +29,9 @@ interface AdminUserDetailModalProps {
   initialForm: AdminUserFormState;
   isSubmitting?: boolean;
   disablePrivilegeControls?: boolean;
+  disableRoleControl?: boolean;
+  disableStatusControl?: boolean;
+  emailOptional?: boolean;
   userName?: string;
   joinedLabel?: string;
   onFormChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
@@ -39,6 +42,9 @@ function AdminUserDetailForm({
   initialForm,
   isSubmitting = false,
   disablePrivilegeControls = false,
+  disableRoleControl = false,
+  disableStatusControl = false,
+  emailOptional = false,
   userName,
   joinedLabel,
   onFormChange,
@@ -48,6 +54,9 @@ function AdminUserDetailForm({
   | 'initialForm'
   | 'isSubmitting'
   | 'disablePrivilegeControls'
+  | 'disableRoleControl'
+  | 'disableStatusControl'
+  | 'emailOptional'
   | 'userName'
   | 'joinedLabel'
   | 'onFormChange'
@@ -59,12 +68,14 @@ function AdminUserDetailForm({
 
   const hasNameChange = trimmedName !== initialName;
   const hasEmailChange = trimmedEmail !== initialEmail;
-  const hasRoleChange = form.role !== initialForm.role;
+  const hasRoleChange = !disableRoleControl && form.role !== initialForm.role;
   const hasStatusChange = form.status !== initialForm.status;
-  const hasAccessChange = hasRoleChange || hasStatusChange;
+  const hasAccessChange = hasRoleChange || (!disableStatusControl && hasStatusChange);
 
   const isNameInvalid = trimmedName.length === 0;
-  const isEmailInvalid = trimmedEmail.length === 0 || !isValidEmail(trimmedEmail);
+  const isEmailInvalid = emailOptional
+    ? trimmedEmail.length > 0 && !isValidEmail(trimmedEmail)
+    : trimmedEmail.length === 0 || !isValidEmail(trimmedEmail);
 
   return (
     <div className="flex flex-col gap-1 pt-1">
@@ -72,7 +83,9 @@ function AdminUserDetailForm({
         <p className="font-semibold text-slate-900">{userName || 'Selected user'}</p>
         {joinedLabel ? <p className="mt-1">Joined {joinedLabel}</p> : null}
         <p className="mt-2 text-xs leading-5 text-slate-500">
-          Name and email update profile details. Role and status control admin access and sign-in availability.
+          {disableStatusControl
+            ? 'Name and email update the selected test-member record. Test-member role and status do not control app sign-in authority here.'
+            : 'Name and email update profile details. Role and status control admin access and sign-in availability.'}
         </p>
       </div>
 
@@ -133,10 +146,16 @@ function AdminUserDetailForm({
         error={isEmailInvalid}
         helperText={
           isEmailInvalid
-            ? 'Enter a valid email address for sign-in and password reset.'
+            ? emailOptional
+              ? 'Enter a valid email address or leave it blank for a member record without email.'
+              : 'Enter a valid email address for sign-in and password reset.'
             : hasEmailChange
-              ? 'The new email becomes the user\'s sign-in address after save.'
-              : 'Used for sign-in, approval tracking, and password reset.'
+              ? emailOptional
+                ? 'The updated email is saved to the test member record after save.'
+                : 'The new email becomes the user\'s sign-in address after save.'
+              : emailOptional
+                ? 'Optional for test member records. Leave blank if no email should be stored.'
+                : 'Used for sign-in, approval tracking, and password reset.'
         }
       />
       <TextField
@@ -147,9 +166,11 @@ function AdminUserDetailForm({
         fullWidth
         value={form.role}
         onChange={onFormChange}
-        disabled={isSubmitting || disablePrivilegeControls}
+        disabled={isSubmitting || disablePrivilegeControls || disableRoleControl}
         helperText={
-          disablePrivilegeControls
+          disableRoleControl
+            ? 'Test member records do not control real admin authority in this view.'
+            : disablePrivilegeControls
             ? 'Your current admin role cannot be changed from this modal.'
             : hasRoleChange
               ? `This user will switch to ${formatRoleLabel(form.role)} permissions after save.`
@@ -167,9 +188,11 @@ function AdminUserDetailForm({
         fullWidth
         value={form.status}
         onChange={onFormChange}
-        disabled={isSubmitting || disablePrivilegeControls}
+        disabled={isSubmitting || disablePrivilegeControls || disableStatusControl}
         helperText={
-          disablePrivilegeControls
+          disableStatusControl
+            ? 'Test member records do not have a separate account status in this admin view.'
+            : disablePrivilegeControls
             ? 'Your current admin access state cannot be changed from this modal.'
             : hasStatusChange
               ? form.status === 'inactive'
@@ -194,6 +217,9 @@ export default function AdminUserDetailModal({
   initialForm,
   isSubmitting,
   disablePrivilegeControls,
+  disableRoleControl,
+  disableStatusControl,
+  emailOptional,
   userName,
   joinedLabel,
   onFormChange,
@@ -205,6 +231,9 @@ export default function AdminUserDetailModal({
         initialForm={initialForm}
         isSubmitting={isSubmitting}
         disablePrivilegeControls={disablePrivilegeControls}
+        disableRoleControl={disableRoleControl}
+        disableStatusControl={disableStatusControl}
+        emailOptional={emailOptional}
         userName={userName}
         joinedLabel={joinedLabel}
         onFormChange={onFormChange}

@@ -196,5 +196,5 @@
   - ✅ 회원가입 승인 버튼만 있고 거절 버튼은 없어서 "DECLINE" 버튼 추가
   - ✅ 사용자 삭제 기능 개발
   - ✅ 사용자 정보 수정 기능 개발
-
-- ☑️✅ TEST_ADMIN 계정일 때 test_member 계정에서 member query 해오기
+- **(2026.03.23)**
+- ✅ TEST_ADMIN 계정일 때 test_member 계정에서 member query 해오기

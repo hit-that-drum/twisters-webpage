@@ -176,9 +176,10 @@ export const logout = async (req: Request, res: Response) => {
   }
 };
 
-export const getPendingUsers = async (_req: Request, res: Response) => {
+export const getPendingUsers = async (req: Request, res: Response) => {
   try {
-    const pendingUsers = await authService.getPendingUsers();
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const pendingUsers = await authService.getPendingUsers(authenticatedUser);
     return res.json(pendingUsers);
   } catch (error) {
     return handleControllerError(
@@ -190,9 +191,10 @@ export const getPendingUsers = async (_req: Request, res: Response) => {
   }
 };
 
-export const getAdminUsers = async (_req: Request, res: Response) => {
+export const getAdminUsers = async (req: Request, res: Response) => {
   try {
-    const users = await authService.getAdminUsers();
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const users = await authService.getAdminUsers(authenticatedUser);
     return res.json(users);
   } catch (error) {
     return handleControllerError(
@@ -206,7 +208,8 @@ export const getAdminUsers = async (_req: Request, res: Response) => {
 
 export const approveUser = async (req: Request, res: Response) => {
   try {
-    const result = await authService.approveUser(req.params.id);
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const result = await authService.approveUser(authenticatedUser, req.params.id);
     return res.json(result);
   } catch (error) {
     return handleControllerError(res, error, '사용자 승인 처리 중 오류가 발생했습니다.', 'User approve error');
@@ -215,7 +218,8 @@ export const approveUser = async (req: Request, res: Response) => {
 
 export const declineUser = async (req: Request, res: Response) => {
   try {
-    const result = await authService.declineUser(req.params.id);
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const result = await authService.declineUser(authenticatedUser, req.params.id);
     return res.json(result);
   } catch (error) {
     return handleControllerError(res, error, '사용자 거절 처리 중 오류가 발생했습니다.', 'User decline error');

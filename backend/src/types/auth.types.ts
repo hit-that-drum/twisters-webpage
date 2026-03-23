@@ -63,11 +63,15 @@ export interface PendingUserRow {
 
 export interface UserApprovalRow {
   id: number;
+  name: string;
+  isTest: boolean | number;
   isAllowed: boolean | number;
 }
 
 export interface ManagedUserRow {
   id: number;
+  name: string;
+  isTest: boolean | number;
   isAdmin: boolean | number;
   isAllowed: boolean | number;
 }

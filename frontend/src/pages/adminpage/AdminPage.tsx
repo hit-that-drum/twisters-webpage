@@ -22,6 +22,11 @@ interface AdminUserRecord {
   isAdmin: boolean;
   isAllowed: boolean;
   createdAt: string;
+  phone?: string | null;
+  roleDetail?: string | null;
+  department?: string | null;
+  joinedAt?: string | null;
+  bio?: string | null;
 }
 
 type UserStatusFilter = 'all' | 'active' | 'inactive';
@@ -576,10 +581,7 @@ export default function AdminPage() {
       setEditingUserId(null);
       setEditUserForm(EMPTY_ADMIN_USER_FORM);
 
-      await Promise.all([
-        loadUsers(),
-        meInfo?.id === editingUserId ? refreshMeInfo() : Promise.resolve(null),
-      ]);
+      await Promise.all([loadUsers(), meInfo?.id === editingUserId ? refreshMeInfo() : Promise.resolve(null)]);
     } catch (error) {
       console.error('User update error:', error);
       enqueueSnackbar('사용자 수정 중 오류가 발생했습니다.', { variant: 'error' });
@@ -1036,6 +1038,9 @@ export default function AdminPage() {
         initialForm={initialEditUserForm}
         isSubmitting={isSubmitting}
         disablePrivilegeControls={meInfo?.id === editingUserId}
+        disableRoleControl={false}
+        disableStatusControl={false}
+        emailOptional={false}
         userName={editingUser?.name}
         joinedLabel={editingUser ? formatJoinedDate(editingUser.createdAt) : undefined}
         onFormChange={handleEditFormChange}

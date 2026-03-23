@@ -131,6 +131,26 @@ const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 
 const isTestUserName = (name: string) => name.trim().startsWith('TEST');
 
+const isTestScopedAdmin = (authenticatedUser: AuthenticatedUser) => {
+  return (
+    normalizeBoolean(authenticatedUser.isAdmin, false) &&
+    (normalizeBoolean(authenticatedUser.isTest, false) || isTestUserName(authenticatedUser.name))
+  );
+};
+
+const isTestScopedUser = (user: { name: string; isTest: boolean | number }) => {
+  return normalizeBoolean(user.isTest, false) || isTestUserName(user.name);
+};
+
+const requireScopedAdminTarget = (
+  authenticatedUser: AuthenticatedUser,
+  targetUser: { name: string; isTest: boolean | number },
+) => {
+  if (isTestScopedAdmin(authenticatedUser) && !isTestScopedUser(targetUser)) {
+    throw new HttpError(403, 'TEST 관리자 계정은 TEST 사용자만 관리할 수 있습니다.');
+  }
+};
+
 const requirePasswordResetLookup = (
   lookup: {
     id: number;
@@ -600,12 +620,14 @@ class AuthService {
     return sessionAuthResponse;
   }
 
-  async getPendingUsers() {
-    return authRepository.findPendingUsers();
+  async getPendingUsers(authenticatedUser: AuthenticatedUser | undefined) {
+    const currentUser = requireAuthenticatedUser(authenticatedUser);
+    return authRepository.findPendingUsers(isTestScopedAdmin(currentUser));
   }
 
-  async getAdminUsers() {
-    const rows = await authRepository.findAllAdminUsers();
+  async getAdminUsers(authenticatedUser: AuthenticatedUser | undefined) {
+    const currentUser = requireAuthenticatedUser(authenticatedUser);
+    const rows = await authRepository.findAllAdminUsers(isTestScopedAdmin(currentUser));
 
     return rows.map((row) => ({
       id: row.id,
@@ -617,7 +639,8 @@ class AuthService {
     }));
   }
 
-  async approveUser(rawUserId: unknown) {
+  async approveUser(authenticatedUser: AuthenticatedUser | undefined, rawUserId: unknown) {
+    const currentUser = requireAuthenticatedUser(authenticatedUser);
     const userId = Number(rawUserId);
 
     if (!Number.isInteger(userId) || userId <= 0) {
@@ -628,6 +651,8 @@ class AuthService {
     if (!user) {
       throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
     }
+
+    requireScopedAdminTarget(currentUser, user);
 
     await authRepository.approveUserById(userId);
 
@@ -637,7 +662,8 @@ class AuthService {
     };
   }
 
-  async declineUser(rawUserId: unknown) {
+  async declineUser(authenticatedUser: AuthenticatedUser | undefined, rawUserId: unknown) {
+    const currentUser = requireAuthenticatedUser(authenticatedUser);
     const userId = Number(rawUserId);
 
     if (!Number.isInteger(userId) || userId <= 0) {
@@ -648,6 +674,8 @@ class AuthService {
     if (!user) {
       throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
     }
+
+    requireScopedAdminTarget(currentUser, user);
 
     if (normalizeBoolean(user.isAllowed, false)) {
       throw new HttpError(409, '이미 승인된 사용자는 거절할 수 없습니다.');
@@ -680,6 +708,8 @@ class AuthService {
     if (!user) {
       throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
     }
+
+    requireScopedAdminTarget(currentUser, user);
 
     const deleteResult = await authRepository.deleteManagedUserById(
       userId,
@@ -716,6 +746,8 @@ class AuthService {
     if (!user) {
       throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
     }
+
+    requireScopedAdminTarget(currentUser, user);
 
     const name = typeof payload.name === 'string' ? payload.name.trim() : '';
     const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';

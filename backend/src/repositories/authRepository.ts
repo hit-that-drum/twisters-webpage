@@ -143,30 +143,44 @@ class AuthRepository {
     return result.rows[0] ?? null;
   }
 
-  async findPendingUsers() {
+  async findPendingUsers(onlyTestUsers = false) {
     const result = await pool.query<PendingUserRow>(
-      'SELECT id, name, email, "createdAt" FROM users WHERE "isAllowed" = FALSE ORDER BY "createdAt" ASC, id ASC',
+      `
+        SELECT id, name, email, "createdAt"
+        FROM users
+        WHERE "isAllowed" = FALSE
+          AND ($1::boolean = FALSE OR ("isTest" = TRUE OR name ILIKE 'TEST%'))
+        ORDER BY "createdAt" ASC, id ASC
+      `,
+      [onlyTestUsers],
     );
     return result.rows;
   }
 
-  async findAllAdminUsers() {
+  async findAllAdminUsers(onlyTestUsers = false) {
     const result = await pool.query<AdminUserRow>(
-      'SELECT id, name, email, "isAdmin", "isAllowed", "createdAt" FROM users ORDER BY "createdAt" DESC, id DESC',
+      `
+        SELECT id, name, email, "isAdmin", "isAllowed", "createdAt"
+        FROM users
+        WHERE $1::boolean = FALSE OR ("isTest" = TRUE OR name ILIKE 'TEST%')
+        ORDER BY "createdAt" DESC, id DESC
+      `,
+      [onlyTestUsers],
     );
     return result.rows;
   }
 
   async findUserApprovalById(userId: number) {
-    const result = await pool.query<UserApprovalRow>('SELECT id, "isAllowed" FROM users WHERE id = $1 LIMIT 1', [
-      userId,
-    ]);
+    const result = await pool.query<UserApprovalRow>(
+      'SELECT id, name, "isTest", "isAllowed" FROM users WHERE id = $1 LIMIT 1',
+      [userId],
+    );
     return result.rows[0] ?? null;
   }
 
   async findManagedUserById(userId: number) {
     const result = await pool.query<ManagedUserRow>(
-      'SELECT id, "isAdmin", "isAllowed" FROM users WHERE id = $1 LIMIT 1',
+      'SELECT id, name, "isTest", "isAdmin", "isAllowed" FROM users WHERE id = $1 LIMIT 1',
       [userId],
     );
     return result.rows[0] ?? null;
