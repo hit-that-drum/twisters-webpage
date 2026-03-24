@@ -1,27 +1,18 @@
-import { useEffect } from 'react';
 import { Navigate, Outlet, useNavigate } from 'react-router-dom';
 import Footer from '@/common/components/Footer';
 import Header from '@/common/components/Header';
 import { useAuth } from '@/features';
-import { getAccessToken } from '@/common/lib/auth/authStorage';
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { meInfo, isAuthLoading, isAuthenticated, logout, refreshMeInfo } = useAuth();
-  const accessToken = getAccessToken();
-
-  useEffect(() => {
-    if (accessToken && !isAuthenticated) {
-      void refreshMeInfo();
-    }
-  }, [accessToken, isAuthenticated, refreshMeInfo]);
+  const { meInfo, isAuthLoading, isAuthenticated, logout } = useAuth();
 
   const handleLogout = () => {
     logout();
     navigate('/signin', { replace: true });
   };
 
-  if (isAuthLoading || (accessToken && !isAuthenticated)) {
+  if (isAuthLoading) {
     return (
       <div className="px-6 py-8">
         <p className="text-sm font-semibold tracking-wide text-gray-600">

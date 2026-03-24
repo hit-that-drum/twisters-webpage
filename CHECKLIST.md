@@ -17,11 +17,12 @@
 
   - ✅ 본문 최상단 카드 width fullscreen으로 수정
   - ✅ File Upload Component
+- **(2026.03.11)**
+  - ✅ 창 새로 켜도 로그인 상태 유지되게 상태관리
+  - ✅ E2E 테스트 도입
 
 - ☑️✅ ScreenLoader Component
 - ☑️✅ 404 Error page
-- ☑️✅ 창 새로 켜도 로그인 상태 유지되게 상태관리
-- ☑️✅ E2E 테스트 도입
 - ☑️✅ 마우스 포인터 귀엽게 만들기
 
 ---

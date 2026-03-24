@@ -5,12 +5,6 @@ import loginPageRightImage from '/login_page_right_image.png';
 import { Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import {
-  clearAccessToken,
-  getAccessToken,
-  setAccessToken,
-  setAuthTokens,
-} from '@/common/lib/auth/authStorage';
 import { useAuth } from '@/features';
 import { SiKakaotalk } from 'react-icons/si';
 
@@ -113,7 +107,7 @@ const getWrongPasswordAttempt = (email: string) => {
 
 export default function Login({ isLogin }: { isLogin: boolean }) {
   const navigate = useNavigate();
-  const { refreshMeInfo } = useAuth();
+  const { completeAuthSession, isAuthLoading, meInfo } = useAuth();
   const isGoogleOAuthEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
   const kakaoRestApiKey = import.meta.env.VITE_KAKAO_REST_API_KEY as string | undefined;
   const kakaoRedirectUri = import.meta.env.VITE_KAKAO_REDIRECT_URI as string | undefined;
@@ -252,11 +246,12 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
         }
 
         if (typeof data.token === 'string' && typeof data.refreshToken === 'string') {
-          setAuthTokens(data.token, data.refreshToken, true);
-          await refreshMeInfo();
-        } else if (typeof data.token === 'string') {
-          setAccessToken(data.token, true);
-          await refreshMeInfo();
+          const authenticatedUser = await completeAuthSession(data.token, data.refreshToken, true);
+          if (!authenticatedUser) {
+            enqueueSnackbar('카카오 로그인 세션을 복구하지 못했습니다.', { variant: 'error' });
+            navigate('/signin', { replace: true });
+            return;
+          }
         } else {
           enqueueSnackbar('카카오 로그인 성공 응답에 인증 토큰이 없습니다.', { variant: 'error' });
           navigate('/signin', { replace: true });
@@ -296,41 +291,26 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
       return;
     }
 
-    const autoSignIn = async () => {
-      const token = getAccessToken();
-      if (!token) {
-        return;
-      }
-
-      try {
-        const response = await apiFetch('/authentication/me');
-        if (!response.ok) {
-          clearAccessToken();
-          return;
-        }
-
-        const data = await response.json();
-        if (data?.id) {
-          navigate(`/${data.id}`, { replace: true });
-        }
-      } catch (error) {
-        console.error('Auto sign-in error:', error);
-      }
-    };
-
-    autoSignIn();
   }, [
+    completeAuthSession,
     isKakaoOAuthEnabled,
     kakaoCode,
     kakaoError,
     kakaoErrorDescription,
     kakaoState,
     navigate,
-    refreshMeInfo,
     resolvedKakaoRedirectUri,
     resetEmailFromLink,
     resetToken,
   ]);
+
+  useEffect(() => {
+    if (isAuthLoading || !meInfo?.id) {
+      return;
+    }
+
+    navigate(`/${meInfo.id}`, { replace: true });
+  }, [isAuthLoading, meInfo?.id, navigate]);
 
   useEffect(() => {
     if (!isLogin || !normalizedLoginEmail) {
@@ -492,11 +472,11 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
           }
 
           if (typeof data.token === 'string' && typeof data.refreshToken === 'string') {
-            setAuthTokens(data.token, data.refreshToken, true);
-            await refreshMeInfo();
-          } else if (typeof data.token === 'string') {
-            setAccessToken(data.token, true);
-            await refreshMeInfo();
+            const authenticatedUser = await completeAuthSession(data.token, data.refreshToken, true);
+            if (!authenticatedUser) {
+              enqueueSnackbar('회원가입 직후 세션을 복구하지 못했습니다.', { variant: 'error' });
+              return;
+            }
           } else {
             enqueueSnackbar('회원가입 성공 응답에 인증 토큰이 없습니다.', { variant: 'error' });
             return;
@@ -543,11 +523,18 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
           setWrongPasswordAttemptCount(0);
 
           if (typeof data.token === 'string' && typeof data.refreshToken === 'string') {
-            setAuthTokens(data.token, data.refreshToken, rememberFor30Days);
-            await refreshMeInfo();
-          } else if (typeof data.token === 'string') {
-            setAccessToken(data.token, rememberFor30Days);
-            await refreshMeInfo();
+            const authenticatedUser = await completeAuthSession(
+              data.token,
+              data.refreshToken,
+              rememberFor30Days,
+            );
+            if (!authenticatedUser) {
+              enqueueSnackbar('로그인 세션을 복구하지 못했습니다.', { variant: 'error' });
+              return;
+            }
+          } else {
+            enqueueSnackbar('로그인 성공 응답에 인증 토큰이 없습니다.', { variant: 'error' });
+            return;
           }
 
           const userIdx = data.user?.id ?? data.userId;
@@ -650,11 +637,11 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
       }
 
       if (typeof data.token === 'string' && typeof data.refreshToken === 'string') {
-        setAuthTokens(data.token, data.refreshToken, true);
-        await refreshMeInfo();
-      } else if (typeof data.token === 'string') {
-        setAccessToken(data.token, true);
-        await refreshMeInfo();
+        const authenticatedUser = await completeAuthSession(data.token, data.refreshToken, true);
+        if (!authenticatedUser) {
+          enqueueSnackbar('구글 로그인 세션을 복구하지 못했습니다.', { variant: 'error' });
+          return;
+        }
       } else {
         enqueueSnackbar('구글 로그인 성공 응답에 인증 토큰이 없습니다.', { variant: 'error' });
         return;

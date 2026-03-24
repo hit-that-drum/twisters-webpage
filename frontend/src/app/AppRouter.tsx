@@ -1,12 +1,11 @@
 import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from '@/app/AppLayout';
 import { useAuth } from '@/features';
-import { getAccessToken } from '@/common/lib/auth/authStorage';
 import { AdminPage, Board, Home, Login, Member, MyPage, Notice, Settlement } from '@/pages';
 import Flowchart from '@/pages/flowchart/Flowchart';
 
 function RootRedirect() {
-  const { meInfo, isAuthLoading } = useAuth();
+  const { hasAuthSession, meInfo, isAuthLoading } = useAuth();
 
   if (isAuthLoading) {
     return (
@@ -22,7 +21,7 @@ function RootRedirect() {
     return <Navigate to={`/${meInfo.id}`} replace />;
   }
 
-  return <Navigate to={getAccessToken() ? '/signin' : '/signup'} replace />;
+  return <Navigate to={hasAuthSession ? '/signin' : '/signup'} replace />;
 }
 
 export default function AppRouter() {

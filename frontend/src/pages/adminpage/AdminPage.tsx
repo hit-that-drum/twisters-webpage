@@ -433,7 +433,7 @@ export default function AdminPage() {
         setDecliningUserId(null);
       }
     },
-    [canManageUsers, handleExpiredSession, loadUsers],
+    [handleExpiredSession, loadUsers],
   );
 
   const handleOpenEditDialog = useCallback(
