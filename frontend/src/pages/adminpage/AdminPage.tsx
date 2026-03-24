@@ -23,10 +23,8 @@ interface AdminUserRecord {
   isAllowed: boolean;
   createdAt: string;
   phone?: string | null;
-  roleDetail?: string | null;
   department?: string | null;
   joinedAt?: string | null;
-  bio?: string | null;
 }
 
 type UserStatusFilter = 'all' | 'active' | 'inactive';
@@ -444,7 +442,7 @@ export default function AdminPage() {
       setEditUserForm(toAdminUserForm(user));
       setOpenEditDialog(true);
     },
-    [canManageUsers],
+    [],
   );
 
   const editingUser = useMemo(
@@ -647,7 +645,7 @@ export default function AdminPage() {
         setDeletingUserId(null);
       }
     },
-    [canManageUsers, handleExpiredSession, loadUsers, meInfo?.id],
+    [handleExpiredSession, loadUsers, meInfo?.id],
   );
 
   const sortedAllUsers = useMemo(

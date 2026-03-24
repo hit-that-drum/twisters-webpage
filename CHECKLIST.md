@@ -117,12 +117,12 @@
   - ✅ 테스트 유저일 때 test_member DB에서 쿼리해 와서 정보 보여주기
   - ✅ Stitch AI로 디자인 완료
 - **(2026.03.10)**
-
   - ✅ Global Modal로 변경
   - ✅ birthDate 필드 추가
+- **(2026.03.24)**
+  - ✅ member DB에서 role, description 컬럼 제거
+  - ✅ member DB에 birthDate 컬럼 추가
 
-- ☑️✅ member DB에서 role, description 컬럼 제거
-- ☑️✅ member DB에 birthDate 컬럼 추가
 - ☑️✅ JOINED AT에 대한 생각 필요. 내가 가입하는 모든 유저들이 멤버에 추가되는 게 아니라, 연결시킬려고 했었는데 이 부분에 대한 정확한 기획이 필요.
 - ☑️✅ 모임 참가 여부 2025년부터 체크해서 보여주는 필드 추가(근데 이걸 어디서 manage 해야 하지? 정산처럼 settlement에서 가져올 수는 없고 그냥 users의 컬럼에 넣거나 아니면... 어케야 하나 흠... 조금 더 생각이 필요함)
 

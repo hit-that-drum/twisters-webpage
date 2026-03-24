@@ -11,7 +11,6 @@ export interface MemberFormState {
   email: string;
   phone: string;
   birthDate: string;
-  bio: string;
 }
 
 interface MemberDetailModalProps {
@@ -92,18 +91,6 @@ function MemberDetailForm({
           }}
         />
       </LocalizationProvider>
-      <TextField
-        margin="dense"
-        label="BIO"
-        name="bio"
-        placeholder="자기소개를 입력해주세요"
-        fullWidth
-        multiline
-        minRows={4}
-        value={form.bio}
-        onChange={onFormChange}
-        disabled={isSubmitting}
-      />
     </div>
   );
 }

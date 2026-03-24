@@ -91,10 +91,9 @@ SET default_table_access_method = heap;
 CREATE TABLE public.members (
     id integer NOT NULL,
     phone character varying(30),
-    role character varying(100),
     department character varying(100),
     joined_at date,
-    bio text,
+    birth_date date,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     name character varying(100) NOT NULL,
@@ -309,18 +308,18 @@ ALTER TABLE public.users ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 -- Data for Name: members; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-INSERT INTO public.members (id, phone, role, department, joined_at, bio, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (5, NULL, NULL, NULL, NULL, NULL, '2026-02-16 09:34:01.755518+00', '2026-02-16 09:34:01.755518+00', '김혜영', NULL, false);
-INSERT INTO public.members (id, phone, role, department, joined_at, bio, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (6, NULL, NULL, NULL, NULL, NULL, '2026-02-16 09:34:09.459629+00', '2026-02-16 09:34:09.459629+00', '서예진', NULL, false);
-INSERT INTO public.members (id, phone, role, department, joined_at, bio, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (7, NULL, NULL, NULL, NULL, NULL, '2026-02-16 09:34:16.612317+00', '2026-02-16 09:34:16.612317+00', '박정수', NULL, false);
-INSERT INTO public.members (id, phone, role, department, joined_at, bio, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (8, NULL, NULL, NULL, NULL, NULL, '2026-02-16 09:34:22.230392+00', '2026-02-16 09:34:22.230392+00', '기재권', NULL, false);
-INSERT INTO public.members (id, phone, role, department, joined_at, bio, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (9, NULL, NULL, NULL, NULL, NULL, '2026-02-16 09:34:27.447674+00', '2026-02-16 09:34:27.447674+00', '정혁', NULL, false);
-INSERT INTO public.members (id, phone, role, department, joined_at, bio, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (10, NULL, NULL, NULL, NULL, NULL, '2026-02-16 09:34:33.389363+00', '2026-02-16 09:34:33.389363+00', '양동수', NULL, false);
-INSERT INTO public.members (id, phone, role, department, joined_at, bio, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (11, NULL, NULL, NULL, NULL, NULL, '2026-02-16 09:34:37.585784+00', '2026-02-16 09:34:37.585784+00', '정재근', NULL, false);
-INSERT INTO public.members (id, phone, role, department, joined_at, bio, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (12, NULL, NULL, NULL, NULL, NULL, '2026-02-16 09:34:42.28372+00', '2026-02-16 09:34:42.28372+00', '박성모', NULL, false);
-INSERT INTO public.members (id, phone, role, department, joined_at, bio, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (13, NULL, NULL, NULL, NULL, NULL, '2026-02-16 09:34:49.986108+00', '2026-02-16 09:34:49.986108+00', '이은실', NULL, false);
-INSERT INTO public.members (id, phone, role, department, joined_at, bio, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (14, NULL, NULL, NULL, NULL, NULL, '2026-02-16 09:34:54.087016+00', '2026-02-16 09:34:54.087016+00', '이정', NULL, false);
-INSERT INTO public.members (id, phone, role, department, joined_at, bio, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (15, NULL, NULL, NULL, NULL, NULL, '2026-02-16 09:34:59.976012+00', '2026-02-16 09:34:59.976012+00', '이재훈', NULL, false);
-INSERT INTO public.members (id, phone, role, department, joined_at, bio, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (16, NULL, NULL, NULL, NULL, NULL, '2026-02-16 09:35:49.761166+00', '2026-02-16 09:35:49.761166+00', '전충진', NULL, false);
+INSERT INTO public.members (id, phone, department, joined_at, birth_date, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (5, NULL, NULL, NULL, NULL, '2026-02-16 09:34:01.755518+00', '2026-02-16 09:34:01.755518+00', '김혜영', NULL, false);
+INSERT INTO public.members (id, phone, department, joined_at, birth_date, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (6, NULL, NULL, NULL, NULL, '2026-02-16 09:34:09.459629+00', '2026-02-16 09:34:09.459629+00', '서예진', NULL, false);
+INSERT INTO public.members (id, phone, department, joined_at, birth_date, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (7, NULL, NULL, NULL, NULL, '2026-02-16 09:34:16.612317+00', '2026-02-16 09:34:16.612317+00', '박정수', NULL, false);
+INSERT INTO public.members (id, phone, department, joined_at, birth_date, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (8, NULL, NULL, NULL, NULL, '2026-02-16 09:34:22.230392+00', '2026-02-16 09:34:22.230392+00', '기재권', NULL, false);
+INSERT INTO public.members (id, phone, department, joined_at, birth_date, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (9, NULL, NULL, NULL, NULL, '2026-02-16 09:34:27.447674+00', '2026-02-16 09:34:27.447674+00', '정혁', NULL, false);
+INSERT INTO public.members (id, phone, department, joined_at, birth_date, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (10, NULL, NULL, NULL, NULL, '2026-02-16 09:34:33.389363+00', '2026-02-16 09:34:33.389363+00', '양동수', NULL, false);
+INSERT INTO public.members (id, phone, department, joined_at, birth_date, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (11, NULL, NULL, NULL, NULL, '2026-02-16 09:34:37.585784+00', '2026-02-16 09:34:37.585784+00', '정재근', NULL, false);
+INSERT INTO public.members (id, phone, department, joined_at, birth_date, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (12, NULL, NULL, NULL, NULL, '2026-02-16 09:34:42.28372+00', '2026-02-16 09:34:42.28372+00', '박성모', NULL, false);
+INSERT INTO public.members (id, phone, department, joined_at, birth_date, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (13, NULL, NULL, NULL, NULL, '2026-02-16 09:34:49.986108+00', '2026-02-16 09:34:49.986108+00', '이은실', NULL, false);
+INSERT INTO public.members (id, phone, department, joined_at, birth_date, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (14, NULL, NULL, NULL, NULL, '2026-02-16 09:34:54.087016+00', '2026-02-16 09:34:54.087016+00', '이정', NULL, false);
+INSERT INTO public.members (id, phone, department, joined_at, birth_date, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (15, NULL, NULL, NULL, NULL, '2026-02-16 09:34:59.976012+00', '2026-02-16 09:34:59.976012+00', '이재훈', NULL, false);
+INSERT INTO public.members (id, phone, department, joined_at, birth_date, created_at, updated_at, name, email, is_admin) OVERRIDING SYSTEM VALUE VALUES (16, NULL, NULL, NULL, NULL, '2026-02-16 09:35:49.761166+00', '2026-02-16 09:35:49.761166+00', '전충진', NULL, false);
 
 
 --
@@ -554,13 +553,6 @@ CREATE INDEX idx_members_department ON public.members USING btree (department);
 --
 
 CREATE INDEX idx_members_email_lower ON public.members USING btree (lower((email)::text));
-
-
---
--- Name: idx_members_role; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_members_role ON public.members USING btree (role);
 
 
 --
