@@ -4,6 +4,7 @@ import { useAuth } from '@/features';
 import { AdminPage, Board, Home, Login, Member, MyPage, Notice, Settlement } from '@/pages';
 import Flowchart from '@/pages/flowchart/Flowchart';
 import LoadingComponent from '@/common/LoadingComponent.tsx';
+import NotFoundComponent from '@/common/NotFoundComponent.tsx';
 
 function RootRedirect() {
   const { hasAuthSession, meInfo, isAuthLoading } = useAuth();
@@ -43,6 +44,8 @@ export default function AppRouter() {
           <Route path="/flowchart" element={<Flowchart />} />
           <Route path="/admin" element={<AdminPage />} />
         </Route>
+
+        <Route path="*" element={<NotFoundComponent />} />
       </Routes>
     </Router>
   );

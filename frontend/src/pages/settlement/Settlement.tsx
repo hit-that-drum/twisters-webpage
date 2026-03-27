@@ -151,7 +151,6 @@ const toFormStateFromRecord = (record: SettlementRecord): SettlementFormState =>
 
 interface SettlementGridProps {
   rows: SettlementRecord[];
-  isLoading: boolean;
   canManageSettlements: boolean;
   deletingSettlementId: number | null;
   onOpenAddDialog: () => void;
@@ -174,7 +173,6 @@ interface SettlementGridProps {
 
 const SettlementGrid = memo(function SettlementGrid({
   rows,
-  isLoading,
   canManageSettlements,
   deletingSettlementId,
   onOpenAddDialog,
@@ -831,7 +829,6 @@ export default function Settlement() {
     <>
       <SettlementGrid
         rows={pagedRows}
-        isLoading={isLoading}
         canManageSettlements={canManageSettlements}
         deletingSettlementId={deletingSettlementId}
         onOpenAddDialog={handleOpenAddDialog}
