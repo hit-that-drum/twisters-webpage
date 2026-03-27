@@ -7,6 +7,7 @@ import { useAuth } from '@/features';
 import GlobalButton from '@/common/components/GlobalButton';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import AdminUserDetailModal, { type AdminUserFormState } from './AdminUserDetailModal';
+import LoadingComponent from '@/common/LoadingComponent';
 
 interface PendingUserRecord {
   id: number;
@@ -436,14 +437,11 @@ export default function AdminPage() {
     [handleExpiredSession, loadUsers],
   );
 
-  const handleOpenEditDialog = useCallback(
-    (user: AdminUserRecord) => {
-      setEditingUserId(user.id);
-      setEditUserForm(toAdminUserForm(user));
-      setOpenEditDialog(true);
-    },
-    [],
-  );
+  const handleOpenEditDialog = useCallback((user: AdminUserRecord) => {
+    setEditingUserId(user.id);
+    setEditUserForm(toAdminUserForm(user));
+    setOpenEditDialog(true);
+  }, []);
 
   const editingUser = useMemo(
     () => allUsers.find((user) => user.id === editingUserId) ?? null,
@@ -538,7 +536,8 @@ export default function AdminPage() {
 
     if (
       meInfo?.id === editingUserId &&
-      (editUserForm.role !== initialEditUserForm.role || editUserForm.status !== initialEditUserForm.status)
+      (editUserForm.role !== initialEditUserForm.role ||
+        editUserForm.status !== initialEditUserForm.status)
     ) {
       enqueueSnackbar('현재 로그인한 관리자 계정의 권한 상태는 변경할 수 없습니다.', {
         variant: 'error',
@@ -579,7 +578,10 @@ export default function AdminPage() {
       setEditingUserId(null);
       setEditUserForm(EMPTY_ADMIN_USER_FORM);
 
-      await Promise.all([loadUsers(), meInfo?.id === editingUserId ? refreshMeInfo() : Promise.resolve(null)]);
+      await Promise.all([
+        loadUsers(),
+        meInfo?.id === editingUserId ? refreshMeInfo() : Promise.resolve(null),
+      ]);
     } catch (error) {
       console.error('User update error:', error);
       enqueueSnackbar('사용자 수정 중 오류가 발생했습니다.', { variant: 'error' });
@@ -724,6 +726,10 @@ export default function AdminPage() {
     );
   }
 
+  if (isLoading) {
+    return <LoadingComponent />;
+  }
+
   return (
     <main className="mx-auto flex w-full flex-1 flex-col px-4 py-8 md:px-10">
       <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
@@ -789,11 +795,7 @@ export default function AdminPage() {
           </h2>
         </div>
 
-        {isLoading ? (
-          <div className="rounded-xl border border-slate-200 bg-white px-6 py-10 text-center text-sm font-medium text-slate-500">
-            Loading approval requests...
-          </div>
-        ) : pendingUsers.length === 0 ? (
+        {pendingUsers.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
             <div className="mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-slate-50 text-5xl text-slate-300">
               ☑

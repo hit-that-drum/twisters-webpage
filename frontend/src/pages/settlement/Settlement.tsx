@@ -250,16 +250,7 @@ const SettlementGrid = memo(function SettlementGrid({
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {isLoading ? (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="px-6 py-8 text-center text-sm font-medium text-slate-500"
-                    >
-                      정산 내역을 불러오는 중입니다.
-                    </td>
-                  </tr>
-                ) : rows.length === 0 ? (
+                {rows.length === 0 ? (
                   <tr>
                     <td
                       colSpan={5}
@@ -833,15 +824,7 @@ export default function Settlement() {
   const pageEnd = totalRows === 0 ? 0 : Math.min((page + 1) * rowsPerPage, totalRows);
 
   if (isLoading) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-6 py-10">
-        <LoadingComponent
-          size={72}
-          speed={1.2}
-          className="drop-shadow-[0_12px_32px_rgba(248,250,252,0.18)]"
-        />
-      </div>
-    );
+    return <LoadingComponent />;
   }
 
   return (

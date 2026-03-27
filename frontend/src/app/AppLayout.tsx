@@ -14,7 +14,7 @@ export default function AppLayout() {
   };
 
   if (isAuthLoading) {
-    return <LoadingComponent size={40} color="#ffd166" speed={1.6} />;
+    return <LoadingComponent />;
   }
 
   if (!isAuthenticated) {

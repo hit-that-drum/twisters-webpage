@@ -11,7 +11,7 @@ function RootRedirect() {
   if (isAuthLoading) {
     return (
       <div className="px-6 py-8">
-        <LoadingComponent size={40} color="#ffd166" speed={1.6} />
+        <LoadingComponent />
       </div>
     );
   }

@@ -19,6 +19,7 @@ import { AiTwotonePushpin } from 'react-icons/ai';
 import { IoPersonCircleSharp } from 'react-icons/io5';
 import { FaClock } from 'react-icons/fa';
 import { IoIosArrowBack, IoIosArrowDown, IoIosArrowForward, IoIosArrowUp } from 'react-icons/io';
+import LoadingComponent from '@/common/LoadingComponent';
 
 interface BoardPostItem {
   id: number;
@@ -919,6 +920,10 @@ export default function Board() {
     });
   };
 
+  if (isLoading) {
+    return <LoadingComponent />;
+  }
+
   return (
     <main className="flex flex-1 flex-col items-center px-3 py-6 sm:px-4 sm:py-8 lg:px-20">
       <div className="layout-content-container flex w-full flex-col gap-5 sm:gap-6">
@@ -978,11 +983,7 @@ export default function Board() {
         </form>
 
         <div className="flex flex-col gap-3 sm:gap-4">
-          {isLoading ? (
-            <div className="rounded-xl border border-slate-200 bg-white px-5 py-7 text-sm font-medium text-slate-500 sm:px-6 sm:py-8">
-              게시글을 불러오는 중입니다.
-            </div>
-          ) : displayedPosts.length === 0 ? (
+          {displayedPosts.length === 0 ? (
             <div className="rounded-xl border border-slate-200 bg-white px-5 py-7 text-sm font-medium text-slate-500 sm:px-6 sm:py-8">
               등록된 게시글이 없습니다.
             </div>

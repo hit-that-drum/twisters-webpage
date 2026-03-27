@@ -17,7 +17,7 @@ const stars = [
 const LOADING_KEYFRAME_NAME = 'loading-component-star-float';
 
 export default function LoadingComponent({
-  size = 56,
+  size = 100,
   color = '#ffd166',
   speed = 1.2,
   className = '',
@@ -45,40 +45,42 @@ export default function LoadingComponent({
         `}
       </style>
 
-      <div
-        className={['inline-flex items-end justify-center select-none', className]
-          .filter(Boolean)
-          .join(' ')}
-        role="status"
-        aria-live="polite"
-        aria-label="Loading"
-      >
-        <span className="sr-only">Loading</span>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-6 py-10">
+        <div
+          className={['inline-flex items-end justify-center select-none', className]
+            .filter(Boolean)
+            .join(' ')}
+          role="status"
+          aria-live="polite"
+          aria-label="Loading"
+        >
+          <span className="sr-only">Loading</span>
 
-        {stars.map((star, index) => (
-          <svg
-            key={`${star.scale}-${star.delay}`}
-            viewBox="0 0 256 256"
-            width={resolvedSize * star.scale}
-            height={resolvedSize * star.scale}
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-            style={{
-              marginLeft: index === 0 ? 0 : star.offset,
-              willChange: 'transform, opacity',
-              transform: 'translate3d(0, 0, 0)',
-              animationName: LOADING_KEYFRAME_NAME,
-              animationDuration: `${resolvedSpeed}s`,
-              animationTimingFunction: 'ease-out',
-              animationIterationCount: 'infinite',
-              animationDelay: `${star.delay}s`,
-              filter: `drop-shadow(0 2px 12px ${color})`,
-              overflow: 'visible',
-            }}
-          >
-            <path d={STAR_PATH} fill={color} />
-          </svg>
-        ))}
+          {stars.map((star, index) => (
+            <svg
+              key={`${star.scale}-${star.delay}`}
+              viewBox="0 0 256 256"
+              width={resolvedSize * star.scale}
+              height={resolvedSize * star.scale}
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+              style={{
+                marginLeft: index === 0 ? 0 : star.offset,
+                willChange: 'transform, opacity',
+                transform: 'translate3d(0, 0, 0)',
+                animationName: LOADING_KEYFRAME_NAME,
+                animationDuration: `${resolvedSpeed}s`,
+                animationTimingFunction: 'ease-out',
+                animationIterationCount: 'infinite',
+                animationDelay: `${star.delay}s`,
+                filter: `drop-shadow(0 2px 12px ${color})`,
+                overflow: 'visible',
+              }}
+            >
+              <path d={STAR_PATH} fill={color} />
+            </svg>
+          ))}
+        </div>
       </div>
     </>
   );
