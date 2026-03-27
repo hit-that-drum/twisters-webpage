@@ -3,6 +3,7 @@ import AppLayout from '@/app/AppLayout';
 import { useAuth } from '@/features';
 import { AdminPage, Board, Home, Login, Member, MyPage, Notice, Settlement } from '@/pages';
 import Flowchart from '@/pages/flowchart/Flowchart';
+import LoadingComponent from '@/common/LoadingComponent.tsx';
 
 function RootRedirect() {
   const { hasAuthSession, meInfo, isAuthLoading } = useAuth();
@@ -10,9 +11,7 @@ function RootRedirect() {
   if (isAuthLoading) {
     return (
       <div className="px-6 py-8">
-        <p className="text-sm font-semibold tracking-wide text-gray-600">
-          Checking your session...
-        </p>
+        <LoadingComponent size={40} color="#ffd166" speed={1.6} />
       </div>
     );
   }

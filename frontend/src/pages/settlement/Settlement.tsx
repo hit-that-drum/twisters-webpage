@@ -17,6 +17,7 @@ import SettlementDetailModal, {
   type SettlementAmountType,
   type SettlementFormState,
 } from './SettlementDetailModal';
+import LoadingComponent from '@/common/LoadingComponent.tsx';
 
 interface SettlementRecord {
   id: number;
@@ -830,6 +831,18 @@ export default function Settlement() {
 
   const pageStart = totalRows === 0 ? 0 : page * rowsPerPage + 1;
   const pageEnd = totalRows === 0 ? 0 : Math.min((page + 1) * rowsPerPage, totalRows);
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-6 py-10">
+        <LoadingComponent
+          size={72}
+          speed={1.2}
+          className="drop-shadow-[0_12px_32px_rgba(248,250,252,0.18)]"
+        />
+      </div>
+    );
+  }
 
   return (
     <>

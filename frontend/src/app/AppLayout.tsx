@@ -2,6 +2,7 @@ import { Navigate, Outlet, useNavigate } from 'react-router-dom';
 import Footer from '@/common/components/Footer';
 import Header from '@/common/components/Header';
 import { useAuth } from '@/features';
+import LoadingComponent from '@/common/LoadingComponent.tsx';
 
 export default function AppLayout() {
   const navigate = useNavigate();
@@ -13,13 +14,7 @@ export default function AppLayout() {
   };
 
   if (isAuthLoading) {
-    return (
-      <div className="px-6 py-8">
-        <p className="text-sm font-semibold tracking-wide text-gray-600">
-          Checking your session...
-        </p>
-      </div>
-    );
+    return <LoadingComponent size={40} color="#ffd166" speed={1.6} />;
   }
 
   if (!isAuthenticated) {
