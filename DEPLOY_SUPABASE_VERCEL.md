@@ -46,6 +46,12 @@ Deploy the `backend` directory as a separate Vercel project.
 - `SUPABASE_DB_URL` (recommended)
 - `JWT_SECRET`
 - `FRONTEND_BASE_URL` (your deployed frontend URL)
+- `EMAIL_FROM` (the sender address used for password reset emails)
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_SECURE`
+- `SMTP_USER`
+- `SMTP_PASS`
 - `VITE_GOOGLE_CLIENT_ID` (if Google login is enabled)
 - `KAKAO_REST_API_KEY` (if Kakao login is enabled)
 - `KAKAO_CLIENT_SECRET` (recommended for Kakao code exchange)
@@ -57,6 +63,8 @@ Deploy the `backend` directory as a separate Vercel project.
 - `SUPABASE_DB_URL` uses Supabase Transaction Pooler URI
 - `JWT_SECRET` is a new production-only random secret
 - `FRONTEND_BASE_URL` exactly matches frontend production URL (no trailing slash)
+- `EMAIL_FROM` is a verified sender address for your SMTP provider
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` match your SMTP provider credentials
 - `VITE_GOOGLE_CLIENT_ID` matches Google OAuth web app config
 - `KAKAO_REST_API_KEY` matches Kakao Developers REST API key
 - `KAKAO_REDIRECT_URI` exactly matches Kakao Developers redirect URI entry
@@ -86,7 +94,7 @@ Deploy the `frontend` directory as another Vercel project.
 - `VITE_API_BASE_URL=https://your-backend.vercel.app`
 - `VITE_GOOGLE_CLIENT_ID=...`
 - `VITE_KAKAO_REST_API_KEY=...`
-- `VITE_KAKAO_REDIRECT_URI=https://your-frontend.vercel.app/signin`
+- `VITE_KAKAO_REDIRECT_URI=https://your-frontend.vercel.app/auth/kakao/callback`
 
 #### Frontend env validation checklist
 
@@ -105,8 +113,91 @@ Run after both projects are deployed:
 3. Open Notice page and verify admin/non-admin UI visibility behaves correctly.
 4. Create/update/delete notice as admin and verify success.
 5. Try create/update/delete as non-admin and verify `403` response.
-6. Trigger forgot-password flow and verify reset link + reset API behavior.
+6. Trigger forgot-password flow and verify the reset email arrives, the link opens the frontend, and the reset API succeeds.
 7. Confirm backend logs have no DB connection or JWT secret errors.
+
+## 4.1) Copy-paste Vercel env templates
+
+Backend project (`backend` root directory):
+
+```env
+SUPABASE_DB_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:6543/postgres
+JWT_SECRET=<generate-a-new-random-production-secret>
+DB_SSL=true
+FRONTEND_BASE_URL=https://your-frontend.vercel.app
+EMAIL_APP_NAME=Twisters
+EMAIL_FROM=noreply@your-domain.com
+SMTP_HOST=smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=apikey
+SMTP_PASS=<your-smtp-or-sendgrid-api-key>
+VITE_GOOGLE_CLIENT_ID=<your-google-client-id>.apps.googleusercontent.com
+KAKAO_REST_API_KEY=<your-kakao-rest-api-key>
+KAKAO_CLIENT_SECRET=<your-kakao-client-secret>
+KAKAO_REDIRECT_URI=https://your-frontend.vercel.app/auth/kakao/callback
+SESSION_IDLE_TIMEOUT_MINUTES=60
+SESSION_ABSOLUTE_TIMEOUT_DAYS=7
+SESSION_ABSOLUTE_TIMEOUT_REMEMBER_DAYS=30
+SESSION_ACTIVITY_TOUCH_THRESHOLD_SECONDS=60
+```
+
+SendGrid-specific backend example:
+
+```env
+EMAIL_APP_NAME=Twisters
+EMAIL_FROM=noreply@yourdomain.com
+SMTP_HOST=smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=apikey
+SMTP_PASS=SG.xxxxx_your_real_sendgrid_api_key
+```
+
+SendGrid notes:
+
+- `SMTP_USER` stays exactly `apikey`
+- `SMTP_PASS` must be the real SendGrid API key, not your dashboard password
+- `EMAIL_FROM` must be a verified sender or a domain-authenticated address in SendGrid
+- `SMTP_PORT=587` with `SMTP_SECURE=false` is the standard STARTTLS setup
+- If you use port `465`, switch to `SMTP_SECURE=true`
+- Test a real reset email immediately after deploy because invalid sender/auth values only show up in backend logs
+
+Frontend project (`frontend` root directory):
+
+```env
+VITE_API_BASE_URL=https://your-backend.vercel.app
+VITE_GOOGLE_CLIENT_ID=<your-google-client-id>.apps.googleusercontent.com
+VITE_KAKAO_REST_API_KEY=<your-kakao-rest-api-key>
+VITE_KAKAO_REDIRECT_URI=https://your-frontend.vercel.app/auth/kakao/callback
+```
+
+Remove the Google/Kakao variables from either project if you are not shipping that login option yet.
+
+## 4.2) One-page post-deploy test scenario
+
+1. Open the frontend production URL and confirm the signin page renders without console or network errors.
+2. Sign in with an approved member account and verify `/authentication/me` returns `200`.
+3. Sign in with an admin account and verify admin-only navigation and Notice CRUD actions are visible and functional.
+4. Sign in with a non-admin account and verify admin-only actions are hidden and protected endpoints return `403`.
+5. Request a password reset for a real account and confirm the reset email arrives from `EMAIL_FROM`.
+6. Open the email link and verify the frontend lands on `/signin` with a valid reset flow.
+7. Submit a new password, sign in with it, and confirm the old password no longer works.
+8. Verify Google login if enabled.
+9. Verify Kakao login if enabled, including the callback redirect URL.
+10. Review Vercel logs for the frontend and backend and confirm there are no startup, DB, JWT, or SMTP errors.
+
+## 4.3) Compressed deployment order
+
+1. Create the Supabase project and run `supabase/schema.sql`.
+2. Create the Vercel backend project with Root Directory `backend`.
+3. Add backend env vars (`SUPABASE_DB_URL`, `JWT_SECRET`, `DB_SSL`, `FRONTEND_BASE_URL`, SMTP values, OAuth values if used).
+4. Deploy the backend and save the production API URL.
+5. Create the Vercel frontend project with Root Directory `frontend`.
+6. Add frontend env vars (`VITE_API_BASE_URL` pointing at the deployed backend, plus OAuth values if used).
+7. Deploy the frontend and save the production app URL.
+8. Update Google/Kakao console redirect/origin settings to the real production URLs.
+9. Run the post-deploy verification sheet, especially login, `/authentication/me`, admin permissions, and reset-email delivery.
 
 ## 5) Local development
 
