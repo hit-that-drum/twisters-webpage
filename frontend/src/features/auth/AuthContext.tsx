@@ -1,13 +1,17 @@
-import { createContext, useContext } from 'react';
-import { type AuthContextValue } from './types';
-
-export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+import { useShallow } from 'zustand/react/shallow';
+import { useAuthStore } from './authStore';
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-
-  return context;
+  return useAuthStore(
+    useShallow((state) => ({
+      meInfo: state.meInfo,
+      isAuthLoading: state.isAuthLoading,
+      isAuthenticated: state.isAuthenticated,
+      hasAuthSession: state.hasAuthSession,
+      rememberMe: state.rememberMe,
+      refreshMeInfo: state.refreshMeInfo,
+      completeAuthSession: state.completeAuthSession,
+      logout: state.logout,
+    })),
+  );
 }

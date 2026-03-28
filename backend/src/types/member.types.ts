@@ -4,10 +4,9 @@ export interface MemberListRow {
   email: string | null;
   isAdmin: boolean | number;
   phone: string | null;
-  role: string | null;
   department: string | null;
   joinedAt: string | null;
-  bio: string | null;
+  birthDate: string | null;
 }
 
 export interface Member {
@@ -16,10 +15,9 @@ export interface Member {
   email: string | null;
   isAdmin: boolean;
   phone: string | null;
-  role: string | null;
   department: string | null;
   joinedAt: string | null;
-  bio: string | null;
+  birthDate: string | null;
 }
 
 export interface MemberLookupRow {
@@ -46,10 +44,9 @@ export interface MemberMutationDTO {
   email?: unknown;
   isAdmin?: unknown;
   phone?: unknown;
-  role?: unknown;
   department?: unknown;
   joinedAt?: unknown;
-  bio?: unknown;
+  birthDate?: unknown;
 }
 
 export interface MemberMutationPayload {
@@ -57,8 +54,7 @@ export interface MemberMutationPayload {
   email: string | null;
   isAdmin: boolean;
   phone: string | null;
-  role: string | null;
   department: string | null;
   joinedAt: string | null;
-  bio: string | null;
+  birthDate: string | null;
 }

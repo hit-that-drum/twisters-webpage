@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import EditDeleteButton from '@/common/components/EditDeleteButton';
 import { apiFetch } from '@/common/lib/api/apiClient';
 import { useAuth } from '@/features';
 import GlobalButton from '@/common/components/GlobalButton';
+import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
+import AdminUserDetailModal, { type AdminUserFormState } from './AdminUserDetailModal';
+import LoadingComponent from '@/common/LoadingComponent';
 
 interface PendingUserRecord {
   id: number;
@@ -20,6 +23,9 @@ interface AdminUserRecord {
   isAdmin: boolean;
   isAllowed: boolean;
   createdAt: string;
+  phone?: string | null;
+  department?: string | null;
+  joinedAt?: string | null;
 }
 
 type UserStatusFilter = 'all' | 'active' | 'inactive';
@@ -233,11 +239,33 @@ const formatCount = (count: number) => {
   return countFormatter.format(count);
 };
 
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const toAdminUserForm = (user: AdminUserRecord): AdminUserFormState => ({
+  name: user.name,
+  email: user.email,
+  role: user.isAdmin ? 'admin' : 'member',
+  status: user.isAllowed ? 'active' : 'inactive',
+});
+
+const EMPTY_ADMIN_USER_FORM: AdminUserFormState = {
+  name: '',
+  email: '',
+  role: 'member',
+  status: 'active',
+};
+
 export default function AdminPage() {
   const navigate = useNavigate();
-  const { meInfo, isAuthLoading, logout } = useAuth();
+  const { meInfo, isAuthLoading, logout, refreshMeInfo } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
+  const [decliningUserId, setDecliningUserId] = useState<number | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [editUserForm, setEditUserForm] = useState<AdminUserFormState>(EMPTY_ADMIN_USER_FORM);
   const [pendingUsers, setPendingUsers] = useState<PendingUserRecord[]>([]);
   const [allUsers, setAllUsers] = useState<AdminUserRecord[]>([]);
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>('all');
@@ -366,6 +394,262 @@ export default function AdminPage() {
     [canManageUsers, handleExpiredSession, loadUsers],
   );
 
+  const handleDeclineUser = useCallback(
+    async (userId: number) => {
+      const shouldDecline = window.confirm(
+        '해당 사용자의 가입 요청을 거절하고 대기 중인 계정을 삭제하시겠습니까?',
+      );
+      if (!shouldDecline) {
+        return;
+      }
+
+      setDecliningUserId(userId);
+
+      try {
+        const response = await apiFetch(`/authentication/admin/users/${userId}/decline`, {
+          method: 'PATCH',
+        });
+        const payload = await parseApiResponse(response);
+
+        if (response.status === 401) {
+          handleExpiredSession();
+          return;
+        }
+
+        if (!response.ok) {
+          enqueueSnackbar(`사용자 거절 실패: ${getApiMessage(payload, '알 수 없는 에러')}`, {
+            variant: 'error',
+          });
+          return;
+        }
+
+        enqueueSnackbar(getApiMessage(payload, '사용자 가입 요청이 거절되었습니다.'), {
+          variant: 'success',
+        });
+        await loadUsers();
+      } catch (error) {
+        console.error('User decline error:', error);
+        enqueueSnackbar('사용자 거절 중 오류가 발생했습니다.', { variant: 'error' });
+      } finally {
+        setDecliningUserId(null);
+      }
+    },
+    [handleExpiredSession, loadUsers],
+  );
+
+  const handleOpenEditDialog = useCallback((user: AdminUserRecord) => {
+    setEditingUserId(user.id);
+    setEditUserForm(toAdminUserForm(user));
+    setOpenEditDialog(true);
+  }, []);
+
+  const editingUser = useMemo(
+    () => allUsers.find((user) => user.id === editingUserId) ?? null,
+    [allUsers, editingUserId],
+  );
+
+  const initialEditUserForm = useMemo(
+    () => (editingUser ? toAdminUserForm(editingUser) : EMPTY_ADMIN_USER_FORM),
+    [editingUser],
+  );
+
+  const hasEditChanges = useMemo(
+    () =>
+      editUserForm.name.trim() !== initialEditUserForm.name.trim() ||
+      editUserForm.email.trim().toLowerCase() !== initialEditUserForm.email.trim().toLowerCase() ||
+      editUserForm.role !== initialEditUserForm.role ||
+      editUserForm.status !== initialEditUserForm.status,
+    [editUserForm, initialEditUserForm],
+  );
+
+  const isEditFormValid = useMemo(() => {
+    const normalizedName = editUserForm.name.trim();
+    const normalizedEmail = editUserForm.email.trim().toLowerCase();
+
+    return normalizedName.length > 0 && isValidEmail(normalizedEmail);
+  }, [editUserForm.email, editUserForm.name]);
+
+  const handleCloseEditDialog = useCallback(
+    (event: object, reason: ModalCloseReason) => {
+      void event;
+      void reason;
+
+      if (isSubmitting) {
+        return;
+      }
+
+      if (hasEditChanges) {
+        const shouldClose = window.confirm(
+          '변경 사항이 있습니다. 저장하지 않고 닫으면 변경사항이 유실됩니다. 닫으시겠습니까?',
+        );
+        if (!shouldClose) {
+          return;
+        }
+      }
+
+      setOpenEditDialog(false);
+      setEditingUserId(null);
+      setEditUserForm(EMPTY_ADMIN_USER_FORM);
+    },
+    [hasEditChanges, isSubmitting],
+  );
+
+  const handleEditFormChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const { name, value } = event.target;
+      setEditUserForm((previous) => ({
+        ...previous,
+        [name]: value,
+      }));
+    },
+    [],
+  );
+
+  const handleUpdateUser = useCallback(async () => {
+    if (!canManageUsers) {
+      enqueueSnackbar('관리자 권한이 필요합니다.', { variant: 'error' });
+      return;
+    }
+
+    if (editingUserId === null) {
+      enqueueSnackbar('수정할 사용자를 찾을 수 없습니다.', { variant: 'error' });
+      return;
+    }
+
+    if (!hasEditChanges) {
+      enqueueSnackbar('변경된 내용이 없습니다.', { variant: 'info' });
+      return;
+    }
+
+    const normalizedName = editUserForm.name.trim();
+    const normalizedEmail = editUserForm.email.trim().toLowerCase();
+
+    if (!normalizedName || !normalizedEmail) {
+      enqueueSnackbar('이름과 이메일을 모두 입력해주세요.', { variant: 'error' });
+      return;
+    }
+
+    if (!isValidEmail(normalizedEmail)) {
+      enqueueSnackbar('이메일 형식이 올바르지 않습니다.', { variant: 'error' });
+      return;
+    }
+
+    if (
+      meInfo?.id === editingUserId &&
+      (editUserForm.role !== initialEditUserForm.role ||
+        editUserForm.status !== initialEditUserForm.status)
+    ) {
+      enqueueSnackbar('현재 로그인한 관리자 계정의 권한 상태는 변경할 수 없습니다.', {
+        variant: 'error',
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await apiFetch(`/authentication/admin/users/${editingUserId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: normalizedName,
+          email: normalizedEmail,
+          isAdmin: editUserForm.role === 'admin',
+          isAllowed: editUserForm.status === 'active',
+        }),
+      });
+      const payload = await parseApiResponse(response);
+
+      if (response.status === 401) {
+        handleExpiredSession();
+        return;
+      }
+
+      if (!response.ok) {
+        enqueueSnackbar(`사용자 수정 실패: ${getApiMessage(payload, '알 수 없는 에러')}`, {
+          variant: 'error',
+        });
+        return;
+      }
+
+      enqueueSnackbar(getApiMessage(payload, '사용자 정보가 수정되었습니다.'), {
+        variant: 'success',
+      });
+      setOpenEditDialog(false);
+      setEditingUserId(null);
+      setEditUserForm(EMPTY_ADMIN_USER_FORM);
+
+      await Promise.all([
+        loadUsers(),
+        meInfo?.id === editingUserId ? refreshMeInfo() : Promise.resolve(null),
+      ]);
+    } catch (error) {
+      console.error('User update error:', error);
+      enqueueSnackbar('사용자 수정 중 오류가 발생했습니다.', { variant: 'error' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    canManageUsers,
+    editUserForm.email,
+    editUserForm.name,
+    editUserForm.role,
+    editUserForm.status,
+    editingUserId,
+    handleExpiredSession,
+    hasEditChanges,
+    initialEditUserForm.role,
+    initialEditUserForm.status,
+    loadUsers,
+    meInfo?.id,
+    refreshMeInfo,
+  ]);
+
+  const handleDeleteUser = useCallback(
+    async (user: AdminUserRecord) => {
+      if (meInfo?.id === user.id) {
+        enqueueSnackbar('현재 로그인한 관리자 계정은 삭제할 수 없습니다.', { variant: 'error' });
+        return;
+      }
+
+      const shouldDelete = window.confirm(
+        `'${user.name}' 사용자를 삭제하시겠습니까? 연결된 세션은 종료되며 작성 기록의 작성자는 비워질 수 있습니다.`,
+      );
+      if (!shouldDelete) {
+        return;
+      }
+
+      setDeletingUserId(user.id);
+
+      try {
+        const response = await apiFetch(`/authentication/admin/users/${user.id}`, {
+          method: 'DELETE',
+        });
+        const payload = await parseApiResponse(response);
+
+        if (response.status === 401) {
+          handleExpiredSession();
+          return;
+        }
+
+        if (!response.ok) {
+          enqueueSnackbar(`사용자 삭제 실패: ${getApiMessage(payload, '알 수 없는 에러')}`, {
+            variant: 'error',
+          });
+          return;
+        }
+
+        enqueueSnackbar(getApiMessage(payload, '사용자가 삭제되었습니다.'), { variant: 'success' });
+        await loadUsers();
+      } catch (error) {
+        console.error('User delete error:', error);
+        enqueueSnackbar('사용자 삭제 중 오류가 발생했습니다.', { variant: 'error' });
+      } finally {
+        setDeletingUserId(null);
+      }
+    },
+    [handleExpiredSession, loadUsers, meInfo?.id],
+  );
+
   const sortedAllUsers = useMemo(
     () => [...allUsers].sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
     [allUsers],
@@ -423,12 +707,27 @@ export default function AdminPage() {
     console.log('handleAddNewUser');
   };
 
+  const editModalActions: TAction[] = [
+    {
+      label: isSubmitting ? 'Updating...' : hasEditChanges ? 'Update' : 'No changes',
+      onClick: () => {
+        void handleUpdateUser();
+      },
+      buttonStyle: 'confirm',
+      disabled: isSubmitting || !hasEditChanges || !isEditFormValid,
+    },
+  ];
+
   if (isAuthLoading) {
     return (
       <main className="mx-auto w-full max-w-[1200px] px-4 py-8 md:px-10">
         <p className="text-sm font-medium text-slate-500">관리자 페이지를 확인 중입니다...</p>
       </main>
     );
+  }
+
+  if (isLoading) {
+    return <LoadingComponent />;
   }
 
   return (
@@ -496,11 +795,7 @@ export default function AdminPage() {
           </h2>
         </div>
 
-        {isLoading ? (
-          <div className="rounded-xl border border-slate-200 bg-white px-6 py-10 text-center text-sm font-medium text-slate-500">
-            Loading approval requests...
-          </div>
-        ) : pendingUsers.length === 0 ? (
+        {pendingUsers.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
             <div className="mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-slate-50 text-5xl text-slate-300">
               ☑
@@ -534,14 +829,24 @@ export default function AdminPage() {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    disabled={approvingUserId === user.id}
-                    onClick={() => void handleApproveUser(user.id)}
-                    className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {approvingUserId === user.id ? 'Approving...' : 'Approve'}
-                  </button>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      disabled={approvingUserId === user.id || decliningUserId === user.id}
+                      onClick={() => void handleDeclineUser(user.id)}
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {decliningUserId === user.id ? 'Declining...' : 'Decline'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={approvingUserId === user.id || decliningUserId === user.id}
+                      onClick={() => void handleApproveUser(user.id)}
+                      className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {approvingUserId === user.id ? 'Approving...' : 'Approve'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -635,6 +940,7 @@ export default function AdminPage() {
                       ? 'text-emerald-600'
                       : 'text-slate-400';
                     const statusDotClassName = user.isAllowed ? 'bg-emerald-500' : 'bg-slate-300';
+                    const isCurrentAdminUser = meInfo?.id === user.id;
 
                     return (
                       <tr key={user.id} className="transition-colors hover:bg-slate-50/50">
@@ -676,15 +982,13 @@ export default function AdminPage() {
                         <td className="px-6 py-4 text-right">
                           <EditDeleteButton
                             onEditClick={() => {
-                              enqueueSnackbar('사용자 편집 기능은 준비 중입니다.', {
-                                variant: 'info',
-                              });
+                              handleOpenEditDialog(user);
                             }}
                             onDeleteClick={() => {
-                              enqueueSnackbar('사용자 삭제 기능은 준비 중입니다.', {
-                                variant: 'info',
-                              });
+                              void handleDeleteUser(user);
                             }}
+                            isDeleting={deletingUserId === user.id}
+                            isDeleteDisabled={deletingUserId !== null || isCurrentAdminUser}
                           />
                         </td>
                       </tr>
@@ -724,6 +1028,23 @@ export default function AdminPage() {
           </div>
         </div>
       </section>
+
+      <AdminUserDetailModal
+        open={openEditDialog}
+        handleClose={handleCloseEditDialog}
+        title="EDIT USER"
+        actions={editModalActions}
+        form={editUserForm}
+        initialForm={initialEditUserForm}
+        isSubmitting={isSubmitting}
+        disablePrivilegeControls={meInfo?.id === editingUserId}
+        disableRoleControl={false}
+        disableStatusControl={false}
+        emailOptional={false}
+        userName={editingUser?.name}
+        joinedLabel={editingUser ? formatJoinedDate(editingUser.createdAt) : undefined}
+        onFormChange={handleEditFormChange}
+      />
     </main>
   );
 }

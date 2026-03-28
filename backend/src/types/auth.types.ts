@@ -16,6 +16,13 @@ export interface SignUpDTO {
   password?: string;
 }
 
+export interface AdminUserMutationDTO {
+  name?: unknown;
+  email?: unknown;
+  isAdmin?: unknown;
+  isAllowed?: unknown;
+}
+
 export interface MeUser {
   id: number;
   name: string;
@@ -56,6 +63,16 @@ export interface PendingUserRow {
 
 export interface UserApprovalRow {
   id: number;
+  name: string;
+  isTest: boolean | number;
+  isAllowed: boolean | number;
+}
+
+export interface ManagedUserRow {
+  id: number;
+  name: string;
+  isTest: boolean | number;
+  isAdmin: boolean | number;
   isAllowed: boolean | number;
 }
 

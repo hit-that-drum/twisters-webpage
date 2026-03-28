@@ -1,19 +1,18 @@
 import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from '@/app/AppLayout';
 import { useAuth } from '@/features';
-import { getAccessToken } from '@/common/lib/auth/authStorage';
 import { AdminPage, Board, Home, Login, Member, MyPage, Notice, Settlement } from '@/pages';
 import Flowchart from '@/pages/flowchart/Flowchart';
+import LoadingComponent from '@/common/LoadingComponent.tsx';
+import NotFoundComponent from '@/common/NotFoundComponent.tsx';
 
 function RootRedirect() {
-  const { meInfo, isAuthLoading } = useAuth();
+  const { hasAuthSession, meInfo, isAuthLoading } = useAuth();
 
   if (isAuthLoading) {
     return (
       <div className="px-6 py-8">
-        <p className="text-sm font-semibold tracking-wide text-gray-600">
-          Checking your session...
-        </p>
+        <LoadingComponent />
       </div>
     );
   }
@@ -22,7 +21,7 @@ function RootRedirect() {
     return <Navigate to={`/${meInfo.id}`} replace />;
   }
 
-  return <Navigate to={getAccessToken() ? '/signin' : '/signup'} replace />;
+  return <Navigate to={hasAuthSession ? '/signin' : '/signup'} replace />;
 }
 
 export default function AppRouter() {
@@ -45,6 +44,8 @@ export default function AppRouter() {
           <Route path="/flowchart" element={<Flowchart />} />
           <Route path="/admin" element={<AdminPage />} />
         </Route>
+
+        <Route path="*" element={<NotFoundComponent />} />
       </Routes>
     </Router>
   );

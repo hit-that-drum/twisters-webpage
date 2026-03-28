@@ -1,34 +1,20 @@
-import { useEffect } from 'react';
 import { Navigate, Outlet, useNavigate } from 'react-router-dom';
 import Footer from '@/common/components/Footer';
 import Header from '@/common/components/Header';
 import { useAuth } from '@/features';
-import { getAccessToken } from '@/common/lib/auth/authStorage';
+import LoadingComponent from '@/common/LoadingComponent.tsx';
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { meInfo, isAuthLoading, isAuthenticated, logout, refreshMeInfo } = useAuth();
-  const accessToken = getAccessToken();
-
-  useEffect(() => {
-    if (accessToken && !isAuthenticated) {
-      void refreshMeInfo();
-    }
-  }, [accessToken, isAuthenticated, refreshMeInfo]);
+  const { meInfo, isAuthLoading, isAuthenticated, logout } = useAuth();
 
   const handleLogout = () => {
     logout();
     navigate('/signin', { replace: true });
   };
 
-  if (isAuthLoading || (accessToken && !isAuthenticated)) {
-    return (
-      <div className="px-6 py-8">
-        <p className="text-sm font-semibold tracking-wide text-gray-600">
-          Checking your session...
-        </p>
-      </div>
-    );
+  if (isAuthLoading) {
+    return <LoadingComponent />;
   }
 
   if (!isAuthenticated) {
@@ -44,7 +30,7 @@ export default function AppLayout() {
       {meInfo?.isTest && (
         <div className="px-6 pb-4 pt-1">
           <div className="mx-auto w-full rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold tracking-wide text-amber-900">
-            TEST MODE: Showing isolated TEST data for notice, member, settlement, and board.
+            TEST MODE
           </div>
         </div>
       )}

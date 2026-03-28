@@ -85,13 +85,13 @@ const normalizeOptionalEmail = (rawValue: unknown) => {
   return lowerCaseEmail;
 };
 
-const normalizeOptionalDate = (rawValue: unknown) => {
+const normalizeOptionalDate = (rawValue: unknown, fieldName: string) => {
   if (rawValue === null || rawValue === undefined) {
     return null;
   }
 
   if (typeof rawValue !== 'string') {
-    throw new HttpError(400, '입사일 형식이 올바르지 않습니다.');
+    throw new HttpError(400, `${fieldName} 형식이 올바르지 않습니다.`);
   }
 
   const normalizedDate = rawValue.trim();
@@ -100,7 +100,7 @@ const normalizeOptionalDate = (rawValue: unknown) => {
   }
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
-    throw new HttpError(400, '입사일은 YYYY-MM-DD 형식이어야 합니다.');
+    throw new HttpError(400, `${fieldName}은 YYYY-MM-DD 형식이어야 합니다.`);
   }
 
   const [yearText, monthText, dayText] = normalizedDate.split('-');
@@ -108,7 +108,7 @@ const normalizeOptionalDate = (rawValue: unknown) => {
   const month = Number(monthText);
   const day = Number(dayText);
   if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-    throw new HttpError(400, '입사일 형식이 올바르지 않습니다.');
+    throw new HttpError(400, `${fieldName} 형식이 올바르지 않습니다.`);
   }
 
   const candidate = new Date(Date.UTC(year, month - 1, day));
@@ -117,7 +117,7 @@ const normalizeOptionalDate = (rawValue: unknown) => {
     candidate.getUTCMonth() !== month - 1 ||
     candidate.getUTCDate() !== day
   ) {
-    throw new HttpError(400, '유효한 입사일을 입력해주세요.');
+    throw new HttpError(400, `유효한 ${fieldName}을(를) 입력해주세요.`);
   }
 
   return normalizedDate;
@@ -172,10 +172,9 @@ const normalizeMemberMutationPayload = (payload: MemberMutationDTO): MemberMutat
     email: normalizeOptionalEmail(payload.email),
     isAdmin: normalizeBoolean(payload.isAdmin, false),
     phone: normalizeOptionalText(payload.phone, 30, '전화번호'),
-    role: normalizeOptionalText(payload.role, 100, '직책'),
     department: normalizeOptionalText(payload.department, 100, '부서'),
-    joinedAt: normalizeOptionalDate(payload.joinedAt),
-    bio: normalizeOptionalText(payload.bio, 2000, '소개'),
+    joinedAt: normalizeOptionalDate(payload.joinedAt, '입사일'),
+    birthDate: normalizeOptionalDate(payload.birthDate, '생년월일'),
   };
 };
 

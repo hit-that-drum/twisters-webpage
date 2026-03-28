@@ -16,7 +16,6 @@ interface MemberUser {
   phone: string | null;
   joinedAt: string | null;
   birthDate: string | null;
-  bio: string | null;
 }
 
 interface ParsedMemberDuesStatus {
@@ -43,7 +42,6 @@ const createDefaultMemberForm = (): MemberFormState => ({
   email: '',
   phone: '',
   birthDate: '',
-  bio: '',
 });
 
 const parseBoolean = (rawValue: unknown) => {
@@ -86,7 +84,6 @@ const parseMembers = (payload: unknown): MemberUser[] => {
         phone?: unknown;
         joinedAt?: unknown;
         birthDate?: unknown;
-        bio?: unknown;
       };
 
       if (
@@ -112,7 +109,6 @@ const parseMembers = (payload: unknown): MemberUser[] => {
         phone: normalizeNullableString(row.phone),
         joinedAt: normalizeNullableString(row.joinedAt),
         birthDate: normalizeNullableString(row.birthDate),
-        bio: normalizeNullableString(row.bio),
       };
     })
     .filter((item): item is MemberUser => item !== null);
@@ -169,7 +165,6 @@ const toEditForm = (member: MemberUser): MemberFormState => ({
   email: member.email ?? '',
   phone: member.phone ?? '',
   birthDate: member.birthDate ?? '',
-  bio: member.bio ?? '',
 });
 
 const parseApiResponse = async (response: Response): Promise<unknown> => {
@@ -794,14 +789,6 @@ export default function Member() {
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 px-6 py-6 md:px-8">
-                  <h3 className="mb-3 text-lg font-bold uppercase tracking-tight text-slate-900">
-                    Bio
-                  </h3>
-                  <p className="whitespace-pre-wrap leading-relaxed text-slate-600">
-                    {renderDetailValue(selectedUser.bio)}
-                  </p>
-                </div>
               </article>
             ) : (
               <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-sm font-semibold text-slate-500 shadow-sm">

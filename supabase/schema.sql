@@ -18,10 +18,9 @@ CREATE TABLE IF NOT EXISTS members (
   email VARCHAR(100) UNIQUE,
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   phone VARCHAR(30),
-  role VARCHAR(100),
   department VARCHAR(100),
   joined_at DATE,
-  bio TEXT,
+  birth_date DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -32,10 +31,9 @@ CREATE TABLE IF NOT EXISTS test_members (
   email VARCHAR(100) UNIQUE,
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   phone VARCHAR(30),
-  role VARCHAR(100),
   department VARCHAR(100),
   joined_at DATE,
-  bio TEXT,
+  birth_date DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -160,10 +158,8 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_password_reset_expires ON password_reset_tokens (expires_at);
 CREATE INDEX IF NOT EXISTS idx_members_email ON members (email);
-CREATE INDEX IF NOT EXISTS idx_members_role ON members (role);
 CREATE INDEX IF NOT EXISTS idx_members_department ON members (department);
 CREATE INDEX IF NOT EXISTS idx_test_members_email ON test_members (email);
-CREATE INDEX IF NOT EXISTS idx_test_members_role ON test_members (role);
 CREATE INDEX IF NOT EXISTS idx_test_members_department ON test_members (department);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions (user_id);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_idle_expires_at ON user_sessions (idle_expires_at);

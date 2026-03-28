@@ -21,10 +21,9 @@ class MemberRepository {
             email VARCHAR(100) UNIQUE,
             is_admin BOOLEAN NOT NULL DEFAULT FALSE,
             phone VARCHAR(30),
-            role VARCHAR(100),
             department VARCHAR(100),
             joined_at DATE,
-            bio TEXT,
+            birth_date DATE,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
           )
@@ -36,10 +35,9 @@ class MemberRepository {
           'ALTER TABLE members ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE',
         );
         await pool.query('ALTER TABLE members ADD COLUMN IF NOT EXISTS phone VARCHAR(30)');
-        await pool.query('ALTER TABLE members ADD COLUMN IF NOT EXISTS role VARCHAR(100)');
         await pool.query('ALTER TABLE members ADD COLUMN IF NOT EXISTS department VARCHAR(100)');
         await pool.query('ALTER TABLE members ADD COLUMN IF NOT EXISTS joined_at DATE');
-        await pool.query('ALTER TABLE members ADD COLUMN IF NOT EXISTS bio TEXT');
+        await pool.query('ALTER TABLE members ADD COLUMN IF NOT EXISTS birth_date DATE');
         await pool.query(
           'ALTER TABLE members ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()',
         );
@@ -77,12 +75,14 @@ class MemberRepository {
         await pool.query('ALTER TABLE members DROP CONSTRAINT IF EXISTS members_user_id_key');
         await pool.query('ALTER TABLE members DROP CONSTRAINT IF EXISTS members_user_id_fkey');
         await pool.query('ALTER TABLE members DROP COLUMN IF EXISTS user_id');
+        await pool.query('DROP INDEX IF EXISTS idx_members_role');
+        await pool.query('ALTER TABLE members DROP COLUMN IF EXISTS role');
+        await pool.query('ALTER TABLE members DROP COLUMN IF EXISTS bio');
 
         await pool.query('ALTER TABLE members ALTER COLUMN name SET NOT NULL');
         await pool.query('ALTER TABLE members ALTER COLUMN email DROP NOT NULL');
 
         await pool.query('CREATE INDEX IF NOT EXISTS idx_members_email_lower ON members (LOWER(email))');
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_members_role ON members (role)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_members_department ON members (department)');
 
         await pool.query(`
@@ -92,10 +92,9 @@ class MemberRepository {
             email VARCHAR(100) UNIQUE,
             is_admin BOOLEAN NOT NULL DEFAULT FALSE,
             phone VARCHAR(30),
-            role VARCHAR(100),
             department VARCHAR(100),
             joined_at DATE,
-            bio TEXT,
+            birth_date DATE,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
           )
@@ -107,10 +106,9 @@ class MemberRepository {
           'ALTER TABLE test_members ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE',
         );
         await pool.query('ALTER TABLE test_members ADD COLUMN IF NOT EXISTS phone VARCHAR(30)');
-        await pool.query('ALTER TABLE test_members ADD COLUMN IF NOT EXISTS role VARCHAR(100)');
         await pool.query('ALTER TABLE test_members ADD COLUMN IF NOT EXISTS department VARCHAR(100)');
         await pool.query('ALTER TABLE test_members ADD COLUMN IF NOT EXISTS joined_at DATE');
-        await pool.query('ALTER TABLE test_members ADD COLUMN IF NOT EXISTS bio TEXT');
+        await pool.query('ALTER TABLE test_members ADD COLUMN IF NOT EXISTS birth_date DATE');
         await pool.query(
           'ALTER TABLE test_members ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()',
         );
@@ -126,9 +124,11 @@ class MemberRepository {
 
         await pool.query('ALTER TABLE test_members ALTER COLUMN name SET NOT NULL');
         await pool.query('ALTER TABLE test_members ALTER COLUMN email DROP NOT NULL');
+        await pool.query('DROP INDEX IF EXISTS idx_test_members_role');
+        await pool.query('ALTER TABLE test_members DROP COLUMN IF EXISTS role');
+        await pool.query('ALTER TABLE test_members DROP COLUMN IF EXISTS bio');
 
         await pool.query('CREATE INDEX IF NOT EXISTS idx_test_members_email_lower ON test_members (LOWER(email))');
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_test_members_role ON test_members (role)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_test_members_department ON test_members (department)');
       })().catch((error) => {
         ensureMembersSchemaPromise = null;
@@ -149,10 +149,9 @@ class MemberRepository {
           email,
           is_admin AS "isAdmin",
           phone,
-          role,
           department,
           CASE WHEN joined_at IS NULL THEN NULL ELSE TO_CHAR(joined_at, 'YYYY-MM-DD') END AS "joinedAt",
-          bio
+          CASE WHEN birth_date IS NULL THEN NULL ELSE TO_CHAR(birth_date, 'YYYY-MM-DD') END AS "birthDate"
         FROM ${membersTable}
         ORDER BY name COLLATE "ko-KR-x-icu" ASC, id ASC
       `,
@@ -215,18 +214,17 @@ class MemberRepository {
     const membersTable = getScopedTableNames(scope).members;
     await pool.query(
       `
-        INSERT INTO ${membersTable} (name, email, is_admin, phone, role, department, joined_at, bio)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO ${membersTable} (name, email, is_admin, phone, department, joined_at, birth_date)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
       `,
       [
         payload.name,
         payload.email,
         payload.isAdmin,
         payload.phone,
-        payload.role,
         payload.department,
         payload.joinedAt,
-        payload.bio,
+        payload.birthDate,
       ],
     );
   }
@@ -241,22 +239,20 @@ class MemberRepository {
           email = $2,
           is_admin = $3,
           phone = $4,
-          role = $5,
-          department = $6,
-          joined_at = $7,
-          bio = $8,
+          department = $5,
+          joined_at = $6,
+          birth_date = $7,
           updated_at = NOW()
-        WHERE id = $9
+        WHERE id = $8
       `,
       [
         payload.name,
         payload.email,
         payload.isAdmin,
         payload.phone,
-        payload.role,
         payload.department,
         payload.joinedAt,
-        payload.bio,
+        payload.birthDate,
         memberId,
       ],
     );

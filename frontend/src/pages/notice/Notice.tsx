@@ -9,6 +9,7 @@ import NoticeDetailModal, { type NoticeFormState } from './NoticeDetailModal';
 import { AiTwotonePushpin } from 'react-icons/ai';
 import { IoPersonCircleSharp } from 'react-icons/io5';
 import { FaClock } from 'react-icons/fa';
+import LoadingComponent from '@/common/LoadingComponent';
 
 interface NoticeItem {
   id: number;
@@ -498,6 +499,10 @@ export default function Notice() {
     setVisibleNoticeCount((previous) => previous + DEFAULT_VISIBLE_NOTICES);
   };
 
+  if (isLoading) {
+    return <LoadingComponent />;
+  }
+
   return (
     <main className="flex flex-1 flex-col items-center px-4 py-8 lg:px-20">
       <div className="layout-content-container flex w-full flex-col gap-6">
@@ -518,11 +523,7 @@ export default function Notice() {
         </div>
 
         <div className="flex flex-col gap-4">
-          {isLoading ? (
-            <div className="rounded-xl border border-slate-200 bg-white px-6 py-8 text-sm font-medium text-slate-500">
-              공지사항을 불러오는 중입니다.
-            </div>
-          ) : displayedNotices.length === 0 ? (
+          {displayedNotices.length === 0 ? (
             <div className="rounded-xl border border-slate-200 bg-white px-6 py-8 text-sm font-medium text-slate-500">
               등록된 공지사항이 없습니다.
             </div>

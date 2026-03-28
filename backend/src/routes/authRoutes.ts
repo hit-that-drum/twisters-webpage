@@ -36,10 +36,28 @@ router.get(
   authController.getAdminUsers,
 );
 router.patch(
+  '/admin/users/:id',
+  passport.authenticate('jwt', { session: false }),
+  requireAdmin,
+  authController.updateUser,
+);
+router.patch(
   '/admin/users/:id/approve',
   passport.authenticate('jwt', { session: false }),
   requireAdmin,
   authController.approveUser,
+);
+router.patch(
+  '/admin/users/:id/decline',
+  passport.authenticate('jwt', { session: false }),
+  requireAdmin,
+  authController.declineUser,
+);
+router.delete(
+  '/admin/users/:id',
+  passport.authenticate('jwt', { session: false }),
+  requireAdmin,
+  authController.deleteUser,
 );
 
 export default router;

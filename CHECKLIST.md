@@ -17,11 +17,13 @@
 
   - ✅ 본문 최상단 카드 width fullscreen으로 수정
   - ✅ File Upload Component
+- **(2026.03.11)**
+  - ✅ 창 새로 켜도 로그인 상태 유지되게 상태관리
+  - ✅ E2E 테스트 도입
+- **(2026.03.27)**
+  - ✅ ScreenLoader Component
+  - ✅ 404 Error page
 
-- ☑️✅ ScreenLoader Component
-- ☑️✅ 404 Error page
-- ☑️✅ 창 새로 켜도 로그인 상태 유지되게 상태관리
-- ☑️✅ E2E 테스트 도입
 - ☑️✅ 마우스 포인터 귀엽게 만들기
 
 ---
@@ -117,12 +119,12 @@
   - ✅ 테스트 유저일 때 test_member DB에서 쿼리해 와서 정보 보여주기
   - ✅ Stitch AI로 디자인 완료
 - **(2026.03.10)**
-
   - ✅ Global Modal로 변경
   - ✅ birthDate 필드 추가
+- **(2026.03.24)**
+  - ✅ member DB에서 role, description 컬럼 제거
+  - ✅ member DB에 birthDate 컬럼 추가
 
-- ☑️✅ member DB에서 role, description 컬럼 제거
-- ☑️✅ member DB에 birthDate 컬럼 추가
 - ☑️✅ JOINED AT에 대한 생각 필요. 내가 가입하는 모든 유저들이 멤버에 추가되는 게 아니라, 연결시킬려고 했었는데 이 부분에 대한 정확한 기획이 필요.
 - ☑️✅ 모임 참가 여부 2025년부터 체크해서 보여주는 필드 추가(근데 이걸 어디서 manage 해야 하지? 정산처럼 settlement에서 가져올 수는 없고 그냥 users의 컬럼에 넣거나 아니면... 어케야 하나 흠... 조금 더 생각이 필요함)
 
@@ -192,7 +194,10 @@
 
   - ✅ 회원가입한 유저를 허가하는 로직을 만들어야 함
   - ✅ Stitch AI로 디자인 완료
-
-- ☑️✅ 회원가입 승인 버튼만 있고 거절 버튼은 없어서 "DECLINE" 버튼 추가
-- ☑️✅ 사용자 삭제 기능 도입
-- ☑️✅ TEST_ADMIN 계정일 때 test_member 계정에서 member query 해오기
+- **(2026.03.19)**
+  - ✅ 회원가입 승인 버튼만 있고 거절 버튼은 없어서 "DECLINE" 버튼 추가
+  - ✅ 사용자 삭제 기능 개발
+  - ✅ 사용자 정보 수정 기능 개발
+- **(2026.03.23)**
+  - ✅ TEST_ADMIN 계정일 때 test_member 계정에서 member query 해오기
+  - ✅ TEST 계정 init.sql에 정보 넣기 

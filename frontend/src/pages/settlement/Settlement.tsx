@@ -17,6 +17,7 @@ import SettlementDetailModal, {
   type SettlementAmountType,
   type SettlementFormState,
 } from './SettlementDetailModal';
+import LoadingComponent from '@/common/LoadingComponent.tsx';
 
 interface SettlementRecord {
   id: number;
@@ -150,7 +151,6 @@ const toFormStateFromRecord = (record: SettlementRecord): SettlementFormState =>
 
 interface SettlementGridProps {
   rows: SettlementRecord[];
-  isLoading: boolean;
   canManageSettlements: boolean;
   deletingSettlementId: number | null;
   onOpenAddDialog: () => void;
@@ -173,7 +173,6 @@ interface SettlementGridProps {
 
 const SettlementGrid = memo(function SettlementGrid({
   rows,
-  isLoading,
   canManageSettlements,
   deletingSettlementId,
   onOpenAddDialog,
@@ -249,16 +248,7 @@ const SettlementGrid = memo(function SettlementGrid({
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {isLoading ? (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="px-6 py-8 text-center text-sm font-medium text-slate-500"
-                    >
-                      정산 내역을 불러오는 중입니다.
-                    </td>
-                  </tr>
-                ) : rows.length === 0 ? (
+                {rows.length === 0 ? (
                   <tr>
                     <td
                       colSpan={5}
@@ -831,11 +821,14 @@ export default function Settlement() {
   const pageStart = totalRows === 0 ? 0 : page * rowsPerPage + 1;
   const pageEnd = totalRows === 0 ? 0 : Math.min((page + 1) * rowsPerPage, totalRows);
 
+  if (isLoading) {
+    return <LoadingComponent />;
+  }
+
   return (
     <>
       <SettlementGrid
         rows={pagedRows}
-        isLoading={isLoading}
         canManageSettlements={canManageSettlements}
         deletingSettlementId={deletingSettlementId}
         onOpenAddDialog={handleOpenAddDialog}
