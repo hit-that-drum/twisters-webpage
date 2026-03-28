@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { HttpError } from '../errors/httpError.js';
 import { authRepository } from '../repositories/authRepository.js';
+import { canSendPasswordResetEmails, sendPasswordResetEmail } from './emailService.js';
 import {
   createSessionAuthResponse,
   refreshSessionAuthResponse,
@@ -28,6 +29,7 @@ import {
 const SALT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MINUTES = 30;
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || 'http://localhost:5173';
+const isProduction = process.env.NODE_ENV === 'production';
 
 const readRequiredEnv = (...candidates: Array<string | undefined>) => {
   for (const value of candidates) {
@@ -454,8 +456,14 @@ class AuthService {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const user = await authRepository.findUserEmailByEmail(normalizedEmail);
     const genericMessage = '입력한 이메일로 비밀번호 재설정 링크를 전송했습니다.';
+    const isEmailDeliveryConfigured = canSendPasswordResetEmails();
+
+    if (isProduction && !isEmailDeliveryConfigured) {
+      throw new HttpError(500, '비밀번호 재설정 이메일 설정이 누락되었습니다.');
+    }
+
+    const user = await authRepository.findUserEmailByEmail(normalizedEmail);
 
     if (!user) {
       return { message: genericMessage };
@@ -469,7 +477,15 @@ class AuthService {
 
     const resetLink = `${FRONTEND_BASE_URL.replace(/\/+$/, '')}/signin?resetToken=${encodeURIComponent(rawToken)}&email=${encodeURIComponent(normalizedEmail)}`;
 
-    if (process.env.NODE_ENV === 'production') {
+    if (isEmailDeliveryConfigured) {
+      try {
+        await sendPasswordResetEmail(normalizedEmail, resetLink);
+      } catch (error) {
+        console.error('Password reset email send error:', error);
+      }
+    }
+
+    if (isProduction) {
       return { message: genericMessage };
     }
 
