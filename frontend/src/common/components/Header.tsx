@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LNB from '@/common/components/LNB';
 import { useAuth } from '@/features';
+import logo from '@/assets/twisters_logo_260304.svg';
 
 interface ProfileMenuItem {
   label: string;
@@ -100,7 +101,7 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
   return (
     <header className="font-grand-hotel mb-4 rounded-2xl border border-gray-200 bg-white px-4 py-3">
       <div className="flex items-center gap-3">
-        <img src="/src/assets/twisters_logo_260304.svg" alt="TWISTERS" className="h-15 w-35" />
+        <img src={logo} alt="TWISTERS" className="h-15 w-35" />
 
         <div className="hidden min-w-0 flex-1 md:block">
           <LNB />
