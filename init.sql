@@ -149,6 +149,7 @@ CREATE TABLE public.user_sessions (
 );
 
 CREATE INDEX idx_members_email_lower ON public.members (LOWER(email));
+CREATE UNIQUE INDEX idx_users_email_lower_unique ON public.users (LOWER(email));
 CREATE INDEX idx_members_department ON public.members (department);
 CREATE INDEX idx_test_members_email_lower ON public.test_members (LOWER(email));
 CREATE INDEX idx_test_members_department ON public.test_members (department);

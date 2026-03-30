@@ -316,7 +316,7 @@ class AuthService {
 
   async signUp(payload: SignUpDTO): Promise<PendingSignUpResponse> {
     const name = payload.name?.trim();
-    const email = payload.email?.trim().toLowerCase();
+    const email = payload.email?.trim();
     const password = payload.password;
 
     if (!name || !email || !password) {
