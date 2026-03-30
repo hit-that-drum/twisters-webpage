@@ -7,6 +7,7 @@ import { EditDeleteButton, GlobalButton } from '@/common/components';
 import MemberDetailModal, { type MemberFormState } from './MemberDetailModal';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import { BiMoneyWithdraw } from 'react-icons/bi';
+import LoadingComponent from '@/common/LoadingComponent';
 
 interface MemberUser {
   id: number;
@@ -628,6 +629,10 @@ export default function Member() {
     },
   ];
 
+  if (isLoading) {
+    return <LoadingComponent />;
+  }
+
   return (
     <section className="px-3 py-6 sm:px-4 sm:py-8 lg:px-20">
       <div className="mx-auto flex w-full flex-col gap-8">
@@ -663,9 +668,7 @@ export default function Member() {
               role="listbox"
               aria-labelledby="member-directory-heading"
             >
-              {isLoading ? (
-                <p className="px-4 py-5 text-sm font-medium text-slate-500">Loading members...</p>
-              ) : users.length === 0 ? (
+              {users.length === 0 ? (
                 <p className="px-4 py-5 text-sm font-medium text-slate-500">
                   No members available.
                 </p>
@@ -716,11 +719,7 @@ export default function Member() {
           </aside>
 
           <section className="flex flex-col gap-6 lg:col-span-9">
-            {isLoading ? (
-              <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-sm font-semibold text-slate-500 shadow-sm">
-                Loading member detail...
-              </div>
-            ) : selectedUser ? (
+            {selectedUser ? (
               <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-200/60">
                 <div className="p-6 md:p-8">
                   <div className="mb-8 flex flex-col gap-5 border-b border-slate-100 pb-8 md:flex-row md:items-center md:justify-between">
@@ -788,7 +787,6 @@ export default function Member() {
                     )}
                   </div>
                 </div>
-
               </article>
             ) : (
               <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-sm font-semibold text-slate-500 shadow-sm">
