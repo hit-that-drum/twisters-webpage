@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import loginPageRightImage from '/login_page_right_image.png';
-import { Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
+import { CircularProgress, Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '@/common/lib/api/apiClient';
+import LoadingComponent from '@/common/LoadingComponent.tsx';
 import { useAuth } from '@/features';
 import { SiKakaotalk } from 'react-icons/si';
 
@@ -132,6 +133,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
   });
   const [rememberFor30Days, setRememberFor30Days] = useState(false);
   const [wrongPasswordAttemptCount, setWrongPasswordAttemptCount] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetSubmitting, setIsResetSubmitting] = useState(false);
   const normalizedLoginEmail = formData.email.trim().toLowerCase();
   const remainingWrongPasswordAttempts = Math.max(
@@ -144,6 +146,10 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
       : wrongPasswordAttemptCount >= 3
         ? 'text-amber-700'
         : 'text-emerald-700';
+  const isSubmitLoading = isSubmitting || isAuthLoading;
+  const submitLoadingMessage = isLogin
+    ? '로그인 정보를 확인하고 있어요. 잠시만 기다려주세요.'
+    : '회원가입을 처리하고 있어요. 잠시만 기다려주세요.';
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -448,60 +454,69 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!isLogin) {
-      if (!formData.email || !formData.password || (!isLogin && !formData.name)) {
-        enqueueSnackbar('모든 필드를 입력해주세요.', { variant: 'error' });
-        return;
-      }
-      try {
-        const response = await apiFetch('/authentication/signup', {
-          method: 'POST',
-          body: JSON.stringify(formData),
-        });
+    if (isSubmitting) {
+      return;
+    }
 
-        const data = await response.json();
+    setIsSubmitting(true);
 
-        if (response.ok) {
-          if (data?.status === 'pending') {
-            enqueueSnackbar(
-              data.message || '회원가입이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.',
-              { variant: 'success' },
-            );
-            navigate('/signin');
-            return;
-          }
+    try {
+      if (!isLogin) {
+        if (!formData.email || !formData.password || (!isLogin && !formData.name)) {
+          enqueueSnackbar('모든 필드를 입력해주세요.', { variant: 'error' });
+          return;
+        }
+        try {
+          const response = await apiFetch('/authentication/signup', {
+            method: 'POST',
+            body: JSON.stringify(formData),
+          });
 
-          if (typeof data.token === 'string' && typeof data.refreshToken === 'string') {
-            const authenticatedUser = await completeAuthSession(data.token, data.refreshToken, true);
-            if (!authenticatedUser) {
-              enqueueSnackbar('회원가입 직후 세션을 복구하지 못했습니다.', { variant: 'error' });
+          const data = await response.json();
+
+          if (response.ok) {
+            if (data?.status === 'pending') {
+              enqueueSnackbar(
+                data.message || '회원가입이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.',
+                { variant: 'success' },
+              );
+              navigate('/signin');
               return;
             }
+
+            if (typeof data.token === 'string' && typeof data.refreshToken === 'string') {
+              const authenticatedUser = await completeAuthSession(data.token, data.refreshToken, true);
+              if (!authenticatedUser) {
+                enqueueSnackbar('회원가입 직후 세션을 복구하지 못했습니다.', { variant: 'error' });
+                return;
+              }
+            } else {
+              enqueueSnackbar('회원가입 성공 응답에 인증 토큰이 없습니다.', { variant: 'error' });
+              return;
+            }
+
+            const userIdx = data.user?.id ?? data.userId;
+            if (!userIdx) {
+              enqueueSnackbar('회원가입 성공 응답에 사용자 ID가 없습니다.', { variant: 'error' });
+              return;
+            }
+
+            enqueueSnackbar('회원가입 성공!', { variant: 'success' });
+            navigate(`/${userIdx}`);
           } else {
-            enqueueSnackbar('회원가입 성공 응답에 인증 토큰이 없습니다.', { variant: 'error' });
-            return;
+            enqueueSnackbar(`회원가입 실패: ${data.error || '알 수 없는 에러'}`, {
+              variant: 'error',
+            });
           }
-
-          const userIdx = data.user?.id ?? data.userId;
-          if (!userIdx) {
-            enqueueSnackbar('회원가입 성공 응답에 사용자 ID가 없습니다.', { variant: 'error' });
-            return;
-          }
-
-          enqueueSnackbar('회원가입 성공!', { variant: 'success' });
-          navigate(`/${userIdx}`);
-        } else {
-          enqueueSnackbar(`회원가입 실패: ${data.error || '알 수 없는 에러'}`, {
+        } catch (error) {
+          console.error('Error:', error);
+          enqueueSnackbar('서버와 연결할 수 없습니다. 백엔드가 켜져 있는지 확인하세요.', {
             variant: 'error',
           });
         }
-      } catch (error) {
-        console.error('Error:', error);
-        enqueueSnackbar('서버와 연결할 수 없습니다. 백엔드가 켜져 있는지 확인하세요.', {
-          variant: 'error',
-        });
+        return;
       }
-    } else {
+
       if (!formData.email || !formData.password) {
         enqueueSnackbar('모든 필드를 입력해주세요.', { variant: 'error' });
         return;
@@ -588,6 +603,8 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
           variant: 'error',
         });
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -704,6 +721,22 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
 
   return (
     <>
+      {isSubmitting && (
+        <>
+          <LoadingComponent size={88} speed={1} />
+          <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center px-6">
+            <div
+              className="mt-36 rounded-full bg-white/92 px-5 py-2 text-sm font-semibold text-slate-700 shadow-lg shadow-slate-950/10 backdrop-blur-sm"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {submitLoadingMessage}
+            </div>
+          </div>
+        </>
+      )}
+
       <div className="flex min-h-screen w-full items-center justify-center bg-white p-4 md:p-8">
         <div className="flex h-full w-full max-w-[1400px] min-h-[630px] overflow-hidden">
           {/* 왼쪽 영역 */}
@@ -713,7 +746,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                 {isLogin ? 'COME ON!' : 'WELCOME!'}
               </h2>
 
-              <form className="space-y-6" onSubmit={handleSubmit}>
+              <form className="space-y-6" onSubmit={handleSubmit} aria-busy={isSubmitLoading}>
                 {/* Name 필드: 회원가입 모드에서만 표시 */}
                 {!isLogin && (
                   <div>
@@ -729,8 +762,9 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
+                      disabled={isSubmitLoading}
                       placeholder="Enter your name"
-                      className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
+                      className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                       required
                     />
                   </div>
@@ -744,13 +778,14 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                   <input
                     id="email"
                     type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="E-MAIL을 입력해주세요"
-                    className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
-                    required
-                  />
+                     name="email"
+                     value={formData.email}
+                     onChange={handleChange}
+                     disabled={isSubmitLoading}
+                     placeholder="E-MAIL을 입력해주세요"
+                     className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                     required
+                   />
                 </div>
 
                 {/* Password */}
@@ -764,13 +799,14 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                   <input
                     id="password"
                     type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="비밀번호를 입력해주세요(8-12자)"
-                    className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
-                    required
-                  />
+                     name="password"
+                     value={formData.password}
+                     onChange={handleChange}
+                     disabled={isSubmitLoading}
+                     placeholder="비밀번호를 입력해주세요(8-12자)"
+                     className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                     required
+                   />
                 </div>
 
                 {isLogin && normalizedLoginEmail && wrongPasswordAttemptCount > 0 && (
@@ -787,12 +823,13 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <input
-                        type="checkbox"
-                        id="remember"
-                        checked={rememberFor30Days}
-                        onChange={(event) => setRememberFor30Days(event.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 accent-green-700 cursor-pointer"
-                      />
+                         type="checkbox"
+                         id="remember"
+                         checked={rememberFor30Days}
+                         disabled={isSubmitLoading}
+                         onChange={(event) => setRememberFor30Days(event.target.checked)}
+                         className="h-4 w-4 cursor-pointer rounded border-gray-300 accent-green-700 disabled:cursor-not-allowed"
+                       />
                       <label
                         htmlFor="remember"
                         className="text-xs font-medium text-gray-600 cursor-pointer"
@@ -800,12 +837,13 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                         30일 동안 기억하기
                       </label>
                     </div>
-                    <button
-                      type="button"
-                      className="text-xs font-bold text-green-600 hover:underline"
-                      onClick={handleForgotPassword}
-                    >
-                      비밀번호 재설정
+                     <button
+                       type="button"
+                       disabled={isSubmitLoading}
+                       className="text-xs font-bold text-green-600 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                       onClick={handleForgotPassword}
+                     >
+                       비밀번호 재설정
                     </button>
                   </div>
                 )}
@@ -813,9 +851,17 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-green-700 py-4 text-sm font-bold text-white transition-all hover:bg-green-800 active:scale-[0.98]"
+                  disabled={isSubmitLoading}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-green-700 py-4 text-sm font-bold text-white transition-all hover:bg-green-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-green-500 disabled:active:scale-100"
                 >
-                  {isLogin ? '로그인' : '회원가입'}
+                  {isSubmitLoading ? (
+                    <>
+                      <CircularProgress size={18} color="inherit" />
+                      <span>{isLogin ? '로그인 중...' : '회원가입 중...'}</span>
+                    </>
+                  ) : (
+                    <span>{isLogin ? '로그인' : '회원가입'}</span>
+                  )}
                 </button>
               </form>
 
@@ -825,8 +871,15 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
               </div>
 
               {/* Social Buttons */}
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                {isGoogleOAuthEnabled ? (
+              <div
+                className="flex flex-wrap items-center justify-center gap-3"
+                aria-busy={isSubmitLoading}
+              >
+                {isGoogleOAuthEnabled ? isSubmitLoading ? (
+                  <div className="inline-flex h-10 w-48 items-center justify-center rounded-sm border border-gray-200 bg-gray-100 px-4 text-sm font-semibold text-gray-500">
+                    Google 로그인 대기 중...
+                  </div>
+                ) : (
                   <GoogleLogin
                     onSuccess={handleGoogleSuccess}
                     onError={handleGoogleError}
@@ -841,7 +894,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                 <button
                   type="button"
                   onClick={handleKakaoLogin}
-                  disabled={!isKakaoOAuthEnabled}
+                  disabled={isSubmitLoading || !isKakaoOAuthEnabled}
                   className="inline-flex h-10 w-48 items-center justify-center gap-2 rounded-sm bg-[#FEE500] px-4 text-sm font-semibold text-[#191919] transition hover:bg-[#fada0a] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
                 >
                   <SiKakaotalk size={20} />
@@ -862,7 +915,8 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                 <button
                   type="button"
                   onClick={() => navigate(isLogin ? '/signup' : '/signin')}
-                  className="font-bold text-green-600 hover:underline"
+                  disabled={isSubmitLoading}
+                  className="font-bold text-green-600 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isLogin ? '회원가입' : '로그인'}
                 </button>
