@@ -95,9 +95,9 @@ Role-based access control between administrators a nd regular users is implement
 ### 테스트 계정
 
 | Role   | Name        | Email                    | Password            |
-| ------ | ----------- | ------------------------ | ------------------- |
-| Admin  | TEST_ADMIN  | twistersAdmin@gmail.com  | twisters-admin-test |
-| Member | TEST_MEMBER | twistersMember@gmail.com | twister-member-test |
+| ------ | ----------- |--------------------------| ------------------- |
+| Admin  | TEST_ADMIN  | twistersadmin@gmail.com  | twisters-admin-test |
+| Member | TEST_MEMBER | twistersmember@gmail.com | twister-member-test |
 
 <br>
 

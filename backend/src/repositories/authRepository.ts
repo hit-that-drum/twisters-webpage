@@ -22,6 +22,9 @@ class AuthRepository {
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isTest" BOOLEAN NOT NULL DEFAULT FALSE');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "profileImage" TEXT');
         await pool.query('ALTER TABLE users ALTER COLUMN "profileImage" TYPE TEXT');
+        await pool.query(
+          'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower_unique ON users (LOWER(email))',
+        );
       })().catch((error) => {
         ensureUsersSchemaPromise = null;
         throw error;
@@ -62,13 +65,13 @@ class AuthRepository {
   }
 
   async findPublicUserByEmail(email: string) {
-    const result = await pool.query<PublicUserRow>('SELECT id, name, email FROM users WHERE email = $1', [email]);
+    const result = await pool.query<PublicUserRow>('SELECT id, name, email FROM users WHERE LOWER(email) = LOWER($1)', [email]);
     return result.rows[0] ?? null;
   }
 
   async findApprovalUserByEmail(email: string) {
     const result = await pool.query<ApprovalUserRow>(
-      'SELECT id, name, email, "isAllowed" FROM users WHERE email = $1 LIMIT 1',
+      'SELECT id, name, email, "isAllowed" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1',
       [email],
     );
     return result.rows[0] ?? null;
@@ -139,7 +142,7 @@ class AuthRepository {
   }
 
   async findUserEmailByEmail(email: string) {
-    const result = await pool.query<UserEmailRow>('SELECT id, email FROM users WHERE email = $1 LIMIT 1', [email]);
+    const result = await pool.query<UserEmailRow>('SELECT id, email FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1', [email]);
     return result.rows[0] ?? null;
   }
 

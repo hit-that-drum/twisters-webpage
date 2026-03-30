@@ -47,7 +47,7 @@ passport.use(
     async (email, password, done) => {
       try {
         const result = await query<PassportUserRow>(
-          'SELECT id, name, email, password, "isAdmin", "isAllowed" FROM users WHERE email = $1',
+          'SELECT id, name, email, password, "isAdmin", "isAllowed" FROM users WHERE LOWER(email) = LOWER($1)',
           [email],
         );
         const user = result.rows[0];
