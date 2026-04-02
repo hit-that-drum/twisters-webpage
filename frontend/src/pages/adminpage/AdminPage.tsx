@@ -743,7 +743,7 @@ export default function AdminPage() {
         setRemovingProfileImageUserId(null);
       }
     },
-    [canManageUsers, handleExpiredSession, loadUsers, meInfo?.id, refreshMeInfo],
+    [handleExpiredSession, loadUsers, meInfo?.id, refreshMeInfo],
   );
 
   const sortedAllUsers = useMemo(

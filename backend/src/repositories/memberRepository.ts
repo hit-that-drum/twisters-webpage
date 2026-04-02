@@ -81,6 +81,8 @@ class MemberRepository {
 
         await pool.query('ALTER TABLE members ALTER COLUMN name SET NOT NULL');
         await pool.query('ALTER TABLE members ALTER COLUMN email DROP NOT NULL');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "profileImage" TEXT');
+        await pool.query('ALTER TABLE users ALTER COLUMN "profileImage" TYPE TEXT');
 
         await pool.query('CREATE INDEX IF NOT EXISTS idx_members_email_lower ON members (LOWER(email))');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_members_department ON members (department)');
@@ -124,6 +126,8 @@ class MemberRepository {
 
         await pool.query('ALTER TABLE test_members ALTER COLUMN name SET NOT NULL');
         await pool.query('ALTER TABLE test_members ALTER COLUMN email DROP NOT NULL');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "profileImage" TEXT');
+        await pool.query('ALTER TABLE users ALTER COLUMN "profileImage" TYPE TEXT');
         await pool.query('DROP INDEX IF EXISTS idx_test_members_role');
         await pool.query('ALTER TABLE test_members DROP COLUMN IF EXISTS role');
         await pool.query('ALTER TABLE test_members DROP COLUMN IF EXISTS bio');
@@ -144,16 +148,18 @@ class MemberRepository {
     const result = await pool.query<MemberListRow>(
       `
         SELECT
-          id,
-          name,
-          email,
-          is_admin AS "isAdmin",
-          phone,
-          department,
-          CASE WHEN joined_at IS NULL THEN NULL ELSE TO_CHAR(joined_at, 'YYYY-MM-DD') END AS "joinedAt",
-          CASE WHEN birth_date IS NULL THEN NULL ELSE TO_CHAR(birth_date, 'YYYY-MM-DD') END AS "birthDate"
-        FROM ${membersTable}
-        ORDER BY name COLLATE "ko-KR-x-icu" ASC, id ASC
+          m.id,
+          m.name,
+          m.email,
+          u."profileImage" AS "profileImage",
+          m.is_admin AS "isAdmin",
+          m.phone,
+          m.department,
+          CASE WHEN m.joined_at IS NULL THEN NULL ELSE TO_CHAR(m.joined_at, 'YYYY-MM-DD') END AS "joinedAt",
+          CASE WHEN m.birth_date IS NULL THEN NULL ELSE TO_CHAR(m.birth_date, 'YYYY-MM-DD') END AS "birthDate"
+        FROM ${membersTable} m
+        LEFT JOIN users u ON m.email IS NOT NULL AND LOWER(BTRIM(u.email)) = LOWER(BTRIM(m.email))
+        ORDER BY m.name COLLATE "ko-KR-x-icu" ASC, m.id ASC
       `,
     );
 

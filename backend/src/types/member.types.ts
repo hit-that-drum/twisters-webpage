@@ -2,6 +2,7 @@ export interface MemberListRow {
   id: number;
   name: string;
   email: string | null;
+  profileImage: string | null;
   isAdmin: boolean | number;
   phone: string | null;
   department: string | null;
@@ -13,6 +14,7 @@ export interface Member {
   id: number;
   name: string;
   email: string | null;
+  profileImage: string | null;
   isAdmin: boolean;
   phone: string | null;
   department: string | null;
