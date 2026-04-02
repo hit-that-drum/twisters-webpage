@@ -13,6 +13,9 @@ const WRONG_PASSWORD_ATTEMPTS_KEY = 'wrongPasswordAttemptsByEmail';
 const MAX_WRONG_PASSWORD_ATTEMPTS = 5;
 const KAKAO_OAUTH_STATE_KEY = 'kakaoOAuthState';
 const KAKAO_OAUTH_PROCESSED_CODE_KEY = 'kakaoOAuthProcessedCode';
+const GOOGLE_OAUTH_LOADING_MESSAGE = 'Google 로그인 정보를 확인하고 있어요. 잠시만 기다려주세요.';
+const KAKAO_OAUTH_LOADING_MESSAGE = '카카오 로그인 정보를 확인하고 있어요. 잠시만 기다려주세요.';
+const KAKAO_REDIRECT_LOADING_MESSAGE = '카카오 로그인 페이지로 이동하고 있어요. 잠시만 기다려주세요.';
 
 type WrongPasswordAttemptsByEmail = Record<string, number>;
 
@@ -134,6 +137,9 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
   const [rememberFor30Days, setRememberFor30Days] = useState(false);
   const [wrongPasswordAttemptCount, setWrongPasswordAttemptCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [oauthLoadingMessage, setOAuthLoadingMessage] = useState<string | null>(
+    kakaoCode ? KAKAO_OAUTH_LOADING_MESSAGE : null,
+  );
   const [isResetSubmitting, setIsResetSubmitting] = useState(false);
   const normalizedLoginEmail = formData.email.trim().toLowerCase();
   const remainingWrongPasswordAttempts = Math.max(
@@ -146,10 +152,12 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
       : wrongPasswordAttemptCount >= 3
         ? 'text-amber-700'
         : 'text-emerald-700';
-  const isSubmitLoading = isSubmitting || isAuthLoading;
+  const isOAuthLoading = oauthLoadingMessage !== null;
+  const isSubmitLoading = isSubmitting || isAuthLoading || isOAuthLoading;
   const submitLoadingMessage = isLogin
     ? '로그인 정보를 확인하고 있어요. 잠시만 기다려주세요.'
     : '회원가입을 처리하고 있어요. 잠시만 기다려주세요.';
+  const activeLoadingMessage = oauthLoadingMessage ?? submitLoadingMessage;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -172,45 +180,48 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
         return;
       }
 
-      logKakaoOAuthDebug('[Kakao OAuth] Callback query params:', {
-        code: kakaoCode,
-        state: kakaoState,
-        error: kakaoError,
-        errorDescription: kakaoErrorDescription,
-      });
-
-      const lastProcessedCode = sessionStorage.getItem(KAKAO_OAUTH_PROCESSED_CODE_KEY);
-      if (lastProcessedCode === kakaoCode) {
-        logKakaoOAuthDebug('[Kakao OAuth] Skipping already processed code:', kakaoCode);
-        return;
-      }
-
-      if (!isKakaoOAuthEnabled) {
-        enqueueSnackbar('카카오 로그인 설정이 누락되었습니다.', { variant: 'error' });
-        navigate('/signin', { replace: true });
-        return;
-      }
-
-      const expectedState = sessionStorage.getItem(KAKAO_OAUTH_STATE_KEY);
-      logKakaoOAuthDebug('[Kakao OAuth] Expected state from sessionStorage:', expectedState);
-
-      if (!expectedState || !kakaoState || expectedState !== kakaoState) {
-        enqueueSnackbar('카카오 로그인 상태 검증에 실패했습니다. 다시 시도해주세요.', {
-          variant: 'error',
-        });
-        navigate('/signin', { replace: true });
-        return;
-      }
-
-      sessionStorage.removeItem(KAKAO_OAUTH_STATE_KEY);
-      sessionStorage.setItem(KAKAO_OAUTH_PROCESSED_CODE_KEY, kakaoCode);
-
-      logKakaoOAuthDebug('[Kakao OAuth] Exchange request payload:', {
-        code: kakaoCode,
-        redirectUri: resolvedKakaoRedirectUri,
-      });
+      setOAuthLoadingMessage(KAKAO_OAUTH_LOADING_MESSAGE);
+      let shouldResetOAuthLoading = true;
 
       try {
+        logKakaoOAuthDebug('[Kakao OAuth] Callback query params:', {
+          code: kakaoCode,
+          state: kakaoState,
+          error: kakaoError,
+          errorDescription: kakaoErrorDescription,
+        });
+
+        const lastProcessedCode = sessionStorage.getItem(KAKAO_OAUTH_PROCESSED_CODE_KEY);
+        if (lastProcessedCode === kakaoCode) {
+          logKakaoOAuthDebug('[Kakao OAuth] Skipping already processed code:', kakaoCode);
+          return;
+        }
+
+        if (!isKakaoOAuthEnabled) {
+          enqueueSnackbar('카카오 로그인 설정이 누락되었습니다.', { variant: 'error' });
+          navigate('/signin', { replace: true });
+          return;
+        }
+
+        const expectedState = sessionStorage.getItem(KAKAO_OAUTH_STATE_KEY);
+        logKakaoOAuthDebug('[Kakao OAuth] Expected state from sessionStorage:', expectedState);
+
+        if (!expectedState || !kakaoState || expectedState !== kakaoState) {
+          enqueueSnackbar('카카오 로그인 상태 검증에 실패했습니다. 다시 시도해주세요.', {
+            variant: 'error',
+          });
+          navigate('/signin', { replace: true });
+          return;
+        }
+
+        sessionStorage.removeItem(KAKAO_OAUTH_STATE_KEY);
+        sessionStorage.setItem(KAKAO_OAUTH_PROCESSED_CODE_KEY, kakaoCode);
+
+        logKakaoOAuthDebug('[Kakao OAuth] Exchange request payload:', {
+          code: kakaoCode,
+          redirectUri: resolvedKakaoRedirectUri,
+        });
+
         const response = await apiFetch('/authentication/auth/kakao', {
           method: 'POST',
           body: JSON.stringify({
@@ -272,11 +283,16 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
         }
 
         enqueueSnackbar('카카오 로그인 성공!', { variant: 'success' });
+        shouldResetOAuthLoading = false;
         navigate(`/${userIdx}`, { replace: true });
       } catch (error) {
         console.error('Kakao auth error:', error);
         enqueueSnackbar('카카오 로그인 처리 중 오류가 발생했습니다.', { variant: 'error' });
         navigate('/signin', { replace: true });
+      } finally {
+        if (shouldResetOAuthLoading) {
+          setOAuthLoadingMessage(null);
+        }
       }
     };
 
@@ -621,6 +637,9 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
     const decodedCredentialPayload = decodeGoogleCredentialPayload(googleToken);
     logGoogleOAuthDebug('[Google OAuth] Decoded credential payload:', decodedCredentialPayload);
 
+    setOAuthLoadingMessage(GOOGLE_OAUTH_LOADING_MESSAGE);
+    let shouldResetOAuthLoading = true;
+
     try {
       const response = await apiFetch('/authentication/auth/google', {
         method: 'POST',
@@ -671,12 +690,17 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
       }
 
       enqueueSnackbar('구글 로그인 성공!', { variant: 'success' });
+      shouldResetOAuthLoading = false;
       navigate(`/${userIdx}`);
     } catch (error) {
       console.error('Google auth error:', error);
       enqueueSnackbar('서버와 연결할 수 없습니다. 잠시 후 다시 시도해주세요.', {
         variant: 'error',
       });
+    } finally {
+      if (shouldResetOAuthLoading) {
+        setOAuthLoadingMessage(null);
+      }
     }
   };
 
@@ -694,6 +718,8 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
       enqueueSnackbar('카카오 로그인을 사용하려면 설정이 필요합니다.', { variant: 'error' });
       return;
     }
+
+    setOAuthLoadingMessage(KAKAO_REDIRECT_LOADING_MESSAGE);
 
     const oauthState = createOAuthState();
     sessionStorage.removeItem(KAKAO_OAUTH_PROCESSED_CODE_KEY);
@@ -721,7 +747,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
 
   return (
     <>
-      {isSubmitting && (
+      {isSubmitLoading ? (
         <>
           <LoadingComponent size={88} speed={1} />
           <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center px-6">
@@ -731,11 +757,11 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
               aria-live="polite"
               aria-atomic="true"
             >
-              {submitLoadingMessage}
+              {activeLoadingMessage}
             </div>
           </div>
         </>
-      )}
+      ) : null}
 
       <div className="flex min-h-screen w-full items-center justify-center bg-white p-4 md:p-8">
         <div className="flex h-full w-full max-w-[1400px] min-h-[630px] overflow-hidden">

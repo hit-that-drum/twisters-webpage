@@ -161,9 +161,10 @@ class AuthRepository {
   }
 
   async findAllAdminUsers(onlyTestUsers = false) {
+    await this.ensureUsersSchema();
     const result = await pool.query<AdminUserRow>(
       `
-        SELECT id, name, email, "isAdmin", "isAllowed", "createdAt"
+        SELECT id, name, email, "profileImage", "isAdmin", "isAllowed", "createdAt"
         FROM users
         WHERE $1::boolean = FALSE OR ("isTest" = TRUE OR name ILIKE 'TEST%')
         ORDER BY "createdAt" DESC, id DESC
