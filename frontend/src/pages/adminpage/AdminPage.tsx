@@ -303,6 +303,7 @@ export default function AdminPage() {
   const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
   const [decliningUserId, setDecliningUserId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [removingProfileImageUserId, setRemovingProfileImageUserId] = useState<number | null>(null);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [editUserForm, setEditUserForm] = useState<AdminUserFormState>(EMPTY_ADMIN_USER_FORM);
@@ -690,6 +691,61 @@ export default function AdminPage() {
     [handleExpiredSession, loadUsers, meInfo?.id],
   );
 
+  const handleDeleteUserProfileImage = useCallback(
+    async (user: AdminUserRecord) => {
+      if (!user.profileImage) {
+        enqueueSnackbar('삭제할 프로필 이미지가 없습니다.', { variant: 'info' });
+        return;
+      }
+
+      const shouldDeleteProfileImage = window.confirm(
+        `'${user.name}' 사용자의 프로필 이미지를 삭제하시겠습니까? 삭제 후에는 이니셜 아바타로 표시됩니다.`,
+      );
+      if (!shouldDeleteProfileImage) {
+        return;
+      }
+
+      setRemovingProfileImageUserId(user.id);
+
+      try {
+        const response = await apiFetch(`/authentication/admin/users/${user.id}/profile-image`, {
+          method: 'DELETE',
+        });
+        const payload = await parseApiResponse(response);
+
+        if (response.status === 401) {
+          handleExpiredSession();
+          return;
+        }
+
+        if (!response.ok) {
+          enqueueSnackbar(
+            `프로필 이미지 삭제 실패: ${getApiMessage(payload, '알 수 없는 에러')}`,
+            {
+              variant: 'error',
+            },
+          );
+          return;
+        }
+
+        enqueueSnackbar(getApiMessage(payload, '사용자 프로필 이미지가 삭제되었습니다.'), {
+          variant: 'success',
+        });
+
+        await Promise.all([
+          loadUsers(),
+          meInfo?.id === user.id ? refreshMeInfo() : Promise.resolve(null),
+        ]);
+      } catch (error) {
+        console.error('User profile image delete error:', error);
+        enqueueSnackbar('프로필 이미지 삭제 중 오류가 발생했습니다.', { variant: 'error' });
+      } finally {
+        setRemovingProfileImageUserId(null);
+      }
+    },
+    [canManageUsers, handleExpiredSession, loadUsers, meInfo?.id, refreshMeInfo],
+  );
+
   const sortedAllUsers = useMemo(
     () => [...allUsers].sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
     [allUsers],
@@ -981,6 +1037,7 @@ export default function AdminPage() {
                       : 'text-slate-400';
                     const statusDotClassName = user.isAllowed ? 'bg-emerald-500' : 'bg-slate-300';
                     const isCurrentAdminUser = meInfo?.id === user.id;
+                    const isRemovingProfileImage = removingProfileImageUserId === user.id;
 
                     return (
                       <tr key={user.id} className="transition-colors hover:bg-slate-50/50">
@@ -1017,17 +1074,36 @@ export default function AdminPage() {
                           {formatJoinedDate(user.createdAt)}
                         </td>
 
-                        <td className="px-6 py-4 text-right">
-                          <EditDeleteButton
-                            onEditClick={() => {
-                              handleOpenEditDialog(user);
-                            }}
-                            onDeleteClick={() => {
-                              void handleDeleteUser(user);
-                            }}
-                            isDeleting={deletingUserId === user.id}
-                            isDeleteDisabled={deletingUserId !== null || isCurrentAdminUser}
-                          />
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-end gap-2">
+                            {user.profileImage ? (
+                              <button
+                                type="button"
+                                disabled={isRemovingProfileImage || deletingUserId === user.id}
+                                onClick={() => {
+                                  void handleDeleteUserProfileImage(user);
+                                }}
+                                className="inline-flex h-9 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {isRemovingProfileImage ? 'Removing photo...' : 'Remove photo'}
+                              </button>
+                            ) : null}
+
+                            <EditDeleteButton
+                              onEditClick={() => {
+                                handleOpenEditDialog(user);
+                              }}
+                              onDeleteClick={() => {
+                                void handleDeleteUser(user);
+                              }}
+                              isDeleting={deletingUserId === user.id}
+                              isDeleteDisabled={
+                                deletingUserId !== null ||
+                                isCurrentAdminUser ||
+                                isRemovingProfileImage
+                              }
+                            />
+                          </div>
                         </td>
                       </tr>
                     );

@@ -673,6 +673,36 @@ class AuthService {
     }));
   }
 
+  async deleteUserProfileImage(
+    authenticatedUser: AuthenticatedUser | undefined,
+    rawUserId: unknown,
+  ) {
+    const currentUser = requireAuthenticatedUser(authenticatedUser);
+    const userId = Number(rawUserId);
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      throw new HttpError(400, '유효한 사용자 ID가 필요합니다.');
+    }
+
+    const user = await authRepository.findManagedUserById(userId);
+    if (!user) {
+      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
+    }
+
+    requireScopedAdminTarget(currentUser, user);
+
+    const updated = await authRepository.updateProfileImageByUserId(userId, null);
+    if (!updated) {
+      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
+    }
+
+    return {
+      message: '사용자 프로필 이미지가 삭제되었습니다.',
+      userId,
+      profileImage: null,
+    };
+  }
+
   async approveUser(authenticatedUser: AuthenticatedUser | undefined, rawUserId: unknown) {
     const currentUser = requireAuthenticatedUser(authenticatedUser);
     const userId = Number(rawUserId);
