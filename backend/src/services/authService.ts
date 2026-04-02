@@ -51,9 +51,9 @@ const readOptionalKakaoClientSecret = () => {
 };
 
 const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID;
-const KAKAO_REST_API_KEY = readRequiredEnv(process.env.KAKAO_REST_API_KEY, process.env.VITE_KAKAO_REST_API_KEY);
+const KAKAO_REST_API_KEY = readRequiredEnv(process.env.VITE_KAKAO_REST_API_KEY);
 const KAKAO_CLIENT_SECRET = readOptionalKakaoClientSecret();
-const KAKAO_REDIRECT_URI = readRequiredEnv(process.env.KAKAO_REDIRECT_URI, process.env.VITE_KAKAO_REDIRECT_URI);
+const KAKAO_REDIRECT_URI = readRequiredEnv(process.env.VITE_KAKAO_REDIRECT_URI);
 const oauth2Client = new OAuth2Client(GOOGLE_CLIENT_ID);
 const shouldLogOAuthDebug = process.env.NODE_ENV !== 'production';
 
@@ -292,13 +292,18 @@ const requestKakaoUserProfile = async (accessToken: string): Promise<KakaoUserPr
   }
 
   const emailValue = payload.kakao_account?.email;
-  const email = typeof emailValue === 'string' && emailValue.trim() ? emailValue.trim().toLowerCase() : null;
+  const email =
+    typeof emailValue === 'string' && emailValue.trim() ? emailValue.trim().toLowerCase() : null;
   const nickname =
-    payload.kakao_account?.profile?.nickname || payload.properties?.nickname || (email ? email.split('@')[0] : '');
+    payload.kakao_account?.profile?.nickname ||
+    payload.properties?.nickname ||
+    (email ? email.split('@')[0] : '');
   const profileImageValue =
     payload.kakao_account?.profile?.profile_image_url || payload.properties?.profile_image;
   const profileImage =
-    typeof profileImageValue === 'string' && profileImageValue.trim() ? profileImageValue.trim() : null;
+    typeof profileImageValue === 'string' && profileImageValue.trim()
+      ? profileImageValue.trim()
+      : null;
 
   return {
     kakaoId,
@@ -475,7 +480,12 @@ class AuthService {
     await authRepository.markUnusedResetTokensAsUsed(user.id);
     await authRepository.createPasswordResetToken(user.id, tokenHash, RESET_TOKEN_TTL_MINUTES);
 
-    const resetLink = `${FRONTEND_BASE_URL.replace(/\/+$/, '')}/signin?resetToken=${encodeURIComponent(rawToken)}&email=${encodeURIComponent(normalizedEmail)}`;
+    const resetLink = `${FRONTEND_BASE_URL.replace(
+      /\/+$/,
+      '',
+    )}/signin?resetToken=${encodeURIComponent(rawToken)}&email=${encodeURIComponent(
+      normalizedEmail,
+    )}`;
 
     if (isEmailDeliveryConfigured) {
       try {
@@ -606,7 +616,11 @@ class AuthService {
       user = await authRepository.findApprovalUserByKakaoId(kakaoProfile.kakaoId);
       logKakaoOAuthDebug('[Kakao OAuth][Backend] Created user fetched by kakao_id:', user);
     } else {
-      await authRepository.updateKakaoProfileByUserId(user.id, kakaoProfile.kakaoId, kakaoProfile.profileImage);
+      await authRepository.updateKakaoProfileByUserId(
+        user.id,
+        kakaoProfile.kakaoId,
+        kakaoProfile.profileImage,
+      );
       logKakaoOAuthDebug('[Kakao OAuth][Backend] Updated existing Kakao user profile:', {
         userId: user.id,
         kakaoId: kakaoProfile.kakaoId,
@@ -699,7 +713,10 @@ class AuthService {
 
     const isDeleted = await authRepository.deletePendingUserById(userId);
     if (!isDeleted) {
-      throw new HttpError(409, '사용자 상태가 변경되어 가입 요청을 거절할 수 없습니다. 목록을 새로고침해주세요.');
+      throw new HttpError(
+        409,
+        '사용자 상태가 변경되어 가입 요청을 거절할 수 없습니다. 목록을 새로고침해주세요.',
+      );
     }
 
     return {
@@ -785,7 +802,10 @@ class AuthService {
     const currentIsAdmin = normalizeBoolean(user.isAdmin, false);
     const currentIsAllowed = normalizeBoolean(user.isAllowed, false);
 
-    if (currentUser.id === userId && (currentIsAdmin !== nextIsAdmin || currentIsAllowed !== nextIsAllowed)) {
+    if (
+      currentUser.id === userId &&
+      (currentIsAdmin !== nextIsAdmin || currentIsAllowed !== nextIsAllowed)
+    ) {
       throw new HttpError(409, '현재 로그인한 관리자 계정의 권한 상태는 변경할 수 없습니다.');
     }
 
