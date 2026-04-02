@@ -41,6 +41,12 @@ router.patch(
   requireAdmin,
   authController.updateUser,
 );
+router.delete(
+  '/admin/users/:id/profile-image',
+  passport.authenticate('jwt', { session: false }),
+  requireAdmin,
+  authController.deleteUserProfileImage,
+);
 router.patch(
   '/admin/users/:id/approve',
   passport.authenticate('jwt', { session: false }),

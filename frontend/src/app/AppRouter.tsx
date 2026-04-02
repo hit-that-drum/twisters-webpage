@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-d
 import AppLayout from '@/app/AppLayout';
 import { useAuth } from '@/features';
 import { AdminPage, Board, Home, Login, Member, MyPage, Notice, Settlement } from '@/pages';
-import Flowchart from '@/pages/flowchart/Flowchart';
+import InformationArchitecture from '@/pages/informationArchitecture/InformationArchitecture';
 import LoadingComponent from '@/common/LoadingComponent.tsx';
 import NotFoundComponent from '@/common/NotFoundComponent.tsx';
 
@@ -41,7 +41,7 @@ export default function AppRouter() {
           <Route path="/settlement" element={<Settlement />} />
           <Route path="/board" element={<Board />} />
           <Route path="/mypage" element={<MyPage />} />
-          <Route path="/flowchart" element={<Flowchart />} />
+          <Route path="/information-architecture" element={<InformationArchitecture />} />
           <Route path="/admin" element={<AdminPage />} />
         </Route>
 

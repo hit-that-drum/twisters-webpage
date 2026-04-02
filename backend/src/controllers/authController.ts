@@ -86,6 +86,21 @@ export const updateProfileImage = async (req: Request, res: Response) => {
   }
 };
 
+export const deleteUserProfileImage = async (req: Request, res: Response) => {
+  try {
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const result = await authService.deleteUserProfileImage(authenticatedUser, req.params.id);
+    return res.json(result);
+  } catch (error) {
+    return handleControllerError(
+      res,
+      error,
+      '사용자 프로필 이미지 삭제 중 오류가 발생했습니다.',
+      'User profile image delete error',
+    );
+  }
+};
+
 export const getUsers = async (req: Request, res: Response) => {
   try {
     const authenticatedUser = (req as AuthenticatedRequest).user;

@@ -80,6 +80,7 @@ export interface AdminUserRow {
   id: number;
   name: string;
   email: string;
+  profileImage: string | null;
   isAdmin: boolean | number;
   isAllowed: boolean | number;
   createdAt: Date;

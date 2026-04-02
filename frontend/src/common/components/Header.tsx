@@ -72,8 +72,8 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
   const profileMenuItems: ProfileMenuItem[] = [
     { label: '📝 My Page', onClick: () => handleProfileNavigation('/mypage') },
     {
-      label: '📊 Flow Chart',
-      onClick: () => handleProfileNavigation('/flowchart'),
+      label: '📊 IA',
+      onClick: () => handleProfileNavigation('/information-architecture'),
       isTestUser: true,
     },
     { label: '👑 Admin', onClick: () => handleProfileNavigation('/admin'), adminOnly: true },
