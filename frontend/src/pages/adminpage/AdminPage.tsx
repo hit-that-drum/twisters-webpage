@@ -20,6 +20,7 @@ interface AdminUserRecord {
   id: number;
   name: string;
   email: string;
+  profileImage: string | null;
   isAdmin: boolean;
   isAllowed: boolean;
   createdAt: string;
@@ -159,6 +160,7 @@ const parseAdminUsers = (payload: unknown): AdminUserRecord[] => {
         id?: unknown;
         name?: unknown;
         email?: unknown;
+        profileImage?: unknown;
         isAdmin?: unknown;
         isAllowed?: unknown;
         createdAt?: unknown;
@@ -174,11 +176,16 @@ const parseAdminUsers = (payload: unknown): AdminUserRecord[] => {
 
       const createdAtValue =
         typeof parsed.createdAt === 'string' ? parsed.createdAt : new Date().toISOString();
+      const profileImageValue =
+        typeof parsed.profileImage === 'string' && parsed.profileImage.trim().length > 0
+          ? parsed.profileImage.trim()
+          : null;
 
       return {
         id: parsed.id,
         name: parsed.name,
         email: parsed.email,
+        profileImage: profileImageValue,
         isAdmin: normalizeBoolean(parsed.isAdmin, false),
         isAllowed: normalizeBoolean(parsed.isAllowed, false),
         createdAt: createdAtValue,
@@ -234,6 +241,39 @@ const getInitials = (name: string) => {
 const getAvatarToneClassName = (userId: number) => {
   return AVATAR_TONES[userId % AVATAR_TONES.length] ?? AVATAR_TONES[0];
 };
+
+function UserAvatar({
+  userId,
+  name,
+  profileImage,
+}: {
+  userId: number;
+  name: string;
+  profileImage: string | null;
+}) {
+  const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
+
+  const shouldShowProfileImage = Boolean(profileImage && profileImage !== failedImageSrc);
+
+  return (
+    <div
+      className={`flex size-10 items-center justify-center overflow-hidden rounded-full text-xs font-bold ${getAvatarToneClassName(
+        userId,
+      )}`}
+    >
+      {shouldShowProfileImage ? (
+        <img
+          src={profileImage ?? undefined}
+          alt={`${name} profile`}
+          className="h-full w-full object-cover"
+          onError={() => setFailedImageSrc(profileImage)}
+        />
+      ) : (
+        getInitials(name)
+      )}
+    </div>
+  );
+}
 
 const formatCount = (count: number) => {
   return countFormatter.format(count);
@@ -946,13 +986,11 @@ export default function AdminPage() {
                       <tr key={user.id} className="transition-colors hover:bg-slate-50/50">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div
-                              className={`flex size-10 items-center justify-center rounded-full text-xs font-bold ${getAvatarToneClassName(
-                                user.id,
-                              )}`}
-                            >
-                              {getInitials(user.name)}
-                            </div>
+                            <UserAvatar
+                              userId={user.id}
+                              name={user.name}
+                              profileImage={user.profileImage}
+                            />
                             <div>
                               <p className="font-bold text-slate-900">{user.name}</p>
                               <p className="text-xs text-slate-500">{user.email}</p>
