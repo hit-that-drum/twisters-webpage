@@ -121,9 +121,11 @@ const getTransporter = () => {
   return transporter;
 };
 
-export const canSendPasswordResetEmails = () => {
+export const canSendEmails = () => {
   return getMissingEmailConfigKeys().length === 0;
 };
+
+export const canSendPasswordResetEmails = canSendEmails;
 
 export const sendPasswordResetEmail = async (recipientEmail: string, resetLink: string) => {
   const emailTransporter = getTransporter();
@@ -159,6 +161,50 @@ export const sendPasswordResetEmail = async (recipientEmail: string, resetLink: 
         <p style="margin: 0 0 8px;">If the button does not work, copy and paste this URL into your browser:</p>
         <p style="margin: 0 0 16px; word-break: break-all;">${escapedResetLink}</p>
         <p style="margin: 0; color: #6b7280;">If you did not request this, you can safely ignore this email.</p>
+      </div>
+    `,
+  });
+};
+
+export const sendSignupVerificationEmail = async (
+  recipientEmail: string,
+  verificationLink: string,
+) => {
+  const emailTransporter = getTransporter();
+  const escapedVerificationLink = escapeHtml(verificationLink);
+  const escapedRecipientEmail = escapeHtml(recipientEmail);
+
+  await emailTransporter.sendMail({
+    from: resolveFromAddress(),
+    to: recipientEmail,
+    subject: `[${EMAIL_APP_NAME}] Verify your email address`,
+    text: [
+      `${EMAIL_APP_NAME} email verification`,
+      '',
+      `Thanks for signing up with ${EMAIL_APP_NAME}.`,
+      `Please verify the email address for ${recipientEmail} using the link below:`,
+      verificationLink,
+      '',
+      'After email verification, your account still requires administrator approval before sign-in.',
+      'If you did not create this account, you can safely ignore this email.',
+    ].join('\n'),
+    html: `
+      <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+        <h2 style="margin-bottom: 16px;">${escapeHtml(EMAIL_APP_NAME)} email verification</h2>
+        <p style="margin: 0 0 12px;">Thanks for signing up with <strong>${escapeHtml(EMAIL_APP_NAME)}</strong>.</p>
+        <p style="margin: 0 0 12px;">Please verify the email address for <strong>${escapedRecipientEmail}</strong>.</p>
+        <p style="margin: 0 0 16px;">After email verification, your account still requires administrator approval before sign-in.</p>
+        <p style="margin: 0 0 20px;">
+          <a
+            href="${escapedVerificationLink}"
+            style="display: inline-block; padding: 12px 18px; border-radius: 8px; background: #166534; color: #ffffff; text-decoration: none; font-weight: 600;"
+          >
+            Verify email
+          </a>
+        </p>
+        <p style="margin: 0 0 8px;">If the button does not work, copy and paste this URL into your browser:</p>
+        <p style="margin: 0 0 16px; word-break: break-all;">${escapedVerificationLink}</p>
+        <p style="margin: 0; color: #6b7280;">If you did not create this account, you can safely ignore this email.</p>
       </div>
     `,
   });

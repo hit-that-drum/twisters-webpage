@@ -21,6 +21,8 @@ router.post('/logout', passport.authenticate('jwt', { session: false }), authCon
 router.post('/request-reset', authController.requestReset);
 router.post('/verify-reset-token', authController.verifyResetToken);
 router.post('/reset-password', authController.resetPassword);
+router.post('/verify-email', authController.verifyEmail);
+router.post('/resend-verification-email', authController.resendVerificationEmail);
 router.post('/auth/google', authController.googleAuth);
 router.post('/auth/kakao', authController.kakaoAuth);
 router.get(

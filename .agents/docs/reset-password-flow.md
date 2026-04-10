@@ -25,7 +25,7 @@ sequenceDiagram
   actor User
   participant Frontend as Frontend (Login Modal)
   participant API as Backend API
-  participant DB as MySQL
+  participant DB as PostgreSQL
 
   User->>Frontend: Open forgot-password modal and input email/newPassword
   Frontend->>API: POST /authentication/request-reset { email }
@@ -53,7 +53,7 @@ sequenceDiagram
 
 ## Frontend Mapping
 
-- Modal component: `frontend/src/pages/Login.tsx`
+- Modal component: `frontend/src/pages/login/Login.tsx`
   - No reset token in URL: calls `request-reset`.
   - Token in URL (`resetToken` query): verifies token then calls `reset-password`.
   - Keeps two inputs (email, new password) and modal UX.

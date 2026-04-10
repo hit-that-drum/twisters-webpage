@@ -8,10 +8,12 @@ import {
   type GoogleAuthDTO,
   type LocalAuthUser,
   type RefreshSessionDTO,
+  type ResendVerificationEmailDTO,
   type RequestResetDTO,
   type ResetPasswordDTO,
   type SignUpDTO,
   type UpdateProfileImageDTO,
+  type VerifyEmailDTO,
   type VerifyResetTokenDTO,
 } from '../types/auth.types.js';
 import { handleControllerError } from '../utils/controllerErrorHandler.js';
@@ -138,6 +140,31 @@ export const verifyResetToken = async (req: Request, res: Response) => {
     return res.json(result);
   } catch (error) {
     return handleControllerError(res, error, '서버 에러가 발생했습니다.', 'Verify Reset Token Error');
+  }
+};
+
+export const verifyEmail = async (req: Request, res: Response) => {
+  try {
+    const payload = req.body as VerifyEmailDTO;
+    const result = await authService.verifyEmail(payload);
+    return res.json(result);
+  } catch (error) {
+    return handleControllerError(res, error, '서버 에러가 발생했습니다.', 'Verify Email Error');
+  }
+};
+
+export const resendVerificationEmail = async (req: Request, res: Response) => {
+  try {
+    const payload = req.body as ResendVerificationEmailDTO;
+    const result = await authService.resendVerificationEmail(payload);
+    return res.json(result);
+  } catch (error) {
+    return handleControllerError(
+      res,
+      error,
+      '서버 에러가 발생했습니다.',
+      'Resend Verification Email Error',
+    );
   }
 };
 

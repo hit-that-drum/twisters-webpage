@@ -10,6 +10,8 @@ interface MockAuthServerOptions {
   accounts?: MockAccount[];
   onSignin?: (route: Route, accounts: MockAccount[]) => Promise<JsonResponseOptions | null>;
   onSignup?: (route: Route, accounts: MockAccount[]) => Promise<JsonResponseOptions | null>;
+  onVerifyEmail?: (route: Route) => Promise<JsonResponseOptions | null>;
+  onResendVerificationEmail?: (route: Route) => Promise<JsonResponseOptions | null>;
   onRequestReset?: (route: Route) => Promise<JsonResponseOptions | null>;
   onVerifyResetToken?: (route: Route) => Promise<JsonResponseOptions | null>;
   onResetPassword?: (route: Route) => Promise<JsonResponseOptions | null>;
@@ -94,10 +96,40 @@ export const installMockAuthServer = async (
     await jsonResponse(route, {
       status: 201,
       body: {
-        token: `signup-token-${createdId}`,
-        refreshToken: `signup-refresh-${createdId}`,
+        status: 'pending',
+        message: '회원가입이 완료되었습니다. 이메일 인증과 관리자 승인 후 로그인하실 수 있습니다.',
         userId: createdId,
-        user: { id: createdId, name, email },
+      },
+    });
+  });
+
+  await context.route('**/authentication/verify-email', async (route) => {
+    if (options.onVerifyEmail) {
+      const customResponse = await options.onVerifyEmail(route);
+      if (customResponse) {
+        await jsonResponse(route, customResponse);
+        return;
+      }
+    }
+
+    await jsonResponse(route, {
+      body: { message: '이메일 인증이 완료되었습니다. 관리자 승인 후 로그인해주세요.' },
+    });
+  });
+
+  await context.route('**/authentication/resend-verification-email', async (route) => {
+    if (options.onResendVerificationEmail) {
+      const customResponse = await options.onResendVerificationEmail(route);
+      if (customResponse) {
+        await jsonResponse(route, customResponse);
+        return;
+      }
+    }
+
+    await jsonResponse(route, {
+      body: {
+        message:
+          '입력한 이메일이 가입 대기 중이면 인증 링크를 다시 전송했습니다. 이메일 인증과 관리자 승인 후 로그인하실 수 있습니다.',
       },
     });
   });

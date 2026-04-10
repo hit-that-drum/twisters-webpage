@@ -8,6 +8,7 @@ CREATE TABLE public.users (
   google_id VARCHAR(255),
   kakao_id VARCHAR(255),
   "profileImage" TEXT,
+  "emailVerifiedAt" TIMESTAMPTZ,
   "isAdmin" BOOLEAN NOT NULL DEFAULT FALSE,
   "isAllowed" BOOLEAN NOT NULL DEFAULT FALSE,
   "isTest" BOOLEAN NOT NULL DEFAULT FALSE,
@@ -135,6 +136,15 @@ CREATE TABLE public.password_reset_tokens (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE public.email_verification_tokens (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE public.user_sessions (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
@@ -156,6 +166,8 @@ CREATE INDEX idx_test_members_department ON public.test_members (department);
 
 CREATE INDEX idx_password_reset_user ON public.password_reset_tokens (user_id);
 CREATE INDEX idx_password_reset_expires ON public.password_reset_tokens (expires_at);
+CREATE INDEX idx_email_verification_user ON public.email_verification_tokens (user_id);
+CREATE INDEX idx_email_verification_expires ON public.email_verification_tokens (expires_at);
 
 CREATE INDEX idx_user_sessions_user_id ON public.user_sessions (user_id);
 CREATE INDEX idx_user_sessions_idle_expires_at ON public.user_sessions (idle_expires_at);

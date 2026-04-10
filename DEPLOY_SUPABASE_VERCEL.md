@@ -46,7 +46,7 @@ Deploy the `backend` directory as a separate Vercel project.
 - `SUPABASE_DB_URL` (recommended)
 - `JWT_SECRET`
 - `FRONTEND_BASE_URL` (your deployed frontend URL)
-- `EMAIL_FROM` (the sender address used for password reset emails)
+- `EMAIL_FROM` (the sender address used for password reset and signup verification emails)
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_SECURE`
@@ -64,6 +64,7 @@ Deploy the `backend` directory as a separate Vercel project.
 - `JWT_SECRET` is a new production-only random secret
 - `FRONTEND_BASE_URL` exactly matches frontend production URL (no trailing slash)
 - `EMAIL_FROM` is a verified sender address for your SMTP provider
+- SMTP delivery must be able to send both password-reset emails and signup verification emails
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` match your SMTP provider credentials
 - `VITE_GOOGLE_CLIENT_ID` matches Google OAuth web app config
 - `KAKAO_REST_API_KEY` matches Kakao Developers REST API key
@@ -113,8 +114,11 @@ Run after both projects are deployed:
 3. Open Notice page and verify admin/non-admin UI visibility behaves correctly.
 4. Create/update/delete notice as admin and verify success.
 5. Try create/update/delete as non-admin and verify `403` response.
-6. Trigger forgot-password flow and verify the reset email arrives, the link opens the frontend, and the reset API succeeds.
-7. Confirm backend logs have no DB connection or JWT secret errors.
+6. Sign up with a new local account and verify the signup email arrives from `EMAIL_FROM`.
+7. Open the email verification link and confirm the frontend lands on `/signin`, consumes the verification token, and shows the verification success message.
+8. Attempt local signin before admin approval and confirm the account is blocked with the pending-approval message.
+9. Trigger forgot-password flow and verify the reset email arrives, the link opens the frontend, and the reset API succeeds.
+10. Confirm backend logs have no DB connection, JWT secret, or SMTP delivery errors.
 
 ## 4.1) Copy-paste Vercel env templates
 
@@ -161,7 +165,7 @@ SendGrid notes:
 - `EMAIL_FROM` must be a verified sender or a domain-authenticated address in SendGrid
 - `SMTP_PORT=587` with `SMTP_SECURE=false` is the standard STARTTLS setup
 - If you use port `465`, switch to `SMTP_SECURE=true`
-- Test a real reset email immediately after deploy because invalid sender/auth values only show up in backend logs
+- Test a real reset email and a real signup verification email immediately after deploy because invalid sender/auth values only show up in backend logs
 
 Frontend project (`frontend` root directory):
 
@@ -180,12 +184,15 @@ Remove the Google/Kakao variables from either project if you are not shipping th
 2. Sign in with an approved member account and verify `/authentication/me` returns `200`.
 3. Sign in with an admin account and verify admin-only navigation and Notice CRUD actions are visible and functional.
 4. Sign in with a non-admin account and verify admin-only actions are hidden and protected endpoints return `403`.
-5. Request a password reset for a real account and confirm the reset email arrives from `EMAIL_FROM`.
-6. Open the email link and verify the frontend lands on `/signin` with a valid reset flow.
-7. Submit a new password, sign in with it, and confirm the old password no longer works.
-8. Verify Google login if enabled.
-9. Verify Kakao login if enabled, including the callback redirect URL.
-10. Review Vercel logs for the frontend and backend and confirm there are no startup, DB, JWT, or SMTP errors.
+5. Sign up with a brand-new local account and confirm the signup verification email arrives from `EMAIL_FROM`.
+6. Open the verification link and verify the frontend lands on `/signin`, consumes the verification token, and shows the success toast.
+7. Attempt local signin before admin approval and confirm the account is blocked with the pending-approval message.
+8. Request a password reset for the same account and confirm the reset email arrives from `EMAIL_FROM`.
+9. Open the reset link and verify the frontend lands on `/signin` with a valid reset flow.
+10. Submit a new password, sign in with it after admin approval, and confirm the old password no longer works.
+11. Verify Google login if enabled.
+12. Verify Kakao login if enabled, including the callback redirect URL.
+13. Review Vercel logs for the frontend and backend and confirm there are no startup, DB, JWT, or SMTP errors.
 
 ## 4.3) Compressed deployment order
 
@@ -197,7 +204,7 @@ Remove the Google/Kakao variables from either project if you are not shipping th
 6. Add frontend env vars (`VITE_API_BASE_URL` pointing at the deployed backend, plus OAuth values if used).
 7. Deploy the frontend and save the production app URL.
 8. Update Google/Kakao console redirect/origin settings to the real production URLs.
-9. Run the post-deploy verification sheet, especially login, `/authentication/me`, admin permissions, and reset-email delivery.
+9. Run the post-deploy verification sheet, especially signup-verification email delivery, login, `/authentication/me`, admin permissions, and reset-email delivery.
 
 ## 5) Local development
 
@@ -207,6 +214,7 @@ For local backend/frontend development:
 - Fill values in root `.env.development`
 - Set `DB_SSL=false` when local Postgres does not support SSL
 - Keep real secrets in `.env.development.local` if needed (gitignored)
+- Without SMTP configured in local non-production environments, signup/resend flows return a `devVerificationLink` so the frontend can simulate email-link landing on `/signin`
 
 Then run:
 - Backend: `cd backend && npm run dev`
@@ -222,5 +230,7 @@ For Docker Compose local dev:
 ## 6) Notes
 
 - Existing routes are unchanged (`/authentication/*`, `/notice/*`).
+- Local account activation is now a two-step process: email verification first, then admin approval.
+- Social login accounts (Google/Kakao) are treated as verified once the provider login succeeds, but they still require admin approval before access.
 - Backend also mounts `/api/authentication/*` and `/api/notice/*` for compatibility with serverless pathing.
 - On Vercel, use Project Environment Variables as the source of truth for production secrets.
