@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
+import { handleBulletListKeyDown } from '@/common/lib/textareaBulletList';
 import { EditDeleteButton, GlobalButton, useConfirmDialog } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import BoardDetailModal, { type BoardFormState } from './BoardDetailModal';
@@ -1260,6 +1261,7 @@ export default function Board() {
                                     onChange={(event) =>
                                       handleCommentDraftChange(post.id, event.target.value)
                                     }
+                                    onKeyDown={handleBulletListKeyDown}
                                     rows={3}
                                     placeholder="댓글을 입력하세요"
                                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500"
