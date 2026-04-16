@@ -16,6 +16,9 @@ const KAKAO_OAUTH_PROCESSED_CODE_KEY = 'kakaoOAuthProcessedCode';
 const GOOGLE_OAUTH_LOADING_MESSAGE = 'Google 로그인 정보를 확인하고 있어요. 잠시만 기다려주세요.';
 const KAKAO_OAUTH_LOADING_MESSAGE = '카카오 로그인 정보를 확인하고 있어요. 잠시만 기다려주세요.';
 const KAKAO_REDIRECT_LOADING_MESSAGE = '카카오 로그인 페이지로 이동하고 있어요. 잠시만 기다려주세요.';
+const EMAIL_VERIFICATION_LOADING_MESSAGE = '이메일 인증 링크를 확인하고 있어요. 잠시만 기다려주세요.';
+const VERIFICATION_REQUIRED_MESSAGE =
+  '이메일 인증이 필요합니다. 가입 후 받은 메일의 인증 링크를 확인해주세요.';
 
 type WrongPasswordAttemptsByEmail = Record<string, number>;
 
@@ -109,6 +112,42 @@ const getWrongPasswordAttempt = (email: string) => {
   return attempts[email] || 0;
 };
 
+const getAuthErrorMessage = (error: unknown, code: unknown) => {
+  if (code === 'ACCOUNT_PENDING_APPROVAL') {
+    return '관리자 승인 대기 중입니다. 승인 후 로그인해주세요.';
+  }
+
+  if (code === 'EMAIL_VERIFICATION_REQUIRED') {
+    return VERIFICATION_REQUIRED_MESSAGE;
+  }
+
+  if (code === 'EMAIL_VERIFICATION_EXPIRED') {
+    return '이메일 인증 링크가 만료되었습니다. 인증 메일을 다시 보내주세요.';
+  }
+
+  if (code === 'INVALID_EMAIL_VERIFICATION_TOKEN') {
+    return '유효하지 않은 이메일 인증 링크입니다. 인증 메일을 다시 보내주세요.';
+  }
+
+  if (code === 'EMAIL_VERIFICATION_EMAIL_MISMATCH') {
+    return '인증 링크 정보가 일치하지 않습니다. 최신 인증 메일을 다시 열어주세요.';
+  }
+
+  if (code === 'EMAIL_ALREADY_VERIFIED') {
+    return '이미 이메일 인증이 완료되었습니다. 관리자 승인 후 로그인해주세요.';
+  }
+
+  if (code === 'EMAIL_VERIFICATION_ALREADY_USED') {
+    return '이미 사용된 이메일 인증 링크입니다. 필요하면 인증 메일을 다시 보내주세요.';
+  }
+
+  if (code === 'EMAIL_DELIVERY_FAILED') {
+    return '인증 메일 전송에 실패했습니다. 잠시 후 다시 보내기를 시도해주세요.';
+  }
+
+  return typeof error === 'string' ? error : '알 수 없는 에러';
+};
+
 export default function Login({ isLogin }: { isLogin: boolean }) {
   const navigate = useNavigate();
   const { completeAuthSession, isAuthLoading, meInfo } = useAuth();
@@ -121,6 +160,8 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const resetToken = searchParams.get('resetToken')?.trim() || '';
   const resetEmailFromLink = searchParams.get('email')?.trim() || '';
+  const verificationToken = searchParams.get('verificationToken')?.trim() || '';
+  const verificationEmailFromLink = searchParams.get('verificationEmail')?.trim().toLowerCase() || '';
   const kakaoCode = searchParams.get('code')?.trim() || '';
   const kakaoState = searchParams.get('state')?.trim() || '';
   const kakaoError = searchParams.get('error')?.trim() || '';
@@ -141,7 +182,10 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
     kakaoCode ? KAKAO_OAUTH_LOADING_MESSAGE : null,
   );
   const [isResetSubmitting, setIsResetSubmitting] = useState(false);
+  const [isVerificationEmailSending, setIsVerificationEmailSending] = useState(false);
+  const [verificationRequiredEmail, setVerificationRequiredEmail] = useState('');
   const normalizedLoginEmail = formData.email.trim().toLowerCase();
+  const verificationTargetEmail = verificationEmailFromLink || verificationRequiredEmail;
   const remainingWrongPasswordAttempts = Math.max(
     MAX_WRONG_PASSWORD_ATTEMPTS - wrongPasswordAttemptCount,
     0,
@@ -160,10 +204,95 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
   const activeLoadingMessage = oauthLoadingMessage ?? submitLoadingMessage;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (
+      e.target.name === 'email' &&
+      verificationRequiredEmail &&
+      e.target.value.trim().toLowerCase() !== verificationRequiredEmail
+    ) {
+      setVerificationRequiredEmail('');
+    }
+
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const [openForgotPasswordDialog, setOpenForgotPasswordDialog] = useState(false);
+
+  const clearVerificationSearchParams = () => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete('verificationToken');
+    nextSearchParams.delete('verificationEmail');
+    setSearchParams(nextSearchParams, { replace: true });
+  };
+
+  const handleResendVerificationEmail = async (emailOverride?: string) => {
+    const targetEmail = (emailOverride || verificationTargetEmail).trim().toLowerCase();
+
+    if (!targetEmail) {
+      enqueueSnackbar('인증 메일을 다시 보내려면 이메일을 먼저 입력해주세요.', {
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setIsVerificationEmailSending(true);
+
+    try {
+      const response = await apiFetch('/authentication/resend-verification-email', {
+        method: 'POST',
+        body: JSON.stringify({ email: targetEmail }),
+      });
+
+      const data = (await response.json().catch(() => ({}))) as {
+        message?: unknown;
+        error?: unknown;
+        code?: unknown;
+        devVerificationLink?: unknown;
+      };
+
+      if (!response.ok) {
+        enqueueSnackbar(getAuthErrorMessage(data.error, data.code), { variant: 'error' });
+        return;
+      }
+
+      if (typeof data.devVerificationLink === 'string') {
+        const linkUrl = new URL(data.devVerificationLink);
+        const nextSearchParams = new URLSearchParams(searchParams);
+        const linkToken = linkUrl.searchParams.get('verificationToken');
+        const linkEmail = linkUrl.searchParams.get('verificationEmail');
+
+        if (linkToken) {
+          nextSearchParams.set('verificationToken', linkToken);
+        }
+
+        if (linkEmail) {
+          nextSearchParams.set('verificationEmail', linkEmail);
+          setFormData((previous) => ({ ...previous, email: linkEmail }));
+          setVerificationRequiredEmail(linkEmail);
+        }
+
+        setSearchParams(nextSearchParams, { replace: true });
+        enqueueSnackbar(
+          '개발 환경 인증 링크를 적용했습니다. 이메일 인증을 자동으로 이어서 처리합니다.',
+          { variant: 'info' },
+        );
+        return;
+      }
+
+      enqueueSnackbar(
+        typeof data.message === 'string'
+          ? data.message
+          : '인증 메일을 다시 전송했습니다. 메일함을 확인해주세요.',
+        { variant: 'success' },
+      );
+    } catch (error) {
+      console.error('Resend verification email error:', error);
+      enqueueSnackbar('인증 메일 재전송 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', {
+        variant: 'error',
+      });
+    } finally {
+      setIsVerificationEmailSending(false);
+    }
+  };
 
   useEffect(() => {
     if (resetToken) {
@@ -172,8 +301,57 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
         resetEmail: resetEmailFromLink || previous.resetEmail,
       }));
       setOpenForgotPasswordDialog(true);
-      return;
     }
+
+    const processEmailVerification = async () => {
+      if (!verificationToken || !verificationEmailFromLink) {
+        return;
+      }
+
+      setFormData((previous) => ({
+        ...previous,
+        email: verificationEmailFromLink || previous.email,
+      }));
+      setOAuthLoadingMessage(EMAIL_VERIFICATION_LOADING_MESSAGE);
+
+      try {
+        const response = await apiFetch('/authentication/verify-email', {
+          method: 'POST',
+          body: JSON.stringify({
+            email: verificationEmailFromLink,
+            token: verificationToken,
+          }),
+        });
+
+        const data = (await response.json().catch(() => ({}))) as {
+          message?: unknown;
+          error?: unknown;
+          code?: unknown;
+        };
+
+      if (!response.ok) {
+        enqueueSnackbar(getAuthErrorMessage(data.error, data.code), { variant: 'error' });
+        return;
+      }
+
+        enqueueSnackbar(
+          typeof data.message === 'string'
+            ? data.message
+            : '이메일 인증이 완료되었습니다. 관리자 승인 후 로그인해주세요.',
+          { variant: 'success' },
+        );
+      } catch (error) {
+        console.error('Email verification error:', error);
+        enqueueSnackbar('이메일 인증 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', {
+          variant: 'error',
+        });
+      } finally {
+        clearVerificationSearchParams();
+        setVerificationRequiredEmail('');
+        setOAuthLoadingMessage(null);
+        navigate('/signin', { replace: true });
+      }
+    };
 
     const processKakaoCode = async () => {
       if (!kakaoCode) {
@@ -296,6 +474,16 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
       }
     };
 
+    if (verificationToken) {
+      if (!verificationEmailFromLink) {
+        enqueueSnackbar('이메일 인증 링크 정보가 올바르지 않습니다.', { variant: 'error' });
+        clearVerificationSearchParams();
+      } else {
+        void processEmailVerification();
+      }
+      return;
+    }
+
     if (kakaoCode) {
       void processKakaoCode();
       return;
@@ -324,6 +512,10 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
     resolvedKakaoRedirectUri,
     resetEmailFromLink,
     resetToken,
+    searchParams,
+    setSearchParams,
+    verificationEmailFromLink,
+    verificationToken,
   ]);
 
   useEffect(() => {
@@ -488,12 +680,47 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
             body: JSON.stringify(formData),
           });
 
-          const data = await response.json();
+          const data = (await response.json().catch(() => ({}))) as {
+            status?: unknown;
+            message?: unknown;
+            error?: unknown;
+            code?: unknown;
+            devVerificationLink?: unknown;
+            token?: unknown;
+            refreshToken?: unknown;
+            user?: { id?: unknown };
+            userId?: unknown;
+          };
 
           if (response.ok) {
             if (data?.status === 'pending') {
+              if (typeof data.devVerificationLink === 'string') {
+                const linkUrl = new URL(data.devVerificationLink);
+                const nextSearchParams = new URLSearchParams();
+                const linkToken = linkUrl.searchParams.get('verificationToken');
+                const linkEmail = linkUrl.searchParams.get('verificationEmail');
+
+                if (linkToken) {
+                  nextSearchParams.set('verificationToken', linkToken);
+                }
+
+                if (linkEmail) {
+                  nextSearchParams.set('verificationEmail', linkEmail);
+                  setVerificationRequiredEmail(linkEmail);
+                }
+
+                enqueueSnackbar(
+                  '회원가입이 완료되었습니다. 개발 환경 인증 링크를 자동으로 적용해 이메일 인증을 이어서 처리합니다.',
+                  { variant: 'info' },
+                );
+                navigate(`/signin?${nextSearchParams.toString()}`);
+                return;
+              }
+
               enqueueSnackbar(
-                data.message || '회원가입이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.',
+                typeof data.message === 'string'
+                  ? data.message
+                  : '회원가입이 완료되었습니다. 이메일 인증과 관리자 승인 후 로그인하실 수 있습니다.',
                 { variant: 'success' },
               );
               navigate('/signin');
@@ -520,7 +747,18 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
             enqueueSnackbar('회원가입 성공!', { variant: 'success' });
             navigate(`/${userIdx}`);
           } else {
-            enqueueSnackbar(`회원가입 실패: ${data.error || '알 수 없는 에러'}`, {
+            if (data.code === 'EMAIL_DELIVERY_FAILED' && normalizedLoginEmail) {
+              enqueueSnackbar(
+                typeof data.error === 'string'
+                  ? data.error
+                  : '회원가입은 완료되었지만 인증 메일 전송에 실패했습니다. 로그인 화면에서 재전송을 시도해주세요.',
+                { variant: 'warning' },
+              );
+              navigate(`/signin?verificationEmail=${encodeURIComponent(normalizedLoginEmail)}`);
+              return;
+            }
+
+            enqueueSnackbar(`회원가입 실패: ${getAuthErrorMessage(data.error, data.code)}`, {
               variant: 'error',
             });
           }
@@ -552,6 +790,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
         if (response.ok) {
           clearWrongPasswordAttempt(normalizedLoginEmail);
           setWrongPasswordAttemptCount(0);
+          setVerificationRequiredEmail('');
 
           if (typeof data.token === 'string' && typeof data.refreshToken === 'string') {
             const authenticatedUser = await completeAuthSession(
@@ -577,14 +816,17 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
           enqueueSnackbar('로그인 성공!', { variant: 'success' });
           navigate(`/${userIdx}`);
         } else {
-          if (data?.code === 'ACCOUNT_PENDING_APPROVAL') {
-            enqueueSnackbar('관리자 승인 대기 중입니다. 승인 후 로그인해주세요.', {
-              variant: 'warning',
+          if (data?.code === 'ACCOUNT_PENDING_APPROVAL' || data?.code === 'EMAIL_VERIFICATION_REQUIRED') {
+            if (data?.code === 'EMAIL_VERIFICATION_REQUIRED' && normalizedLoginEmail) {
+              setVerificationRequiredEmail(normalizedLoginEmail);
+            }
+            enqueueSnackbar(getAuthErrorMessage(data.error, data.code), {
+              variant: data.code === 'EMAIL_VERIFICATION_REQUIRED' ? 'warning' : 'warning',
             });
             return;
           }
 
-          const errorMessage = data.error || '알 수 없는 에러';
+          const errorMessage = getAuthErrorMessage(data.error, data.code);
           enqueueSnackbar(`로그인 실패: ${errorMessage}`, { variant: 'error' });
 
           const normalizedErrorMessage =
@@ -659,15 +901,15 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
       logGoogleOAuthDebug('[Google OAuth] Backend auth response:', data);
 
       if (!response.ok) {
-        if (data.code === 'ACCOUNT_PENDING_APPROVAL') {
-          enqueueSnackbar('관리자 승인 대기 중입니다. 승인 후 로그인해주세요.', {
+        if (data.code === 'ACCOUNT_PENDING_APPROVAL' || data.code === 'EMAIL_VERIFICATION_REQUIRED') {
+          enqueueSnackbar(getAuthErrorMessage(data.error, data.code), {
             variant: 'warning',
           });
           navigate('/signin');
           return;
         }
 
-        const errorMessage = typeof data.error === 'string' ? data.error : '알 수 없는 에러';
+        const errorMessage = getAuthErrorMessage(data.error, data.code);
         enqueueSnackbar(`구글 로그인 실패: ${errorMessage}`, { variant: 'error' });
         return;
       }
@@ -771,6 +1013,23 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
               <h2 className="font-grand-hotel mb-10 text-5xl font-bold tracking-tight text-gray-900">
                 {isLogin ? 'COME ON!' : 'WELCOME!'}
               </h2>
+
+              {isLogin && verificationTargetEmail ? (
+                <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                  <p className="font-semibold">이메일 인증 안내</p>
+                  <p className="mt-1 break-all text-xs text-emerald-800">
+                    {verificationTargetEmail} 계정은 이메일 인증이 완료되어야 로그인할 수 있습니다.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={isVerificationEmailSending || isSubmitLoading}
+                    onClick={() => void handleResendVerificationEmail()}
+                    className="mt-3 inline-flex items-center justify-center rounded-full bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-400"
+                  >
+                    {isVerificationEmailSending ? '인증 메일 재전송 중...' : '인증 메일 다시 보내기'}
+                  </button>
+                </div>
+              ) : null}
 
               <form className="space-y-6" onSubmit={handleSubmit} aria-busy={isSubmitLoading}>
                 {/* Name 필드: 회원가입 모드에서만 표시 */}

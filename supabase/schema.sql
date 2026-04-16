@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   google_id VARCHAR(255),
   kakao_id VARCHAR(255),
   "profileImage" TEXT,
+  "emailVerifiedAt" TIMESTAMPTZ,
   "isAdmin" BOOLEAN NOT NULL DEFAULT FALSE,
   "isTest" BOOLEAN NOT NULL DEFAULT FALSE,
   "isAllowed" BOOLEAN NOT NULL DEFAULT FALSE,
@@ -142,6 +143,15 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS user_sessions (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -157,6 +167,8 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 
 CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_password_reset_expires ON password_reset_tokens (expires_at);
+CREATE INDEX IF NOT EXISTS idx_email_verification_user ON email_verification_tokens (user_id);
+CREATE INDEX IF NOT EXISTS idx_email_verification_expires ON email_verification_tokens (expires_at);
 CREATE INDEX IF NOT EXISTS idx_members_email ON members (email);
 CREATE INDEX IF NOT EXISTS idx_members_department ON members (department);
 CREATE INDEX IF NOT EXISTS idx_test_members_email ON test_members (email);
