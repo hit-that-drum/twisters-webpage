@@ -1,11 +1,7 @@
-import nodemailer from 'nodemailer';
+import sendgridMail from '@sendgrid/mail';
 import { loadEnvironment } from '../config/env.js';
 
 loadEnvironment();
-
-const DEFAULT_CONNECTION_TIMEOUT_MS = 10_000;
-const DEFAULT_GREETING_TIMEOUT_MS = 10_000;
-const DEFAULT_SOCKET_TIMEOUT_MS = 15_000;
 
 const normalizeEnv = (value: string | undefined) => {
   if (typeof value !== 'string') {
@@ -14,37 +10,6 @@ const normalizeEnv = (value: string | undefined) => {
 
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
-};
-
-const parsePort = (value: string | undefined) => {
-  const normalized = normalizeEnv(value);
-  if (!normalized) {
-    return 587;
-  }
-
-  const parsed = Number(normalized);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    return 587;
-  }
-
-  return parsed;
-};
-
-const parseBoolean = (value: string | undefined, fallbackValue: boolean) => {
-  const normalized = normalizeEnv(value)?.toLowerCase();
-  if (!normalized) {
-    return fallbackValue;
-  }
-
-  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
-    return true;
-  }
-
-  if (['0', 'false', 'no', 'off'].includes(normalized)) {
-    return false;
-  }
-
-  return fallbackValue;
 };
 
 const escapeHtml = (value: string) => {
@@ -56,29 +21,17 @@ const escapeHtml = (value: string) => {
     .replaceAll("'", '&#39;');
 };
 
-const SMTP_HOST = normalizeEnv(process.env.SMTP_HOST);
-const SMTP_PORT = parsePort(process.env.SMTP_PORT);
-const SMTP_USER = normalizeEnv(process.env.SMTP_USER);
-const SMTP_PASS = normalizeEnv(process.env.SMTP_PASS);
+const SENDGRID_API_KEY = normalizeEnv(process.env.SENDGRID_API_KEY);
 const EMAIL_FROM = normalizeEnv(process.env.EMAIL_FROM);
 const EMAIL_APP_NAME = normalizeEnv(process.env.EMAIL_APP_NAME) || 'Twisters';
-const SMTP_SECURE = parseBoolean(process.env.SMTP_SECURE, SMTP_PORT === 465);
 
-let transporter: nodemailer.Transporter | null = null;
+let isApiKeyConfigured = false;
 
 const getMissingEmailConfigKeys = () => {
   const missingKeys: string[] = [];
 
-  if (!SMTP_HOST) {
-    missingKeys.push('SMTP_HOST');
-  }
-
-  if (!SMTP_USER) {
-    missingKeys.push('SMTP_USER');
-  }
-
-  if (!SMTP_PASS) {
-    missingKeys.push('SMTP_PASS');
+  if (!SENDGRID_API_KEY) {
+    missingKeys.push('SENDGRID_API_KEY');
   }
 
   if (!EMAIL_FROM) {
@@ -88,37 +41,41 @@ const getMissingEmailConfigKeys = () => {
   return missingKeys;
 };
 
+const ensureSendGridConfigured = () => {
+  const missingKeys = getMissingEmailConfigKeys();
+  if (missingKeys.length > 0) {
+    throw new Error(`Missing email configuration: ${missingKeys.join(', ')}`);
+  }
+
+  if (!isApiKeyConfigured) {
+    sendgridMail.setApiKey(SENDGRID_API_KEY as string);
+    isApiKeyConfigured = true;
+  }
+};
+
 const resolveFromAddress = () => {
   if (!EMAIL_FROM) {
     throw new Error('EMAIL_FROM must be configured before sending email.');
   }
 
-  return EMAIL_APP_NAME ? `"${EMAIL_APP_NAME}" <${EMAIL_FROM}>` : EMAIL_FROM;
+  return EMAIL_APP_NAME ? `${EMAIL_APP_NAME} <${EMAIL_FROM}>` : EMAIL_FROM;
 };
 
-const getTransporter = () => {
-  if (transporter) {
-    return transporter;
-  }
+const sendEmail = async (payload: {
+  recipientEmail: string;
+  subject: string;
+  text: string;
+  html: string;
+}) => {
+  ensureSendGridConfigured();
 
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !EMAIL_FROM) {
-    throw new Error(`Missing email configuration: ${getMissingEmailConfigKeys().join(', ')}`);
-  }
-
-  transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_SECURE,
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS,
-    },
-    connectionTimeout: DEFAULT_CONNECTION_TIMEOUT_MS,
-    greetingTimeout: DEFAULT_GREETING_TIMEOUT_MS,
-    socketTimeout: DEFAULT_SOCKET_TIMEOUT_MS,
+  await sendgridMail.send({
+    to: payload.recipientEmail,
+    from: resolveFromAddress(),
+    subject: payload.subject,
+    text: payload.text,
+    html: payload.html,
   });
-
-  return transporter;
 };
 
 export const canSendEmails = () => {
@@ -128,13 +85,11 @@ export const canSendEmails = () => {
 export const canSendPasswordResetEmails = canSendEmails;
 
 export const sendPasswordResetEmail = async (recipientEmail: string, resetLink: string) => {
-  const emailTransporter = getTransporter();
   const escapedResetLink = escapeHtml(resetLink);
   const escapedRecipientEmail = escapeHtml(recipientEmail);
 
-  await emailTransporter.sendMail({
-    from: resolveFromAddress(),
-    to: recipientEmail,
+  await sendEmail({
+    recipientEmail,
     subject: `[${EMAIL_APP_NAME}] Password reset instructions`,
     text: [
       `${EMAIL_APP_NAME} password reset request`,
@@ -170,13 +125,11 @@ export const sendSignupVerificationEmail = async (
   recipientEmail: string,
   verificationLink: string,
 ) => {
-  const emailTransporter = getTransporter();
   const escapedVerificationLink = escapeHtml(verificationLink);
   const escapedRecipientEmail = escapeHtml(recipientEmail);
 
-  await emailTransporter.sendMail({
-    from: resolveFromAddress(),
-    to: recipientEmail,
+  await sendEmail({
+    recipientEmail,
     subject: `[${EMAIL_APP_NAME}] Verify your email address`,
     text: [
       `${EMAIL_APP_NAME} email verification`,

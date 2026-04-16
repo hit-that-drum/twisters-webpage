@@ -241,6 +241,63 @@ const buildEmailVerificationLink = (rawToken: string, normalizedEmail: string) =
   )}`;
 };
 
+const formatEmailDeliveryErrorMessage = (fallbackMessage: string, error: unknown) => {
+  if (isProduction) {
+    return fallbackMessage;
+  }
+
+  if (!(error instanceof Error)) {
+    return fallbackMessage;
+  }
+
+  const errorWithDetails = error as Error & {
+    code?: string;
+    responseCode?: number;
+    command?: string;
+    response?: {
+      statusCode?: number;
+      body?: {
+        errors?: Array<{
+          message?: string;
+          field?: string;
+          help?: string;
+        }>;
+      };
+    } | string;
+  };
+
+  const responseDetails =
+    typeof errorWithDetails.response === 'object' && errorWithDetails.response !== null
+      ? [
+          typeof errorWithDetails.response.statusCode === 'number'
+            ? `HTTP ${errorWithDetails.response.statusCode}`
+            : undefined,
+          ...(errorWithDetails.response.body?.errors ?? []).flatMap((responseError) =>
+            [responseError.message, responseError.field, responseError.help].filter(
+              (value): value is string => typeof value === 'string' && value.trim().length > 0,
+            ),
+          ),
+        ]
+      : [];
+
+  const details = [
+    errorWithDetails.code,
+    typeof errorWithDetails.responseCode === 'number'
+      ? `SMTP ${errorWithDetails.responseCode}`
+      : undefined,
+    errorWithDetails.command,
+    error.message,
+    ...(typeof errorWithDetails.response === 'string' ? [errorWithDetails.response] : []),
+    ...responseDetails,
+  ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+  if (details.length === 0) {
+    return fallbackMessage;
+  }
+
+  return `${fallbackMessage} (${details.join(' | ')})`;
+};
+
 const createEmailVerificationPayload = async (userId: number, normalizedEmail: string) => {
   const rawToken = crypto.randomBytes(32).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
@@ -257,7 +314,12 @@ const createEmailVerificationPayload = async (userId: number, normalizedEmail: s
   };
 };
 
-const sendEmailVerification = async (userId: number, normalizedEmail: string) => {
+const sendEmailVerification = async (
+  userId: number,
+  normalizedEmail: string,
+  deliveryFailureMessage =
+    '이메일 인증 메일 전송에 실패했습니다. 잠시 후 다시 시도해주세요.',
+) => {
   const { verificationLink } = await createEmailVerificationPayload(userId, normalizedEmail);
   const isEmailDeliveryConfigured = canSendEmails();
 
@@ -266,6 +328,11 @@ const sendEmailVerification = async (userId: number, normalizedEmail: string) =>
       await sendSignupVerificationEmail(normalizedEmail, verificationLink);
     } catch (error) {
       console.error('Signup verification email send error:', error);
+      throw new HttpError(
+        502,
+        formatEmailDeliveryErrorMessage(deliveryFailureMessage, error),
+        'EMAIL_DELIVERY_FAILED',
+      );
     }
   }
 
@@ -438,7 +505,11 @@ class AuthService {
         throw new HttpError(500, '회원가입 처리 중 사용자 ID를 확인하지 못했습니다.');
       }
 
-      const { verificationLink, isEmailDeliveryConfigured } = await sendEmailVerification(userId, email);
+      const { verificationLink, isEmailDeliveryConfigured } = await sendEmailVerification(
+        userId,
+        email,
+        '회원가입은 완료되었지만 인증 메일 전송에 실패했습니다. 로그인 화면에서 인증 메일을 다시 보내주세요.',
+      );
 
       return {
         message: '회원가입이 완료되었습니다. 이메일 인증과 관리자 승인 후 로그인하실 수 있습니다.',
@@ -686,6 +757,7 @@ class AuthService {
     const { verificationLink, isEmailDeliveryConfigured } = await sendEmailVerification(
       user.id,
       normalizedEmail,
+      '인증 메일 재전송에 실패했습니다. 잠시 후 다시 시도해주세요.',
     );
 
     if (!isProduction && !isEmailDeliveryConfigured) {

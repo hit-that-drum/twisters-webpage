@@ -47,11 +47,7 @@ Deploy the `backend` directory as a separate Vercel project.
 - `JWT_SECRET`
 - `FRONTEND_BASE_URL` (your deployed frontend URL)
 - `EMAIL_FROM` (the sender address used for password reset and signup verification emails)
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_SECURE`
-- `SMTP_USER`
-- `SMTP_PASS`
+- `SENDGRID_API_KEY` (recommended)
 - `VITE_GOOGLE_CLIENT_ID` (if Google login is enabled)
 - `KAKAO_REST_API_KEY` (if Kakao login is enabled)
 - `KAKAO_CLIENT_SECRET` (recommended for Kakao code exchange)
@@ -63,9 +59,9 @@ Deploy the `backend` directory as a separate Vercel project.
 - `SUPABASE_DB_URL` uses Supabase Transaction Pooler URI
 - `JWT_SECRET` is a new production-only random secret
 - `FRONTEND_BASE_URL` exactly matches frontend production URL (no trailing slash)
-- `EMAIL_FROM` is a verified sender address for your SMTP provider
-- SMTP delivery must be able to send both password-reset emails and signup verification emails
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` match your SMTP provider credentials
+- `EMAIL_FROM` is a verified sender address or domain-authenticated address in SendGrid
+- SendGrid Web API delivery must be able to send both password-reset emails and signup verification emails
+- `SENDGRID_API_KEY` is a valid SendGrid API key with Mail Send permission
 - `VITE_GOOGLE_CLIENT_ID` matches Google OAuth web app config
 - `KAKAO_REST_API_KEY` matches Kakao Developers REST API key
 - `KAKAO_REDIRECT_URI` exactly matches Kakao Developers redirect URI entry
@@ -118,7 +114,7 @@ Run after both projects are deployed:
 7. Open the email verification link and confirm the frontend lands on `/signin`, consumes the verification token, and shows the verification success message.
 8. Attempt local signin before admin approval and confirm the account is blocked with the pending-approval message.
 9. Trigger forgot-password flow and verify the reset email arrives, the link opens the frontend, and the reset API succeeds.
-10. Confirm backend logs have no DB connection, JWT secret, or SMTP delivery errors.
+10. Confirm backend logs have no DB connection, JWT secret, or SendGrid delivery errors.
 
 ## 4.1) Copy-paste Vercel env templates
 
@@ -131,11 +127,7 @@ DB_SSL=true
 FRONTEND_BASE_URL=https://your-frontend.vercel.app
 EMAIL_APP_NAME=Twisters
 EMAIL_FROM=noreply@your-domain.com
-SMTP_HOST=smtp.sendgrid.net
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=apikey
-SMTP_PASS=<your-smtp-or-sendgrid-api-key>
+SENDGRID_API_KEY=<your-sendgrid-api-key-with-mail-send>
 VITE_GOOGLE_CLIENT_ID=<your-google-client-id>.apps.googleusercontent.com
 KAKAO_REST_API_KEY=<your-kakao-rest-api-key>
 KAKAO_CLIENT_SECRET=<your-kakao-client-secret>
@@ -151,21 +143,14 @@ SendGrid-specific backend example:
 ```env
 EMAIL_APP_NAME=Twisters
 EMAIL_FROM=noreply@yourdomain.com
-SMTP_HOST=smtp.sendgrid.net
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=apikey
-SMTP_PASS=SG.xxxxx_your_real_sendgrid_api_key
+SENDGRID_API_KEY=SG.xxxxx_your_real_sendgrid_api_key
 ```
 
 SendGrid notes:
 
-- `SMTP_USER` stays exactly `apikey`
-- `SMTP_PASS` must be the real SendGrid API key, not your dashboard password
+- `SENDGRID_API_KEY` must be the real SendGrid API key, not your dashboard password
 - `EMAIL_FROM` must be a verified sender or a domain-authenticated address in SendGrid
-- `SMTP_PORT=587` with `SMTP_SECURE=false` is the standard STARTTLS setup
-- If you use port `465`, switch to `SMTP_SECURE=true`
-- Test a real reset email and a real signup verification email immediately after deploy because invalid sender/auth values only show up in backend logs
+- Test a real reset email and a real signup verification email immediately after deploy because invalid sender/auth values show up in SendGrid API errors and backend logs
 
 Frontend project (`frontend` root directory):
 
@@ -192,13 +177,13 @@ Remove the Google/Kakao variables from either project if you are not shipping th
 10. Submit a new password, sign in with it after admin approval, and confirm the old password no longer works.
 11. Verify Google login if enabled.
 12. Verify Kakao login if enabled, including the callback redirect URL.
-13. Review Vercel logs for the frontend and backend and confirm there are no startup, DB, JWT, or SMTP errors.
+13. Review Vercel logs for the frontend and backend and confirm there are no startup, DB, JWT, or SendGrid errors.
 
 ## 4.3) Compressed deployment order
 
 1. Create the Supabase project and run `supabase/schema.sql`.
 2. Create the Vercel backend project with Root Directory `backend`.
-3. Add backend env vars (`SUPABASE_DB_URL`, `JWT_SECRET`, `DB_SSL`, `FRONTEND_BASE_URL`, SMTP values, OAuth values if used).
+3. Add backend env vars (`SUPABASE_DB_URL`, `JWT_SECRET`, `DB_SSL`, `FRONTEND_BASE_URL`, `EMAIL_FROM`, `SENDGRID_API_KEY`, OAuth values if used).
 4. Deploy the backend and save the production API URL.
 5. Create the Vercel frontend project with Root Directory `frontend`.
 6. Add frontend env vars (`VITE_API_BASE_URL` pointing at the deployed backend, plus OAuth values if used).
@@ -214,7 +199,7 @@ For local backend/frontend development:
 - Fill values in root `.env.development`
 - Set `DB_SSL=false` when local Postgres does not support SSL
 - Keep real secrets in `.env.development.local` if needed (gitignored)
-- Without SMTP configured in local non-production environments, signup/resend flows return a `devVerificationLink` so the frontend can simulate email-link landing on `/signin`
+- Without SendGrid configured in local non-production environments, signup/resend flows return a `devVerificationLink` so the frontend can simulate email-link landing on `/signin`
 
 Then run:
 - Backend: `cd backend && npm run dev`

@@ -141,6 +141,10 @@ const getAuthErrorMessage = (error: unknown, code: unknown) => {
     return '이미 사용된 이메일 인증 링크입니다. 필요하면 인증 메일을 다시 보내주세요.';
   }
 
+  if (code === 'EMAIL_DELIVERY_FAILED') {
+    return '인증 메일 전송에 실패했습니다. 잠시 후 다시 보내기를 시도해주세요.';
+  }
+
   return typeof error === 'string' ? error : '알 수 없는 에러';
 };
 
@@ -743,6 +747,17 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
             enqueueSnackbar('회원가입 성공!', { variant: 'success' });
             navigate(`/${userIdx}`);
           } else {
+            if (data.code === 'EMAIL_DELIVERY_FAILED' && normalizedLoginEmail) {
+              enqueueSnackbar(
+                typeof data.error === 'string'
+                  ? data.error
+                  : '회원가입은 완료되었지만 인증 메일 전송에 실패했습니다. 로그인 화면에서 재전송을 시도해주세요.',
+                { variant: 'warning' },
+              );
+              navigate(`/signin?verificationEmail=${encodeURIComponent(normalizedLoginEmail)}`);
+              return;
+            }
+
             enqueueSnackbar(`회원가입 실패: ${getAuthErrorMessage(data.error, data.code)}`, {
               variant: 'error',
             });
