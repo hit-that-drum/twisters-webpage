@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { EditDeleteButton, GlobalButton } from '@/common/components';
+import { EditDeleteButton, GlobalButton, useConfirmDialog } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import NoticeDetailModal, { type NoticeFormState } from './NoticeDetailModal';
 import { AiTwotonePushpin } from 'react-icons/ai';
@@ -185,6 +185,7 @@ const getApiMessage = (payload: unknown, fallback: string) => {
 export default function Notice() {
   const navigate = useNavigate();
   const { meInfo, logout } = useAuth();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [noticeList, setNoticeList] = useState<NoticeItem[]>([]);
   const [visibleNoticeCount, setVisibleNoticeCount] = useState(DEFAULT_VISIBLE_NOTICES);
   const [isLoading, setIsLoading] = useState(false);
@@ -458,7 +459,12 @@ export default function Notice() {
       return;
     }
 
-    const shouldDelete = window.confirm('해당 공지사항을 삭제하시겠습니까?');
+    const shouldDelete = await confirm({
+      title: '공지사항 삭제',
+      description: '해당 공지사항을 삭제하시겠습니까?',
+      confirmLabel: '삭제',
+      confirmButtonStyle: 'error',
+    });
     if (!shouldDelete) {
       return;
     }
@@ -668,6 +674,8 @@ export default function Notice() {
           }));
         }}
       />
+
+      {confirmDialog}
     </main>
   );
 }

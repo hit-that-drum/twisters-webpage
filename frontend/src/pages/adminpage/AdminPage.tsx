@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'rea
 import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import EditDeleteButton from '@/common/components/EditDeleteButton';
+import useConfirmDialog from '@/common/components/useConfirmDialog';
 import { apiFetch } from '@/common/lib/api/apiClient';
 import { useAuth } from '@/features';
 import GlobalButton from '@/common/components/GlobalButton';
@@ -298,6 +299,7 @@ const EMPTY_ADMIN_USER_FORM: AdminUserFormState = {
 export default function AdminPage() {
   const navigate = useNavigate();
   const { meInfo, isAuthLoading, logout, refreshMeInfo } = useAuth();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
@@ -398,7 +400,11 @@ export default function AdminPage() {
         return;
       }
 
-      const shouldApprove = window.confirm('해당 사용자를 승인하시겠습니까?');
+      const shouldApprove = await confirm({
+        title: '사용자 승인',
+        description: '해당 사용자를 승인하시겠습니까?',
+        confirmLabel: '승인',
+      });
       if (!shouldApprove) {
         return;
       }
@@ -432,14 +438,17 @@ export default function AdminPage() {
         setApprovingUserId(null);
       }
     },
-    [canManageUsers, handleExpiredSession, loadUsers],
+    [canManageUsers, confirm, handleExpiredSession, loadUsers],
   );
 
   const handleDeclineUser = useCallback(
     async (userId: number) => {
-      const shouldDecline = window.confirm(
-        '해당 사용자의 가입 요청을 거절하고 대기 중인 계정을 삭제하시겠습니까?',
-      );
+      const shouldDecline = await confirm({
+        title: '가입 요청 거절',
+        description: '해당 사용자의 가입 요청을 거절하고 대기 중인 계정을 삭제하시겠습니까?',
+        confirmLabel: '거절',
+        confirmButtonStyle: 'error',
+      });
       if (!shouldDecline) {
         return;
       }
@@ -475,7 +484,7 @@ export default function AdminPage() {
         setDecliningUserId(null);
       }
     },
-    [handleExpiredSession, loadUsers],
+    [confirm, handleExpiredSession, loadUsers],
   );
 
   const handleOpenEditDialog = useCallback((user: AdminUserRecord) => {
@@ -511,7 +520,7 @@ export default function AdminPage() {
   }, [editUserForm.email, editUserForm.name]);
 
   const handleCloseEditDialog = useCallback(
-    (event: object, reason: ModalCloseReason) => {
+    async (event: object, reason: ModalCloseReason) => {
       void event;
       void reason;
 
@@ -520,9 +529,12 @@ export default function AdminPage() {
       }
 
       if (hasEditChanges) {
-        const shouldClose = window.confirm(
-          '변경 사항이 있습니다. 저장하지 않고 닫으면 변경사항이 유실됩니다. 닫으시겠습니까?',
-        );
+        const shouldClose = await confirm({
+          title: '변경 사항 닫기',
+          description: '변경 사항이 있습니다. 저장하지 않고 닫으면 변경사항이 유실됩니다. 닫으시겠습니까?',
+          confirmLabel: '닫기',
+          confirmButtonStyle: 'error',
+        });
         if (!shouldClose) {
           return;
         }
@@ -532,7 +544,7 @@ export default function AdminPage() {
       setEditingUserId(null);
       setEditUserForm(EMPTY_ADMIN_USER_FORM);
     },
-    [hasEditChanges, isSubmitting],
+    [confirm, hasEditChanges, isSubmitting],
   );
 
   const handleEditFormChange = useCallback(
@@ -652,9 +664,12 @@ export default function AdminPage() {
         return;
       }
 
-      const shouldDelete = window.confirm(
-        `'${user.name}' 사용자를 삭제하시겠습니까? 연결된 세션은 종료되며 작성 기록의 작성자는 비워질 수 있습니다.`,
-      );
+      const shouldDelete = await confirm({
+        title: '사용자 삭제',
+        description: `'${user.name}' 사용자를 삭제하시겠습니까? 연결된 세션은 종료되며 작성 기록의 작성자는 비워질 수 있습니다.`,
+        confirmLabel: '삭제',
+        confirmButtonStyle: 'error',
+      });
       if (!shouldDelete) {
         return;
       }
@@ -688,7 +703,7 @@ export default function AdminPage() {
         setDeletingUserId(null);
       }
     },
-    [handleExpiredSession, loadUsers, meInfo?.id],
+    [confirm, handleExpiredSession, loadUsers, meInfo?.id],
   );
 
   const handleDeleteUserProfileImage = useCallback(
@@ -698,9 +713,12 @@ export default function AdminPage() {
         return;
       }
 
-      const shouldDeleteProfileImage = window.confirm(
-        `'${user.name}' 사용자의 프로필 이미지를 삭제하시겠습니까? 삭제 후에는 이니셜 아바타로 표시됩니다.`,
-      );
+      const shouldDeleteProfileImage = await confirm({
+        title: '프로필 이미지 삭제',
+        description: `'${user.name}' 사용자의 프로필 이미지를 삭제하시겠습니까? 삭제 후에는 이니셜 아바타로 표시됩니다.`,
+        confirmLabel: '삭제',
+        confirmButtonStyle: 'error',
+      });
       if (!shouldDeleteProfileImage) {
         return;
       }
@@ -743,7 +761,7 @@ export default function AdminPage() {
         setRemovingProfileImageUserId(null);
       }
     },
-    [handleExpiredSession, loadUsers, meInfo?.id, refreshMeInfo],
+    [confirm, handleExpiredSession, loadUsers, meInfo?.id, refreshMeInfo],
   );
 
   const sortedAllUsers = useMemo(
@@ -1159,6 +1177,8 @@ export default function AdminPage() {
         joinedLabel={editingUser ? formatJoinedDate(editingUser.createdAt) : undefined}
         onFormChange={handleEditFormChange}
       />
+
+      {confirmDialog}
     </main>
   );
 }

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { EditDeleteButton, GlobalButton } from '@/common/components';
+import { EditDeleteButton, GlobalButton, useConfirmDialog } from '@/common/components';
 import MemberDetailModal, { type MemberFormState } from './MemberDetailModal';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import { BiMoneyWithdraw } from 'react-icons/bi';
@@ -294,6 +294,7 @@ const DetailInfoDesc = (detailInfo: DetailInfoItem[]) => {
 export default function Member() {
   const navigate = useNavigate();
   const { meInfo, isAuthLoading, logout } = useAuth();
+  const { confirm, confirmDialog } = useConfirmDialog();
 
   const [users, setUsers] = useState<MemberUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -600,7 +601,12 @@ export default function Member() {
       return;
     }
 
-    const isConfirmed = window.confirm(`정말로 '${selectedUser.name}' 회원을 삭제하시겠습니까?`);
+    const isConfirmed = await confirm({
+      title: '회원 삭제',
+      description: `정말로 '${selectedUser.name}' 회원을 삭제하시겠습니까?`,
+      confirmLabel: '삭제',
+      confirmButtonStyle: 'error',
+    });
     if (!isConfirmed) {
       return;
     }
@@ -863,6 +869,8 @@ export default function Member() {
         onFormChange={handleChangeEditForm}
         onDateChange={handleEditDateChange}
       />
+
+      {confirmDialog}
     </section>
   );
 }
