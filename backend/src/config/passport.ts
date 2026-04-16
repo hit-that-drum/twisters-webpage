@@ -5,6 +5,7 @@ import bcrypt from 'bcrypt';
 import { query } from '../db.js';
 import { getJwtSecret } from '../authUtils.js';
 import { HttpError } from '../errors/httpError.js';
+import { authRepository } from '../repositories/authRepository.js';
 import { getAuthenticatedUserBySession, touchSessionActivity } from '../sessionService.js';
 
 interface AccessJwtPayload {
@@ -34,6 +35,7 @@ interface PassportUserRow {
   password: string | null;
   isAdmin: boolean | null;
   isAllowed: boolean | null;
+  emailVerifiedAt: Date | null;
   sessionId?: number;
 }
 
@@ -46,8 +48,9 @@ passport.use(
     },
     async (email, password, done) => {
       try {
+        await authRepository.ensureAuthSchema();
         const result = await query<PassportUserRow>(
-          'SELECT id, name, email, password, "isAdmin", "isAllowed" FROM users WHERE LOWER(email) = LOWER($1)',
+          'SELECT id, name, email, password, "isAdmin", "isAllowed", "emailVerifiedAt" FROM users WHERE LOWER(email) = LOWER($1)',
           [email],
         );
         const user = result.rows[0];
@@ -59,6 +62,16 @@ passport.use(
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return done(null, false, { message: 'Incorrect password.' });
+
+        if (!user.emailVerifiedAt) {
+          return done(
+            new HttpError(
+              403,
+              '이메일 인증이 필요합니다. 가입 후 받은 메일의 인증 링크를 확인해주세요.',
+              'EMAIL_VERIFICATION_REQUIRED',
+            ),
+          );
+        }
 
         if (user.isAllowed !== true) {
           return done(new HttpError(403, '관리자 승인 대기 중입니다.', 'ACCOUNT_PENDING_APPROVAL'));

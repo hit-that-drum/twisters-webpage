@@ -8,6 +8,7 @@ export interface PendingSignUpResponse {
   message: string;
   status: 'pending';
   userId: number;
+  devVerificationLink?: string;
 }
 
 export interface SignUpDTO {
@@ -52,6 +53,7 @@ export interface ApprovalUserRow {
   name: string;
   email: string;
   isAllowed: boolean | number;
+  emailVerifiedAt: Date | null;
 }
 
 export interface PendingUserRow {
@@ -80,6 +82,7 @@ export interface AdminUserRow {
   id: number;
   name: string;
   email: string;
+  profileImage: string | null;
   isAdmin: boolean | number;
   isAllowed: boolean | number;
   createdAt: Date;
@@ -88,6 +91,7 @@ export interface AdminUserRow {
 export interface UserEmailRow {
   id: number;
   email: string;
+  emailVerifiedAt: Date | null;
 }
 
 export interface PasswordResetLookupRow {
@@ -96,6 +100,15 @@ export interface PasswordResetLookupRow {
   expires_at: Date;
   used_at: Date | null;
   email: string;
+}
+
+export interface EmailVerificationLookupRow {
+  id: number;
+  user_id: number;
+  expires_at: Date;
+  used_at: Date | null;
+  email: string;
+  email_verified_at: Date | null;
 }
 
 export interface ResetPasswordDTO {
@@ -111,6 +124,15 @@ export interface RequestResetDTO {
 export interface VerifyResetTokenDTO {
   email?: string;
   token?: string;
+}
+
+export interface VerifyEmailDTO {
+  email?: string;
+  token?: string;
+}
+
+export interface ResendVerificationEmailDTO {
+  email?: string;
 }
 
 export interface GoogleAuthDTO {

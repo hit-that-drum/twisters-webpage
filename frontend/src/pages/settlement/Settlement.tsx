@@ -154,6 +154,10 @@ interface SettlementGridProps {
   canManageSettlements: boolean;
   deletingSettlementId: number | null;
   onOpenAddDialog: () => void;
+  relationFilter: string;
+  relationOptions: string[];
+  onRelationFilterChange: (relation: string) => void;
+  emptyStateMessage: string;
   onEdit: (record: SettlementRecord) => void;
   onDelete: (settlementId: number) => Promise<void>;
   totalAmount: number;
@@ -176,6 +180,10 @@ const SettlementGrid = memo(function SettlementGrid({
   canManageSettlements,
   deletingSettlementId,
   onOpenAddDialog,
+  relationFilter,
+  relationOptions,
+  onRelationFilterChange,
+  emptyStateMessage,
   onEdit,
   onDelete,
   totalAmount,
@@ -200,13 +208,40 @@ const SettlementGrid = memo(function SettlementGrid({
             SETTLEMENT
           </h1>
 
-          {canManageSettlements && (
-            <GlobalButton
-              onClick={onOpenAddDialog}
-              label="ADD SETTLEMENT"
-              iconBasicMappingType="ADD"
-            />
-          )}
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+            <label className="flex w-full min-w-[220px] items-center gap-2 text-sm font-medium text-slate-600 sm:w-auto">
+              <span className="shrink-0">Relation filter</span>
+              <div className="relative w-full sm:w-auto">
+                <select
+                  value={relationFilter}
+                  onChange={(event) => onRelationFilterChange(event.target.value)}
+                  className="h-10 w-full cursor-pointer appearance-none rounded-lg border border-slate-300 bg-white py-1 pl-3 pr-8 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-amber-400"
+                  aria-label="Filter settlements by relation"
+                >
+                  <option value="">All Relations</option>
+                  {relationOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"
+                >
+                  ▾
+                </span>
+              </div>
+            </label>
+
+            {canManageSettlements && (
+              <GlobalButton
+                onClick={onOpenAddDialog}
+                label="ADD SETTLEMENT"
+                iconBasicMappingType="ADD"
+              />
+            )}
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -254,7 +289,7 @@ const SettlementGrid = memo(function SettlementGrid({
                       colSpan={5}
                       className="px-6 py-8 text-center text-sm font-medium text-slate-500"
                     >
-                      등록된 정산 내역이 없습니다.
+                      {emptyStateMessage}
                     </td>
                   </tr>
                 ) : (
@@ -789,37 +824,66 @@ export default function Settlement() {
 
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
   const [page, setPage] = useState(0);
+  const [relationFilter, setRelationFilter] = useState('');
 
   const sortedRows = useMemo(
     () => [...settlementRows].sort((left, right) => right.date.localeCompare(left.date)),
     [settlementRows],
   );
 
-  const totalRows = sortedRows.length;
+  const relationOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          sortedRows
+            .map((row) => row.relation.trim())
+            .filter((relation): relation is string => relation.length > 0),
+        ),
+      ),
+    [sortedRows],
+  );
+
+  useEffect(() => {
+    if (relationFilter && !relationOptions.includes(relationFilter)) {
+      setRelationFilter('');
+      setPage(0);
+    }
+  }, [relationFilter, relationOptions]);
+
+  const filteredRows = useMemo(() => {
+    if (!relationFilter) {
+      return sortedRows;
+    }
+
+    return sortedRows.filter((row) => row.relation.trim() === relationFilter);
+  }, [relationFilter, sortedRows]);
+
+  const totalRows = filteredRows.length;
   const maxPage = Math.max(0, Math.ceil(totalRows / rowsPerPage) - 1);
+  const currentPage = Math.min(page, maxPage);
 
   useEffect(() => {
     setPage((previous) => Math.min(previous, maxPage));
   }, [maxPage]);
 
   const pagedRows = useMemo(() => {
-    const startIndex = page * rowsPerPage;
-    return sortedRows.slice(startIndex, startIndex + rowsPerPage);
-  }, [page, rowsPerPage, sortedRows]);
+    const startIndex = currentPage * rowsPerPage;
+    return filteredRows.slice(startIndex, startIndex + rowsPerPage);
+  }, [currentPage, filteredRows, rowsPerPage]);
 
-  const totalAmount = settlementRows.reduce((sum, row) => sum + row.amount, 0);
-  const totalIncome = settlementRows.reduce(
+  const totalAmount = filteredRows.reduce((sum, row) => sum + row.amount, 0);
+  const totalIncome = filteredRows.reduce(
     (sum, row) => (row.amount > 0 ? sum + row.amount : sum),
     0,
   );
-  const totalExpense = settlementRows.reduce(
+  const totalExpense = filteredRows.reduce(
     (sum, row) => (row.amount < 0 ? sum + row.amount : sum),
     0,
   );
   const carryOverAmount = totalAmount;
 
-  const pageStart = totalRows === 0 ? 0 : page * rowsPerPage + 1;
-  const pageEnd = totalRows === 0 ? 0 : Math.min((page + 1) * rowsPerPage, totalRows);
+  const pageStart = totalRows === 0 ? 0 : currentPage * rowsPerPage + 1;
+  const pageEnd = totalRows === 0 ? 0 : Math.min((currentPage + 1) * rowsPerPage, totalRows);
 
   if (isLoading) {
     return <LoadingComponent />;
@@ -832,6 +896,17 @@ export default function Settlement() {
         canManageSettlements={canManageSettlements}
         deletingSettlementId={deletingSettlementId}
         onOpenAddDialog={handleOpenAddDialog}
+        relationFilter={relationFilter}
+        relationOptions={relationOptions}
+        onRelationFilterChange={(nextRelationFilter) => {
+          setRelationFilter(nextRelationFilter);
+          setPage(0);
+        }}
+        emptyStateMessage={
+          relationFilter
+            ? '선택한 Relation에 해당하는 정산 내역이 없습니다.'
+            : '등록된 정산 내역이 없습니다.'
+        }
         onEdit={handleOpenEditDialog}
         onDelete={handleDeleteSettlement}
         totalAmount={totalAmount}
@@ -842,8 +917,8 @@ export default function Settlement() {
         pageStart={pageStart}
         pageEnd={pageEnd}
         totalRows={totalRows}
-        canGoPrevious={page > 0}
-        canGoNext={page < maxPage}
+        canGoPrevious={currentPage > 0}
+        canGoNext={currentPage < maxPage}
         onRowsPerPageChange={(nextRowsPerPage) => {
           if (
             !ROWS_PER_PAGE_OPTIONS.includes(

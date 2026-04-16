@@ -185,8 +185,18 @@ class MemberService {
     const rows = await memberRepository.findAllMembers(scope);
 
     return rows.map((row) => ({
-      ...row,
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      profileImage:
+        typeof row.profileImage === 'string' && row.profileImage.trim().length > 0
+          ? row.profileImage.trim()
+          : null,
       isAdmin: normalizeBoolean(row.isAdmin, false),
+      phone: row.phone,
+      department: row.department,
+      joinedAt: row.joinedAt,
+      birthDate: row.birthDate,
     }));
   }
 

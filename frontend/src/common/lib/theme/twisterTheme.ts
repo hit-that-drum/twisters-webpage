@@ -95,8 +95,11 @@ export const twisterPalette = {
   },
 } as const;
 
-const twisterCssVariableEntries = Object.entries(twisterPalette).flatMap(([colorName, colorScale]) =>
-  Object.entries(colorScale).map(([scaleKey, value]) => [`--twister-${colorName}-${scaleKey}`, value] as const),
+const twisterCssVariableEntries = Object.entries(twisterPalette).flatMap(
+  ([colorName, colorScale]) =>
+    Object.entries(colorScale).map(
+      ([scaleKey, value]) => [`--twister-${colorName}-${scaleKey}`, value] as const,
+    ),
 );
 
 const twisterVariables = twisterCssVariableEntries.reduce<Record<string, string>>(
@@ -238,8 +241,17 @@ export const twisterMuiTheme = createTheme({
    * These values apply to MUI Typography components and MUI-based controls.
    */
   typography: {
-    fontFamily:
-      "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, -system-ui, 'Segoe UI', sans-serif",
+    // fontFamily:
+    //   "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, -system-ui, 'Segoe UI', sans-serif",
+    fontFamily: [
+      "'Noto Sans KR'",
+      '-apple-system',
+      'BlinkMacSystemFont',
+      "'SF Pro Text'",
+      'system-ui',
+      "'Segoe UI'",
+      'sans-serif',
+    ].join(', '),
     h1: {
       fontSize: '2rem', // 32px
       lineHeight: 1.25,

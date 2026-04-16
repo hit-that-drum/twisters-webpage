@@ -13,6 +13,7 @@ interface MemberUser {
   id: number;
   name: string;
   email: string | null;
+  profileImage: string | null;
   isAdmin: boolean;
   phone: string | null;
   joinedAt: string | null;
@@ -82,6 +83,8 @@ const parseMembers = (payload: unknown): MemberUser[] => {
         id?: unknown;
         name?: unknown;
         email?: unknown;
+        profileImage?: unknown;
+        isAdmin?: unknown;
         phone?: unknown;
         joinedAt?: unknown;
         birthDate?: unknown;
@@ -107,6 +110,8 @@ const parseMembers = (payload: unknown): MemberUser[] => {
         id: row.id,
         name: row.name,
         email: normalizeNullableString(row.email),
+        profileImage: normalizeNullableString(row.profileImage),
+        isAdmin: parseBoolean(row.isAdmin),
         phone: normalizeNullableString(row.phone),
         joinedAt: normalizeNullableString(row.joinedAt),
         birthDate: normalizeNullableString(row.birthDate),
@@ -236,6 +241,40 @@ const renderDetailValue = (value: string | null) => {
 
   return value;
 };
+
+const getMemberInitial = (name: string) => {
+  return name.trim().charAt(0).toUpperCase() || '?';
+};
+
+function MemberAvatar({
+  name,
+  profileImage,
+  containerClassName,
+  fallbackClassName,
+}: {
+  name: string;
+  profileImage: string | null;
+  containerClassName: string;
+  fallbackClassName: string;
+}) {
+  const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
+  const shouldShowProfileImage = Boolean(profileImage && profileImage !== failedImageSrc);
+
+  return (
+    <div aria-hidden="true" className={containerClassName}>
+      {shouldShowProfileImage ? (
+        <img
+          src={profileImage ?? undefined}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setFailedImageSrc(profileImage)}
+        />
+      ) : (
+        <span className={fallbackClassName}>{getMemberInitial(name)}</span>
+      )}
+    </div>
+  );
+}
 
 const DetailInfoDesc = (detailInfo: DetailInfoItem[]) => {
   return (
@@ -690,14 +729,14 @@ export default function Member() {
                           : 'border-transparent text-slate-600 hover:bg-slate-50'
                       } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-inset`}
                     >
-                      <span
-                        aria-hidden="true"
-                        className={`inline-flex size-8 items-center justify-center rounded-full text-xs font-bold ${
+                      <MemberAvatar
+                        name={user.name}
+                        profileImage={user.profileImage}
+                        containerClassName={`inline-flex size-8 items-center justify-center overflow-hidden rounded-full text-xs font-bold ${
                           isActive ? 'bg-amber-200 text-amber-800' : 'bg-slate-100 text-slate-500'
                         }`}
-                      >
-                        {user.name.trim().charAt(0) || '?'}
-                      </span>
+                        fallbackClassName="text-xs font-bold"
+                      />
 
                       <span className="min-w-0 flex-1">
                         <span
@@ -724,9 +763,13 @@ export default function Member() {
                 <div className="p-6 md:p-8">
                   <div className="mb-8 flex flex-col gap-5 border-b border-slate-100 pb-8 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center gap-5">
-                      <div className="inline-flex size-24 items-center justify-center rounded-full border-4 border-amber-300 bg-slate-100 text-4xl font-black text-slate-500 shadow-inner">
-                        {selectedUser.name.trim().charAt(0) || '?'}
-                      </div>
+                      <MemberAvatar
+                        key={`${selectedUser.id}:${selectedUser.profileImage ?? ''}`}
+                        name={selectedUser.name}
+                        profileImage={selectedUser.profileImage}
+                        containerClassName="inline-flex size-24 items-center justify-center overflow-hidden rounded-full border-4 border-amber-300 bg-slate-100 text-4xl font-black text-slate-500 shadow-inner"
+                        fallbackClassName="text-4xl font-black text-slate-500"
+                      />
 
                       <div>
                         <h2 className="text-3xl font-black tracking-tight text-slate-900">
