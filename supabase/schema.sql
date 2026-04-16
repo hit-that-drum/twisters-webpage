@@ -126,6 +126,66 @@ CREATE TABLE IF NOT EXISTS test_board_comments (
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS meeting_sources (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "boardId" INTEGER NOT NULL UNIQUE REFERENCES board(id) ON DELETE CASCADE,
+  "meetingYear" INTEGER NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS test_meeting_sources (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "boardId" INTEGER NOT NULL UNIQUE REFERENCES test_board(id) ON DELETE CASCADE,
+  "meetingYear" INTEGER NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS meeting_attendance (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "meetingSourceId" INTEGER NOT NULL REFERENCES meeting_sources(id) ON DELETE CASCADE,
+  "memberId" INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  "sourceCommentId" INTEGER REFERENCES board_comments(id) ON DELETE SET NULL,
+  "sourceType" VARCHAR(30) NOT NULL DEFAULT 'derived',
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE("meetingSourceId", "memberId")
+);
+
+CREATE TABLE IF NOT EXISTS test_meeting_attendance (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "meetingSourceId" INTEGER NOT NULL REFERENCES test_meeting_sources(id) ON DELETE CASCADE,
+  "memberId" INTEGER NOT NULL REFERENCES test_members(id) ON DELETE CASCADE,
+  "sourceCommentId" INTEGER REFERENCES test_board_comments(id) ON DELETE SET NULL,
+  "sourceType" VARCHAR(30) NOT NULL DEFAULT 'derived',
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE("meetingSourceId", "memberId")
+);
+
+CREATE TABLE IF NOT EXISTS meeting_attendance_overrides (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "memberId" INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  "meetingYear" INTEGER NOT NULL,
+  attended BOOLEAN NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE("memberId", "meetingYear")
+);
+
+CREATE TABLE IF NOT EXISTS test_meeting_attendance_overrides (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "memberId" INTEGER NOT NULL REFERENCES test_members(id) ON DELETE CASCADE,
+  "meetingYear" INTEGER NOT NULL,
+  attended BOOLEAN NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE("memberId", "meetingYear")
+);
+
 CREATE TABLE IF NOT EXISTS test_settlement (
   id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   settlement_date DATE NOT NULL,
@@ -185,6 +245,12 @@ CREATE INDEX IF NOT EXISTS idx_board_comments_board_id ON board_comments ("board
 CREATE INDEX IF NOT EXISTS idx_board_comments_author_id ON board_comments ("authorId");
 CREATE INDEX IF NOT EXISTS idx_test_board_comments_board_id ON test_board_comments ("boardId", "createdAt" ASC);
 CREATE INDEX IF NOT EXISTS idx_test_board_comments_author_id ON test_board_comments ("authorId");
+CREATE INDEX IF NOT EXISTS idx_meeting_sources_year ON meeting_sources ("meetingYear" DESC);
+CREATE INDEX IF NOT EXISTS idx_test_meeting_sources_year ON test_meeting_sources ("meetingYear" DESC);
+CREATE INDEX IF NOT EXISTS idx_meeting_attendance_member_id ON meeting_attendance ("memberId");
+CREATE INDEX IF NOT EXISTS idx_test_meeting_attendance_member_id ON test_meeting_attendance ("memberId");
+CREATE INDEX IF NOT EXISTS idx_meeting_attendance_overrides_member_year ON meeting_attendance_overrides ("memberId", "meetingYear");
+CREATE INDEX IF NOT EXISTS idx_test_meeting_attendance_overrides_member_year ON test_meeting_attendance_overrides ("memberId", "meetingYear");
 CREATE INDEX IF NOT EXISTS idx_test_settlement_date ON test_settlement (settlement_date DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_test_settlement_unique_entry ON test_settlement (settlement_date, item, amount, relation);
 
@@ -205,6 +271,14 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION update_board_comment_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW."updatedAt" = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION update_meeting_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW."updatedAt" = NOW();
@@ -253,3 +327,45 @@ CREATE TRIGGER trg_test_board_comment_update_date
 BEFORE UPDATE ON test_board_comments
 FOR EACH ROW
 EXECUTE FUNCTION update_board_comment_updated_at();
+
+DROP TRIGGER IF EXISTS trg_meeting_sources_update_date ON meeting_sources;
+
+CREATE TRIGGER trg_meeting_sources_update_date
+BEFORE UPDATE ON meeting_sources
+FOR EACH ROW
+EXECUTE FUNCTION update_meeting_updated_at();
+
+DROP TRIGGER IF EXISTS trg_test_meeting_sources_update_date ON test_meeting_sources;
+
+CREATE TRIGGER trg_test_meeting_sources_update_date
+BEFORE UPDATE ON test_meeting_sources
+FOR EACH ROW
+EXECUTE FUNCTION update_meeting_updated_at();
+
+DROP TRIGGER IF EXISTS trg_meeting_attendance_update_date ON meeting_attendance;
+
+CREATE TRIGGER trg_meeting_attendance_update_date
+BEFORE UPDATE ON meeting_attendance
+FOR EACH ROW
+EXECUTE FUNCTION update_meeting_updated_at();
+
+DROP TRIGGER IF EXISTS trg_test_meeting_attendance_update_date ON test_meeting_attendance;
+
+CREATE TRIGGER trg_test_meeting_attendance_update_date
+BEFORE UPDATE ON test_meeting_attendance
+FOR EACH ROW
+EXECUTE FUNCTION update_meeting_updated_at();
+
+DROP TRIGGER IF EXISTS trg_meeting_attendance_overrides_update_date ON meeting_attendance_overrides;
+
+CREATE TRIGGER trg_meeting_attendance_overrides_update_date
+BEFORE UPDATE ON meeting_attendance_overrides
+FOR EACH ROW
+EXECUTE FUNCTION update_meeting_updated_at();
+
+DROP TRIGGER IF EXISTS trg_test_meeting_attendance_overrides_update_date ON test_meeting_attendance_overrides;
+
+CREATE TRIGGER trg_test_meeting_attendance_overrides_update_date
+BEFORE UPDATE ON test_meeting_attendance_overrides
+FOR EACH ROW
+EXECUTE FUNCTION update_meeting_updated_at();

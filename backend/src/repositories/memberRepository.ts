@@ -207,6 +207,15 @@ class MemberRepository {
     return result.rows[0] ?? null;
   }
 
+  async findMemberById(scope: DataScope, memberId: number) {
+    const membersTable = getScopedTableNames(scope).members;
+    const result = await pool.query<MemberLookupRow>(
+      `SELECT id FROM ${membersTable} WHERE id = $1 LIMIT 1`,
+      [memberId],
+    );
+    return result.rows[0] ?? null;
+  }
+
   async findMemberByEmailExcludingId(scope: DataScope, email: string, memberId: number) {
     const membersTable = getScopedTableNames(scope).members;
     const result = await pool.query<MemberLookupRow>(

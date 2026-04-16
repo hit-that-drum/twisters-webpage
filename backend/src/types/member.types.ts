@@ -41,6 +41,15 @@ export type MemberDuesStatus = {
   name: string;
 } & Record<`deposit${number}`, boolean>;
 
+export type MemberMeetingAttendanceStatus = {
+  memberId: number;
+  name: string;
+} & Record<`attendance${number}`, boolean>;
+
+export interface MemberMeetingAttendanceOverrideDTO {
+  attended?: unknown;
+}
+
 export interface MemberMutationDTO {
   name?: unknown;
   email?: unknown;

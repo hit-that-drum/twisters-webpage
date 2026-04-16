@@ -1,16 +1,21 @@
 import { HttpError } from '../errors/httpError.js';
 import { memberRepository } from '../repositories/memberRepository.js';
+import { meetingAttendanceRepository } from '../repositories/meetingAttendanceRepository.js';
 import { type AuthenticatedUser } from '../types/common.types.js';
 import {
   type Member,
   type MemberDuesStatus,
+  type MemberMeetingAttendanceOverrideDTO,
+  type MemberMeetingAttendanceStatus,
   type MemberMutationDTO,
   type MemberMutationPayload,
 } from '../types/member.types.js';
+import { meetingAttendanceService } from './meetingAttendanceService.js';
 import { resolveDataScopeByUser } from '../utils/dataScope.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DUES_BASE_YEAR = 2024;
+const MIN_MEETING_YEAR = 2000;
 
 const parseMemberId = (rawMemberId?: string) => {
   const parsedMemberId = Number(rawMemberId);
@@ -19,6 +24,15 @@ const parseMemberId = (rawMemberId?: string) => {
   }
 
   return parsedMemberId;
+};
+
+const parseMeetingYear = (rawMeetingYear?: string) => {
+  const parsedMeetingYear = Number(rawMeetingYear);
+  if (!Number.isInteger(parsedMeetingYear) || parsedMeetingYear < MIN_MEETING_YEAR) {
+    return null;
+  }
+
+  return parsedMeetingYear;
 };
 
 const normalizeOptionalText = (rawValue: unknown, maxLength: number, fieldPrefix: string) => {
@@ -266,6 +280,142 @@ class MemberService {
 
       return row;
     });
+  }
+
+  async getMemberMeetingAttendanceStatus(
+    authenticatedUser: AuthenticatedUser | undefined,
+  ): Promise<MemberMeetingAttendanceStatus[]> {
+    const scope = resolveDataScopeByUser(authenticatedUser);
+    await memberRepository.ensureMembersSchema();
+    await meetingAttendanceService.syncAllMeetingAttendance(scope);
+
+    const [membersRows, attendanceRows, meetingYearRows, overrideRows] = await Promise.all([
+      memberRepository.findAllMemberNames(scope),
+      meetingAttendanceRepository.findMeetingAttendanceRows(scope),
+      meetingAttendanceRepository.findMeetingYears(scope),
+      meetingAttendanceRepository.findMeetingAttendanceOverrideRows(scope),
+    ]);
+
+    const meetingYears = meetingYearRows
+      .map((row) => Number(row.meetingYear))
+      .filter((year) => Number.isInteger(year))
+      .sort((a, b) => a - b);
+
+    const attendanceYearsByMemberId = new Map<number, Set<number>>();
+    attendanceRows.forEach((row) => {
+      const memberId = row.memberId;
+      const meetingYear = Number(row.meetingYear);
+
+      if (!Number.isInteger(memberId) || !Number.isInteger(meetingYear)) {
+        return;
+      }
+
+      const years = attendanceYearsByMemberId.get(memberId) ?? new Set<number>();
+      years.add(meetingYear);
+      attendanceYearsByMemberId.set(memberId, years);
+    });
+
+    const attendanceOverridesByMemberId = new Map<number, Map<number, boolean>>();
+    overrideRows.forEach((row) => {
+      const memberId = row.memberId;
+      const meetingYear = Number(row.meetingYear);
+
+      if (!Number.isInteger(memberId) || !Number.isInteger(meetingYear)) {
+        return;
+      }
+
+      const overrides = attendanceOverridesByMemberId.get(memberId) ?? new Map<number, boolean>();
+      overrides.set(meetingYear, normalizeBoolean(row.attended, false));
+      attendanceOverridesByMemberId.set(memberId, overrides);
+    });
+
+    return membersRows.map((member) => {
+      const row = {
+        memberId: member.id,
+        name: member.name,
+      } as MemberMeetingAttendanceStatus;
+      const attendedYears = attendanceYearsByMemberId.get(member.id) ?? new Set<number>();
+      const overrides = attendanceOverridesByMemberId.get(member.id) ?? new Map<number, boolean>();
+
+      meetingYears.forEach((year) => {
+        const key = `attendance${year}` as `attendance${number}`;
+        row[key] = overrides.has(year) ? (overrides.get(year) ?? false) : attendedYears.has(year);
+      });
+
+      return row;
+    });
+  }
+
+  async updateMemberMeetingAttendanceStatus(
+    authenticatedUser: AuthenticatedUser | undefined,
+    rawMemberId: string | undefined,
+    rawMeetingYear: string | undefined,
+    payload: MemberMeetingAttendanceOverrideDTO,
+  ) {
+    const adminUser = requireAdminUser(authenticatedUser);
+    const scope = resolveDataScopeByUser(adminUser);
+    const memberId = parseMemberId(rawMemberId);
+    const meetingYear = parseMeetingYear(rawMeetingYear);
+
+    if (!memberId) {
+      throw new HttpError(400, '유효한 회원 ID가 필요합니다.');
+    }
+
+    if (!meetingYear) {
+      throw new HttpError(400, '유효한 모임 연도가 필요합니다.');
+    }
+
+    if (typeof payload.attended !== 'boolean') {
+      throw new HttpError(400, '참석 여부는 boolean 형식이어야 합니다.');
+    }
+
+    await Promise.all([
+      memberRepository.ensureMembersSchema(),
+      meetingAttendanceRepository.ensureMeetingAttendanceSchema(),
+    ]);
+
+    const member = await memberRepository.findMemberById(scope, memberId);
+    if (!member) {
+      throw new HttpError(404, '해당 회원을 찾을 수 없습니다.');
+    }
+
+    await meetingAttendanceRepository.upsertMeetingAttendanceOverride(
+      scope,
+      memberId,
+      meetingYear,
+      payload.attended,
+    );
+  }
+
+  async clearMemberMeetingAttendanceStatus(
+    authenticatedUser: AuthenticatedUser | undefined,
+    rawMemberId: string | undefined,
+    rawMeetingYear: string | undefined,
+  ) {
+    const adminUser = requireAdminUser(authenticatedUser);
+    const scope = resolveDataScopeByUser(adminUser);
+    const memberId = parseMemberId(rawMemberId);
+    const meetingYear = parseMeetingYear(rawMeetingYear);
+
+    if (!memberId) {
+      throw new HttpError(400, '유효한 회원 ID가 필요합니다.');
+    }
+
+    if (!meetingYear) {
+      throw new HttpError(400, '유효한 모임 연도가 필요합니다.');
+    }
+
+    await Promise.all([
+      memberRepository.ensureMembersSchema(),
+      meetingAttendanceRepository.ensureMeetingAttendanceSchema(),
+    ]);
+
+    const member = await memberRepository.findMemberById(scope, memberId);
+    if (!member) {
+      throw new HttpError(404, '해당 회원을 찾을 수 없습니다.');
+    }
+
+    await meetingAttendanceRepository.deleteMeetingAttendanceOverride(scope, memberId, meetingYear);
   }
 
   async createMember(authenticatedUser: AuthenticatedUser | undefined, payload: MemberMutationDTO) {
