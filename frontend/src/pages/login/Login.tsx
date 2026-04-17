@@ -1,10 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import loginPageRightImage from '/login_page_right_image.png';
 import { CircularProgress, Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '@/common/lib/api/apiClient';
+import PasswordField from '@/common/components/PasswordField';
+import {
+  evaluatePasswordPolicy,
+  PASSWORD_POLICY_ERROR_MESSAGE,
+} from '@/common/lib/passwordPolicy';
 import LoadingComponent from '@/common/LoadingComponent.tsx';
 import { useAuth } from '@/features';
 import { SiKakaotalk } from 'react-icons/si';
@@ -160,6 +165,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const resetToken = searchParams.get('resetToken')?.trim() || '';
   const resetEmailFromLink = searchParams.get('email')?.trim() || '';
+  const isResetLinkFlow = Boolean(resetToken && resetEmailFromLink);
   const verificationToken = searchParams.get('verificationToken')?.trim() || '';
   const verificationEmailFromLink = searchParams.get('verificationEmail')?.trim().toLowerCase() || '';
   const kakaoCode = searchParams.get('code')?.trim() || '';
@@ -202,6 +208,8 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
     ? '로그인 정보를 확인하고 있어요. 잠시만 기다려주세요.'
     : '회원가입을 처리하고 있어요. 잠시만 기다려주세요.';
   const activeLoadingMessage = oauthLoadingMessage ?? submitLoadingMessage;
+  const signupPasswordEvaluation = evaluatePasswordPolicy(formData.password);
+  const resetPasswordEvaluation = evaluatePasswordPolicy(resetFormData.resetPassword);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (
@@ -217,12 +225,12 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
 
   const [openForgotPasswordDialog, setOpenForgotPasswordDialog] = useState(false);
 
-  const clearVerificationSearchParams = () => {
+  const clearVerificationSearchParams = useCallback(() => {
     const nextSearchParams = new URLSearchParams(searchParams);
     nextSearchParams.delete('verificationToken');
     nextSearchParams.delete('verificationEmail');
     setSearchParams(nextSearchParams, { replace: true });
-  };
+  }, [searchParams, setSearchParams]);
 
   const handleResendVerificationEmail = async (emailOverride?: string) => {
     const targetEmail = (emailOverride || verificationTargetEmail).trim().toLowerCase();
@@ -295,7 +303,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
   };
 
   useEffect(() => {
-    if (resetToken) {
+    if (isResetLinkFlow) {
       setResetFormData((previous) => ({
         ...previous,
         resetEmail: resetEmailFromLink || previous.resetEmail,
@@ -510,8 +518,9 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
     kakaoState,
     navigate,
     resolvedKakaoRedirectUri,
+    clearVerificationSearchParams,
+    isResetLinkFlow,
     resetEmailFromLink,
-    resetToken,
     searchParams,
     setSearchParams,
     verificationEmailFromLink,
@@ -539,6 +548,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
     setResetFormData((previous) => ({
       ...previous,
       resetEmail: resetEmailFromLink || formData.email || previous.resetEmail,
+      resetPassword: isResetLinkFlow ? previous.resetPassword : '',
     }));
     setOpenForgotPasswordDialog(true);
   };
@@ -548,21 +558,26 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
   };
 
   const handleResetPassword = async () => {
-    if (!resetFormData.resetEmail || !resetFormData.resetPassword) {
-      enqueueSnackbar('이메일과 새 비밀번호를 입력해주세요.', { variant: 'error' });
-      return;
-    }
-
     const normalizedResetEmail = resetFormData.resetEmail.trim().toLowerCase();
     if (!normalizedResetEmail) {
       enqueueSnackbar('이메일 형식이 올바르지 않습니다.', { variant: 'error' });
       return;
     }
 
+      if (isResetLinkFlow && !resetFormData.resetPassword) {
+        enqueueSnackbar('새 비밀번호를 입력해주세요.', { variant: 'error' });
+        return;
+      }
+
+      if (isResetLinkFlow && !resetPasswordEvaluation.isValid) {
+        enqueueSnackbar(PASSWORD_POLICY_ERROR_MESSAGE, { variant: 'error' });
+        return;
+      }
+
     setIsResetSubmitting(true);
 
     try {
-      if (!resetToken) {
+      if (!isResetLinkFlow) {
         const requestResetResponse = await apiFetch('/authentication/request-reset', {
           method: 'POST',
           body: JSON.stringify({
@@ -578,33 +593,14 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
           return;
         }
 
-        if (requestResetData.devResetLink) {
-          const linkUrl = new URL(requestResetData.devResetLink);
-          const nextSearchParams = new URLSearchParams(searchParams);
-          const linkToken = linkUrl.searchParams.get('resetToken');
-          const linkEmail = linkUrl.searchParams.get('email');
-
-          if (linkToken) {
-            nextSearchParams.set('resetToken', linkToken);
-          }
-          if (linkEmail) {
-            nextSearchParams.set('email', linkEmail);
-            setResetFormData((previous) => ({ ...previous, resetEmail: linkEmail }));
-          }
-
-          setSearchParams(nextSearchParams, { replace: true });
-          enqueueSnackbar(
-            '개발 환경 재설정 링크를 적용했습니다. 다시 비밀번호 재설정을 눌러주세요.',
-            {
-              variant: 'info',
-            },
-          );
-          return;
-        }
-
         enqueueSnackbar(requestResetData.message || '비밀번호 재설정 링크를 이메일로 보냈습니다.', {
           variant: 'success',
         });
+        setOpenForgotPasswordDialog(false);
+        setResetFormData((previous) => ({
+          ...previous,
+          resetPassword: '',
+        }));
         return;
       }
 
@@ -674,6 +670,12 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
           enqueueSnackbar('모든 필드를 입력해주세요.', { variant: 'error' });
           return;
         }
+
+        if (!signupPasswordEvaluation.isValid) {
+          enqueueSnackbar(PASSWORD_POLICY_ERROR_MESSAGE, { variant: 'error' });
+          return;
+        }
+
         try {
           const response = await apiFetch('/authentication/signup', {
             method: 'POST',
@@ -1039,7 +1041,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                       htmlFor="name"
                       className="mb-2 block text-sm font-semibold text-gray-800"
                     >
-                      Name
+                      NAME
                     </label>
                     <input
                       id="name"
@@ -1048,8 +1050,8 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                       value={formData.name}
                       onChange={handleChange}
                       disabled={isSubmitLoading}
-                      placeholder="Enter your name"
-                      className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                      placeholder="이름을 입력해주세요"
+                      className="auth-input auth-input-reset"
                       required
                     />
                   </div>
@@ -1060,38 +1062,31 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                   <label htmlFor="email" className="mb-2 block text-sm font-semibold text-gray-800">
                     E-MAIL
                   </label>
-                  <input
-                    id="email"
-                    type="email"
-                     name="email"
-                     value={formData.email}
-                     onChange={handleChange}
-                     disabled={isSubmitLoading}
-                     placeholder="E-MAIL을 입력해주세요"
-                     className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
-                     required
-                   />
+                   <input
+                     id="email"
+                     type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      disabled={isSubmitLoading}
+                      placeholder="E-MAIL을 입력해주세요"
+                      className="auth-input auth-input-reset"
+                      required
+                    />
                 </div>
 
                 {/* Password */}
                 <div>
-                  <label
-                    htmlFor="password"
-                    className="mb-2 block text-sm font-semibold text-gray-800"
-                  >
-                    PASSWORD
-                  </label>
-                  <input
+                  <PasswordField
                     id="password"
-                    type="password"
-                     name="password"
-                     value={formData.password}
-                     onChange={handleChange}
-                     disabled={isSubmitLoading}
-                     placeholder="비밀번호를 입력해주세요(8-12자)"
-                     className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
-                     required
-                   />
+                    name="password"
+                    label="PASSWORD"
+                    value={formData.password}
+                    onChange={handleChange}
+                    disabled={isSubmitLoading}
+                    placeholder="비밀번호를 입력해주세요"
+                    showValidation={!isLogin}
+                  />
                 </div>
 
                 {isLogin && normalizedLoginEmail && wrongPasswordAttemptCount > 0 && (
@@ -1233,9 +1228,9 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
         <DialogTitle>비밀번호 재설정</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {resetToken
+            {isResetLinkFlow
               ? '토큰이 확인되었습니다. 이메일과 새 비밀번호를 입력해 재설정을 완료하세요.'
-              : '가입한 이메일을 입력하면 재설정 링크를 발송합니다. 개발 환경에서는 링크가 자동 적용됩니다.'}
+              : '가입한 이메일을 입력하면 재설정 링크를 발송합니다.'}
           </DialogContentText>
           <div className="mt-4 mb-4">
             <label htmlFor="resetEmail" className="mb-2 block text-sm font-semibold text-gray-800">
@@ -1247,36 +1242,33 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
               name="resetEmail"
               value={resetFormData.resetEmail}
               onChange={handleResetChange}
-              placeholder="Enter your email"
-              className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
+              placeholder="E-MAIL을 입력해주세요"
+              className="auth-input auth-input-reset"
               required
             />
           </div>
-          <div className="mb-4">
-            <label
-              htmlFor="resetPassword"
-              className="mb-2 block text-sm font-semibold text-gray-800"
-            >
-              New password
-            </label>
-            <input
-              id="resetPassword"
-              type="password"
-              name="resetPassword"
-              value={resetFormData.resetPassword}
-              onChange={handleResetChange}
-              placeholder="Enter your new password"
-              className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
-              required
-            />
-          </div>
+          {isResetLinkFlow && (
+            <div className="mb-4">
+              <PasswordField
+                id="resetPassword"
+                name="resetPassword"
+                label="Password"
+                value={resetFormData.resetPassword}
+                onChange={handleResetChange}
+                disabled={isResetSubmitting}
+                placeholder="비밀번호를 입력해주세요"
+                required
+                showValidation
+              />
+            </div>
+          )}
           <button
             type="button"
             disabled={isResetSubmitting}
             className="mt-4 w-full rounded-xl bg-blue-700 py-4 text-sm font-bold text-white transition-all hover:bg-blue-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             onClick={handleResetPassword}
           >
-            {isResetSubmitting ? '처리 중...' : '비밀번호 재설정'}
+            {isResetSubmitting ? '처리 중...' : isResetLinkFlow ? '비밀번호 재설정' : '재설정 링크 보내기'}
           </button>
         </DialogContent>
       </Dialog>

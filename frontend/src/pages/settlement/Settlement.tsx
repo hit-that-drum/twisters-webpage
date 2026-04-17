@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { EditDeleteButton, GlobalButton } from '@/common/components';
+import { EditDeleteButton, GlobalButton, useConfirmDialog } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import SettlementDetailModal, {
   type SettlementAmountType,
@@ -443,6 +443,7 @@ const SettlementGrid = memo(function SettlementGrid({
 export default function Settlement() {
   const navigate = useNavigate();
   const { meInfo, logout } = useAuth();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [settlementRows, setSettlementRows] = useState<SettlementRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -759,7 +760,12 @@ export default function Settlement() {
         return;
       }
 
-      const shouldDelete = window.confirm('해당 정산 내역을 삭제하시겠습니까?');
+      const shouldDelete = await confirm({
+        title: '정산 내역 삭제',
+        description: '해당 정산 내역을 삭제하시겠습니까?',
+        confirmLabel: '삭제',
+        confirmButtonStyle: 'error',
+      });
       if (!shouldDelete) {
         return;
       }
@@ -797,7 +803,7 @@ export default function Settlement() {
         setDeletingSettlementId(null);
       }
     },
-    [loadSettlements, logout, navigate, requireAdminAction],
+    [confirm, loadSettlements, logout, navigate, requireAdminAction],
   );
 
   const addSettlementActions: TAction[] = [
@@ -962,6 +968,8 @@ export default function Settlement() {
         onFormChange={handleChangeEditSettlementForm}
         onAmountTypeChange={handleEditAmountTypeChange}
       />
+
+      {confirmDialog}
     </>
   );
 }

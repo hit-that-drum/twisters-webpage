@@ -61,6 +61,7 @@ export interface PendingUserRow {
   name: string;
   email: string;
   createdAt: Date;
+  emailVerifiedAt: Date | null;
 }
 
 export interface UserApprovalRow {
@@ -86,6 +87,7 @@ export interface AdminUserRow {
   isAdmin: boolean | number;
   isAllowed: boolean | number;
   createdAt: Date;
+  emailVerifiedAt: Date | null;
 }
 
 export interface UserEmailRow {

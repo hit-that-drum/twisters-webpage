@@ -11,7 +11,8 @@ import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { EditDeleteButton, GlobalButton } from '@/common/components';
+import { handleBulletListKeyDown } from '@/common/lib/textareaBulletList';
+import { EditDeleteButton, GlobalButton, useConfirmDialog } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import BoardDetailModal, { type BoardFormState } from './BoardDetailModal';
 import BoardImageModal from './BoardImageModal';
@@ -309,6 +310,7 @@ const buildBoardListPath = (search: string, sort: BoardSortOption) => {
 export default function Board() {
   const navigate = useNavigate();
   const { meInfo, logout } = useAuth();
+  const { confirm, confirmDialog } = useConfirmDialog();
 
   const [boardPosts, setBoardPosts] = useState<BoardPostItem[]>([]);
   const [visiblePostCount, setVisiblePostCount] = useState(DEFAULT_VISIBLE_POSTS);
@@ -723,7 +725,12 @@ export default function Board() {
       return;
     }
 
-    const shouldDelete = window.confirm('해당 게시글을 삭제하시겠습니까?');
+    const shouldDelete = await confirm({
+      title: '게시글 삭제',
+      description: '해당 게시글을 삭제하시겠습니까?',
+      confirmLabel: '삭제',
+      confirmButtonStyle: 'error',
+    });
     if (!shouldDelete) {
       return;
     }
@@ -822,7 +829,12 @@ export default function Board() {
       return;
     }
 
-    const shouldDelete = window.confirm('해당 댓글을 삭제하시겠습니까?');
+    const shouldDelete = await confirm({
+      title: '댓글 삭제',
+      description: '해당 댓글을 삭제하시겠습니까?',
+      confirmLabel: '삭제',
+      confirmButtonStyle: 'error',
+    });
     if (!shouldDelete) {
       return;
     }
@@ -1249,6 +1261,7 @@ export default function Board() {
                                     onChange={(event) =>
                                       handleCommentDraftChange(post.id, event.target.value)
                                     }
+                                    onKeyDown={handleBulletListKeyDown}
                                     rows={3}
                                     placeholder="댓글을 입력하세요"
                                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500"
@@ -1377,6 +1390,8 @@ export default function Board() {
           handleSelectPostImage(imageModalPost.id, index);
         }}
       />
+
+      {confirmDialog}
     </main>
   );
 }

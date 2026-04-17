@@ -199,7 +199,7 @@ class AuthRepository {
   async findPendingUsers(onlyTestUsers = false) {
     const result = await pool.query<PendingUserRow>(
       `
-        SELECT id, name, email, "createdAt"
+        SELECT id, name, email, "createdAt", "emailVerifiedAt"
         FROM users
         WHERE "isAllowed" = FALSE
           AND ($1::boolean = FALSE OR ("isTest" = TRUE OR name ILIKE 'TEST%'))
@@ -214,7 +214,7 @@ class AuthRepository {
     await this.ensureUsersSchema();
     const result = await pool.query<AdminUserRow>(
       `
-        SELECT id, name, email, "profileImage", "isAdmin", "isAllowed", "createdAt"
+        SELECT id, name, email, "profileImage", "isAdmin", "isAllowed", "createdAt", "emailVerifiedAt"
         FROM users
         WHERE $1::boolean = FALSE OR ("isTest" = TRUE OR name ILIKE 'TEST%')
         ORDER BY "createdAt" DESC, id DESC
