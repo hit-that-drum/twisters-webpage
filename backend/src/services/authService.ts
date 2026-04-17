@@ -32,6 +32,7 @@ import {
   type VerifyEmailDTO,
   type VerifyResetTokenDTO,
 } from '../types/auth.types.js';
+import { evaluatePasswordPolicy, PASSWORD_POLICY_ERROR_MESSAGE } from '../utils/passwordPolicy.js';
 
 const SALT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MINUTES = 30;
@@ -492,6 +493,10 @@ class AuthService {
       throw new HttpError(400, '이메일 형식이 올바르지 않습니다.');
     }
 
+    if (!evaluatePasswordPolicy(password).isValid) {
+      throw new HttpError(400, PASSWORD_POLICY_ERROR_MESSAGE);
+    }
+
     if (isProduction && !canSendEmails()) {
       throw new HttpError(500, '회원가입 이메일 인증 설정이 누락되었습니다.');
     }
@@ -605,6 +610,11 @@ class AuthService {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+
+    if (!evaluatePasswordPolicy(newPassword).isValid) {
+      throw new HttpError(400, PASSWORD_POLICY_ERROR_MESSAGE);
+    }
+
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
     const lookup = await authRepository.findPasswordResetLookupByTokenHash(tokenHash);

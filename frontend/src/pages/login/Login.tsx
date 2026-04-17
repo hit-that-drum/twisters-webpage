@@ -5,6 +5,11 @@ import loginPageRightImage from '/login_page_right_image.png';
 import { CircularProgress, Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '@/common/lib/api/apiClient';
+import PasswordField from '@/common/components/PasswordField';
+import {
+  evaluatePasswordPolicy,
+  PASSWORD_POLICY_ERROR_MESSAGE,
+} from '@/common/lib/passwordPolicy';
 import LoadingComponent from '@/common/LoadingComponent.tsx';
 import { useAuth } from '@/features';
 import { SiKakaotalk } from 'react-icons/si';
@@ -203,6 +208,8 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
     ? '로그인 정보를 확인하고 있어요. 잠시만 기다려주세요.'
     : '회원가입을 처리하고 있어요. 잠시만 기다려주세요.';
   const activeLoadingMessage = oauthLoadingMessage ?? submitLoadingMessage;
+  const signupPasswordEvaluation = evaluatePasswordPolicy(formData.password);
+  const resetPasswordEvaluation = evaluatePasswordPolicy(resetFormData.resetPassword);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (
@@ -557,10 +564,15 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
       return;
     }
 
-    if (isResetLinkFlow && !resetFormData.resetPassword) {
-      enqueueSnackbar('새 비밀번호를 입력해주세요.', { variant: 'error' });
-      return;
-    }
+      if (isResetLinkFlow && !resetFormData.resetPassword) {
+        enqueueSnackbar('새 비밀번호를 입력해주세요.', { variant: 'error' });
+        return;
+      }
+
+      if (isResetLinkFlow && !resetPasswordEvaluation.isValid) {
+        enqueueSnackbar(PASSWORD_POLICY_ERROR_MESSAGE, { variant: 'error' });
+        return;
+      }
 
     setIsResetSubmitting(true);
 
@@ -658,6 +670,12 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
           enqueueSnackbar('모든 필드를 입력해주세요.', { variant: 'error' });
           return;
         }
+
+        if (!signupPasswordEvaluation.isValid) {
+          enqueueSnackbar(PASSWORD_POLICY_ERROR_MESSAGE, { variant: 'error' });
+          return;
+        }
+
         try {
           const response = await apiFetch('/authentication/signup', {
             method: 'POST',
@@ -1023,7 +1041,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                       htmlFor="name"
                       className="mb-2 block text-sm font-semibold text-gray-800"
                     >
-                      Name
+                      NAME
                     </label>
                     <input
                       id="name"
@@ -1032,8 +1050,8 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                       value={formData.name}
                       onChange={handleChange}
                       disabled={isSubmitLoading}
-                      placeholder="Enter your name"
-                      className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                      placeholder="이름을 입력해주세요"
+                      className="auth-input auth-input-reset"
                       required
                     />
                   </div>
@@ -1044,38 +1062,31 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                   <label htmlFor="email" className="mb-2 block text-sm font-semibold text-gray-800">
                     E-MAIL
                   </label>
-                  <input
-                    id="email"
-                    type="email"
-                     name="email"
-                     value={formData.email}
-                     onChange={handleChange}
-                     disabled={isSubmitLoading}
-                     placeholder="E-MAIL을 입력해주세요"
-                     className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
-                     required
-                   />
+                   <input
+                     id="email"
+                     type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      disabled={isSubmitLoading}
+                      placeholder="E-MAIL을 입력해주세요"
+                      className="auth-input auth-input-reset"
+                      required
+                    />
                 </div>
 
                 {/* Password */}
                 <div>
-                  <label
-                    htmlFor="password"
-                    className="mb-2 block text-sm font-semibold text-gray-800"
-                  >
-                    PASSWORD
-                  </label>
-                  <input
+                  <PasswordField
                     id="password"
-                    type="password"
-                     name="password"
-                     value={formData.password}
-                     onChange={handleChange}
-                     disabled={isSubmitLoading}
-                     placeholder="비밀번호를 입력해주세요(8-12자)"
-                     className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
-                     required
-                   />
+                    name="password"
+                    label="PASSWORD"
+                    value={formData.password}
+                    onChange={handleChange}
+                    disabled={isSubmitLoading}
+                    placeholder="비밀번호를 입력해주세요"
+                    showValidation={!isLogin}
+                  />
                 </div>
 
                 {isLogin && normalizedLoginEmail && wrongPasswordAttemptCount > 0 && (
@@ -1231,28 +1242,23 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
               name="resetEmail"
               value={resetFormData.resetEmail}
               onChange={handleResetChange}
-              placeholder="Enter your email"
-              className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
+              placeholder="E-MAIL을 입력해주세요"
+              className="auth-input auth-input-reset"
               required
             />
           </div>
           {isResetLinkFlow && (
             <div className="mb-4">
-              <label
-                htmlFor="resetPassword"
-                className="mb-2 block text-sm font-semibold text-gray-800"
-              >
-                New password
-              </label>
-              <input
+              <PasswordField
                 id="resetPassword"
-                type="password"
                 name="resetPassword"
+                label="Password"
                 value={resetFormData.resetPassword}
                 onChange={handleResetChange}
-                placeholder="Enter your new password"
-                className="w-full rounded-xl border border-gray-300 p-3.5 text-sm transition-all focus:border-blue-700 focus:outline-none"
+                disabled={isResetSubmitting}
+                placeholder="비밀번호를 입력해주세요"
                 required
+                showValidation
               />
             </div>
           )}
