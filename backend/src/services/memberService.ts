@@ -16,6 +16,7 @@ import { resolveDataScopeByUser } from '../utils/dataScope.js';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DUES_BASE_YEAR = 2024;
 const MIN_MEETING_YEAR = 2000;
+const VALID_MEETING_PERIODS = new Set([1, 2]);
 
 const parseMemberId = (rawMemberId?: string) => {
   const parsedMemberId = Number(rawMemberId);
@@ -33,6 +34,23 @@ const parseMeetingYear = (rawMeetingYear?: string) => {
   }
 
   return parsedMeetingYear;
+};
+
+const parseMeetingPeriod = (rawMeetingPeriod?: string) => {
+  const parsedMeetingPeriod = Number(rawMeetingPeriod);
+  if (!Number.isInteger(parsedMeetingPeriod) || !VALID_MEETING_PERIODS.has(parsedMeetingPeriod)) {
+    return null;
+  }
+
+  return parsedMeetingPeriod;
+};
+
+const createMeetingAttendanceKey = (meetingYear: number, meetingPeriod: number) => {
+  return `${meetingYear}_${meetingPeriod}`;
+};
+
+const createMeetingAttendanceFieldKey = (meetingYear: number, meetingPeriod: number) => {
+  return `attendance${meetingYear}_${meetingPeriod}` as `attendance${number}_${number}`;
 };
 
 const normalizeOptionalText = (rawValue: unknown, maxLength: number, fieldPrefix: string) => {
@@ -292,40 +310,59 @@ class MemberService {
     const [membersRows, attendanceRows, meetingYearRows, overrideRows] = await Promise.all([
       memberRepository.findAllMemberNames(scope),
       meetingAttendanceRepository.findMeetingAttendanceRows(scope),
-      meetingAttendanceRepository.findMeetingYears(scope),
+      meetingAttendanceRepository.findMeetingPeriods(scope),
       meetingAttendanceRepository.findMeetingAttendanceOverrideRows(scope),
     ]);
 
-    const meetingYears = meetingYearRows
-      .map((row) => Number(row.meetingYear))
-      .filter((year) => Number.isInteger(year))
-      .sort((a, b) => a - b);
+    const meetingPeriods = meetingYearRows
+      .map((row) => ({
+        meetingYear: Number(row.meetingYear),
+        meetingPeriod: Number(row.meetingPeriod),
+      }))
+      .filter(
+        (row): row is { meetingYear: number; meetingPeriod: number } =>
+          Number.isInteger(row.meetingYear) && VALID_MEETING_PERIODS.has(row.meetingPeriod),
+      )
+      .sort(
+        (left, right) =>
+          left.meetingYear - right.meetingYear || left.meetingPeriod - right.meetingPeriod,
+      );
 
-    const attendanceYearsByMemberId = new Map<number, Set<number>>();
+    const attendanceYearsByMemberId = new Map<number, Set<string>>();
     attendanceRows.forEach((row) => {
       const memberId = row.memberId;
       const meetingYear = Number(row.meetingYear);
+      const meetingPeriod = Number(row.meetingPeriod);
 
-      if (!Number.isInteger(memberId) || !Number.isInteger(meetingYear)) {
+      if (
+        !Number.isInteger(memberId) ||
+        !Number.isInteger(meetingYear) ||
+        !VALID_MEETING_PERIODS.has(meetingPeriod)
+      ) {
         return;
       }
 
-      const years = attendanceYearsByMemberId.get(memberId) ?? new Set<number>();
-      years.add(meetingYear);
+      const years = attendanceYearsByMemberId.get(memberId) ?? new Set<string>();
+      years.add(createMeetingAttendanceKey(meetingYear, meetingPeriod));
       attendanceYearsByMemberId.set(memberId, years);
     });
 
-    const attendanceOverridesByMemberId = new Map<number, Map<number, boolean>>();
+    const attendanceOverridesByMemberId = new Map<number, Map<string, boolean>>();
     overrideRows.forEach((row) => {
       const memberId = row.memberId;
       const meetingYear = Number(row.meetingYear);
+      const meetingPeriod = Number(row.meetingPeriod);
 
-      if (!Number.isInteger(memberId) || !Number.isInteger(meetingYear)) {
+      if (
+        !Number.isInteger(memberId) ||
+        !Number.isInteger(meetingYear) ||
+        !VALID_MEETING_PERIODS.has(meetingPeriod)
+      ) {
         return;
       }
 
-      const overrides = attendanceOverridesByMemberId.get(memberId) ?? new Map<number, boolean>();
-      overrides.set(meetingYear, normalizeBoolean(row.attended, false));
+      const overrides = attendanceOverridesByMemberId.get(memberId) ?? new Map<string, boolean>();
+      overrides.set(createMeetingAttendanceKey(meetingYear, meetingPeriod), normalizeBoolean(row.attended, false));
       attendanceOverridesByMemberId.set(memberId, overrides);
     });
 
@@ -334,12 +371,15 @@ class MemberService {
         memberId: member.id,
         name: member.name,
       } as MemberMeetingAttendanceStatus;
-      const attendedYears = attendanceYearsByMemberId.get(member.id) ?? new Set<number>();
-      const overrides = attendanceOverridesByMemberId.get(member.id) ?? new Map<number, boolean>();
+      const attendedYears = attendanceYearsByMemberId.get(member.id) ?? new Set<string>();
+      const overrides = attendanceOverridesByMemberId.get(member.id) ?? new Map<string, boolean>();
 
-      meetingYears.forEach((year) => {
-        const key = `attendance${year}` as `attendance${number}`;
-        row[key] = overrides.has(year) ? (overrides.get(year) ?? false) : attendedYears.has(year);
+      meetingPeriods.forEach(({ meetingYear, meetingPeriod }) => {
+        const attendanceKey = createMeetingAttendanceKey(meetingYear, meetingPeriod);
+        const fieldKey = createMeetingAttendanceFieldKey(meetingYear, meetingPeriod);
+        row[fieldKey] = overrides.has(attendanceKey)
+          ? (overrides.get(attendanceKey) ?? false)
+          : attendedYears.has(attendanceKey);
       });
 
       return row;
@@ -350,12 +390,14 @@ class MemberService {
     authenticatedUser: AuthenticatedUser | undefined,
     rawMemberId: string | undefined,
     rawMeetingYear: string | undefined,
+    rawMeetingPeriod: string | undefined,
     payload: MemberMeetingAttendanceOverrideDTO,
   ) {
     const adminUser = requireAdminUser(authenticatedUser);
     const scope = resolveDataScopeByUser(adminUser);
     const memberId = parseMemberId(rawMemberId);
     const meetingYear = parseMeetingYear(rawMeetingYear);
+    const meetingPeriod = parseMeetingPeriod(rawMeetingPeriod);
 
     if (!memberId) {
       throw new HttpError(400, '유효한 회원 ID가 필요합니다.');
@@ -363,6 +405,10 @@ class MemberService {
 
     if (!meetingYear) {
       throw new HttpError(400, '유효한 모임 연도가 필요합니다.');
+    }
+
+    if (!meetingPeriod) {
+      throw new HttpError(400, '유효한 모임 차수가 필요합니다.');
     }
 
     if (typeof payload.attended !== 'boolean') {
@@ -383,6 +429,7 @@ class MemberService {
       scope,
       memberId,
       meetingYear,
+      meetingPeriod,
       payload.attended,
     );
   }
@@ -391,11 +438,13 @@ class MemberService {
     authenticatedUser: AuthenticatedUser | undefined,
     rawMemberId: string | undefined,
     rawMeetingYear: string | undefined,
+    rawMeetingPeriod: string | undefined,
   ) {
     const adminUser = requireAdminUser(authenticatedUser);
     const scope = resolveDataScopeByUser(adminUser);
     const memberId = parseMemberId(rawMemberId);
     const meetingYear = parseMeetingYear(rawMeetingYear);
+    const meetingPeriod = parseMeetingPeriod(rawMeetingPeriod);
 
     if (!memberId) {
       throw new HttpError(400, '유효한 회원 ID가 필요합니다.');
@@ -403,6 +452,10 @@ class MemberService {
 
     if (!meetingYear) {
       throw new HttpError(400, '유효한 모임 연도가 필요합니다.');
+    }
+
+    if (!meetingPeriod) {
+      throw new HttpError(400, '유효한 모임 차수가 필요합니다.');
     }
 
     await Promise.all([
@@ -415,7 +468,12 @@ class MemberService {
       throw new HttpError(404, '해당 회원을 찾을 수 없습니다.');
     }
 
-    await meetingAttendanceRepository.deleteMeetingAttendanceOverride(scope, memberId, meetingYear);
+    await meetingAttendanceRepository.deleteMeetingAttendanceOverride(
+      scope,
+      memberId,
+      meetingYear,
+      meetingPeriod,
+    );
   }
 
   async createMember(authenticatedUser: AuthenticatedUser | undefined, payload: MemberMutationDTO) {

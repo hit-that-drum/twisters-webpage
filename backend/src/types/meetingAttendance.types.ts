@@ -1,13 +1,17 @@
+export type MeetingPeriod = 1 | 2;
+
 export interface MeetingSourceRow {
   id: number;
   boardId: number;
   meetingYear: number;
+  meetingPeriod: MeetingPeriod;
   title: string;
 }
 
 export interface MeetingSourceMutationPayload {
   boardId: number;
   meetingYear: number;
+  meetingPeriod: MeetingPeriod;
   title: string;
 }
 
@@ -47,10 +51,12 @@ export interface MeetingAttendanceUpsertRow {
 export interface MemberMeetingAttendanceRow {
   memberId: number;
   meetingYear: number | string;
+  meetingPeriod: number | string;
 }
 
 export interface MeetingAttendanceOverrideRow {
   memberId: number;
   meetingYear: number | string;
+  meetingPeriod: number | string;
   attended: boolean | number;
 }

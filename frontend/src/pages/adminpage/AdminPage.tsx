@@ -15,6 +15,7 @@ interface PendingUserRecord {
   name: string;
   email: string;
   createdAt: string;
+  emailVerifiedAt: string | null;
 }
 
 interface AdminUserRecord {
@@ -25,6 +26,7 @@ interface AdminUserRecord {
   isAdmin: boolean;
   isAllowed: boolean;
   createdAt: string;
+  emailVerifiedAt: string | null;
   phone?: string | null;
   department?: string | null;
   joinedAt?: string | null;
@@ -119,11 +121,12 @@ const parsePendingUsers = (payload: unknown): PendingUserRecord[] => {
       }
 
       const parsed = row as {
-        id?: unknown;
-        name?: unknown;
-        email?: unknown;
-        createdAt?: unknown;
-      };
+          id?: unknown;
+          name?: unknown;
+          email?: unknown;
+          createdAt?: unknown;
+          emailVerifiedAt?: unknown;
+        };
 
       if (
         typeof parsed.id !== 'number' ||
@@ -141,6 +144,8 @@ const parsePendingUsers = (payload: unknown): PendingUserRecord[] => {
         name: parsed.name,
         email: parsed.email,
         createdAt: createdAtValue,
+        emailVerifiedAt:
+          typeof parsed.emailVerifiedAt === 'string' ? parsed.emailVerifiedAt : null,
       } satisfies PendingUserRecord;
     })
     .filter((row): row is PendingUserRecord => row !== null);
@@ -158,14 +163,15 @@ const parseAdminUsers = (payload: unknown): AdminUserRecord[] => {
       }
 
       const parsed = row as {
-        id?: unknown;
-        name?: unknown;
-        email?: unknown;
-        profileImage?: unknown;
-        isAdmin?: unknown;
-        isAllowed?: unknown;
-        createdAt?: unknown;
-      };
+          id?: unknown;
+          name?: unknown;
+          email?: unknown;
+          profileImage?: unknown;
+          isAdmin?: unknown;
+          isAllowed?: unknown;
+          createdAt?: unknown;
+          emailVerifiedAt?: unknown;
+        };
 
       if (
         typeof parsed.id !== 'number' ||
@@ -190,6 +196,8 @@ const parseAdminUsers = (payload: unknown): AdminUserRecord[] => {
         isAdmin: normalizeBoolean(parsed.isAdmin, false),
         isAllowed: normalizeBoolean(parsed.isAllowed, false),
         createdAt: createdAtValue,
+        emailVerifiedAt:
+          typeof parsed.emailVerifiedAt === 'string' ? parsed.emailVerifiedAt : null,
       } satisfies AdminUserRecord;
     })
     .filter((row): row is AdminUserRecord => row !== null);
@@ -221,6 +229,24 @@ const formatJoinedDate = (raw: string) => {
     day: '2-digit',
     year: 'numeric',
   });
+};
+
+const getEmailVerificationMeta = (raw: string | null) => {
+  if (!raw) {
+    return {
+      label: 'Not verified',
+      detail: 'Waiting for email verification',
+      className: 'bg-amber-50 text-amber-700',
+      dotClassName: 'bg-amber-500',
+    };
+  }
+
+  return {
+    label: 'Verified',
+    detail: formatDateTime(raw),
+    className: 'bg-emerald-50 text-emerald-700',
+    dotClassName: 'bg-emerald-500',
+  };
 };
 
 const getInitials = (name: string) => {
@@ -929,41 +955,57 @@ export default function AdminPage() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="divide-y divide-slate-100">
-              {pendingUsers.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <p className="text-base font-bold text-slate-900">{user.name}</p>
-                    <p className="text-sm text-slate-500">{user.email}</p>
-                    <p className="text-xs text-slate-400">
-                      Requested at {formatDateTime(user.createdAt)}
-                    </p>
-                  </div>
+              <div className="divide-y divide-slate-100">
+                {pendingUsers.map((user) => {
+                  const verificationMeta = getEmailVerificationMeta(user.emailVerifiedAt);
 
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      disabled={approvingUserId === user.id || decliningUserId === user.id}
-                      onClick={() => void handleDeclineUser(user.id)}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {decliningUserId === user.id ? 'Declining...' : 'Decline'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={approvingUserId === user.id || decliningUserId === user.id}
-                      onClick={() => void handleApproveUser(user.id)}
-                      className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {approvingUserId === user.id ? 'Approving...' : 'Approve'}
-                    </button>
+                  return (
+                  <div
+                    key={user.id}
+                    className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="text-base font-bold text-slate-900">{user.name}</p>
+                      <p className="text-sm text-slate-500">{user.email}</p>
+                      <p className="text-xs text-slate-400">
+                        Requested at {formatDateTime(user.createdAt)}
+                      </p>
+                      <div className="mt-2 flex items-center gap-2 text-xs font-semibold">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${verificationMeta.className}`}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`size-2 rounded-full ${verificationMeta.dotClassName}`}
+                          />
+                          {verificationMeta.label}
+                        </span>
+                        <span className="text-slate-500">{verificationMeta.detail}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        disabled={approvingUserId === user.id || decliningUserId === user.id}
+                        onClick={() => void handleDeclineUser(user.id)}
+                        className="inline-flex h-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {decliningUserId === user.id ? 'Declining...' : 'Decline'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={approvingUserId === user.id || decliningUserId === user.id}
+                        onClick={() => void handleApproveUser(user.id)}
+                        className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {approvingUserId === user.id ? 'Approving...' : 'Approve'}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
           </div>
         )}
       </section>
@@ -1016,6 +1058,12 @@ export default function AdminPage() {
                     scope="col"
                     className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500"
                   >
+                    Email Verification
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500"
+                  >
                     Joined
                   </th>
                   <th
@@ -1031,7 +1079,7 @@ export default function AdminPage() {
                 {isLoading ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-6 py-8 text-center text-sm font-medium text-slate-500"
                     >
                       Loading users...
@@ -1040,7 +1088,7 @@ export default function AdminPage() {
                 ) : pagedUsers.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-6 py-8 text-center text-sm font-medium text-slate-500"
                     >
                       No users found for this filter.
@@ -1054,6 +1102,7 @@ export default function AdminPage() {
                       ? 'text-emerald-600'
                       : 'text-slate-400';
                     const statusDotClassName = user.isAllowed ? 'bg-emerald-500' : 'bg-slate-300';
+                    const verificationMeta = getEmailVerificationMeta(user.emailVerifiedAt);
                     const isCurrentAdminUser = meInfo?.id === user.id;
                     const isRemovingProfileImage = removingProfileImageUserId === user.id;
 
@@ -1085,6 +1134,21 @@ export default function AdminPage() {
                           >
                             <span className={`size-2 rounded-full ${statusDotClassName}`} />
                             {statusLabel}
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1">
+                            <span
+                              className={`inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${verificationMeta.className}`}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`size-2 rounded-full ${verificationMeta.dotClassName}`}
+                              />
+                              {verificationMeta.label}
+                            </span>
+                            <span className="text-xs text-slate-500">{verificationMeta.detail}</span>
                           </div>
                         </td>
 

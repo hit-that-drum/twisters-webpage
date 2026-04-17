@@ -16,12 +16,12 @@ router.get(
   memberController.getMemberMeetingAttendanceStatus,
 );
 router.patch(
-  '/:memberId/meeting/attendance/:meetingYear',
+  '/:memberId/meeting/attendance/:meetingYear/:meetingPeriod',
   passport.authenticate('jwt', { session: false }),
   memberController.updateMemberMeetingAttendanceStatus,
 );
 router.delete(
-  '/:memberId/meeting/attendance/:meetingYear',
+  '/:memberId/meeting/attendance/:meetingYear/:meetingPeriod',
   passport.authenticate('jwt', { session: false }),
   memberController.clearMemberMeetingAttendanceStatus,
 );

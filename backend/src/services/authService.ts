@@ -915,7 +915,15 @@ class AuthService {
 
   async getPendingUsers(authenticatedUser: AuthenticatedUser | undefined) {
     const currentUser = requireAuthenticatedUser(authenticatedUser);
-    return authRepository.findPendingUsers(isTestScopedAdmin(currentUser));
+    const rows = await authRepository.findPendingUsers(isTestScopedAdmin(currentUser));
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      createdAt: row.createdAt,
+      emailVerifiedAt: row.emailVerifiedAt,
+    }));
   }
 
   async getAdminUsers(authenticatedUser: AuthenticatedUser | undefined) {
@@ -933,6 +941,7 @@ class AuthService {
       isAdmin: normalizeBoolean(row.isAdmin, false),
       isAllowed: normalizeBoolean(row.isAllowed, false),
       createdAt: row.createdAt,
+      emailVerifiedAt: row.emailVerifiedAt,
     }));
   }
 

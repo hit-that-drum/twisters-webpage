@@ -53,6 +53,7 @@ export const updateMemberMeetingAttendanceStatus = async (req: Request, res: Res
       authenticatedUser,
       req.params.memberId,
       req.params.meetingYear,
+      req.params.meetingPeriod,
       payload,
     );
     return res.json({ message: '회원 모임 참석 여부가 저장되었습니다.' });
@@ -73,6 +74,7 @@ export const clearMemberMeetingAttendanceStatus = async (req: Request, res: Resp
       authenticatedUser,
       req.params.memberId,
       req.params.meetingYear,
+      req.params.meetingPeriod,
     );
     return res.json({ message: '회원 모임 참석 수동 설정이 해제되었습니다.' });
   } catch (error) {

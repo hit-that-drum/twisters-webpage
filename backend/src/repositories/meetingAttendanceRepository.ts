@@ -23,6 +23,7 @@ class MeetingAttendanceRepository {
             id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
             "boardId" INTEGER NOT NULL UNIQUE REFERENCES board(id) ON DELETE CASCADE,
             "meetingYear" INTEGER NOT NULL,
+            "meetingPeriod" SMALLINT NOT NULL DEFAULT 1,
             title VARCHAR(255) NOT NULL,
             "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -34,6 +35,7 @@ class MeetingAttendanceRepository {
             id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
             "boardId" INTEGER NOT NULL UNIQUE REFERENCES test_board(id) ON DELETE CASCADE,
             "meetingYear" INTEGER NOT NULL,
+            "meetingPeriod" SMALLINT NOT NULL DEFAULT 1,
             title VARCHAR(255) NOT NULL,
             "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -71,10 +73,11 @@ class MeetingAttendanceRepository {
             id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
             "memberId" INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
             "meetingYear" INTEGER NOT NULL,
+            "meetingPeriod" SMALLINT NOT NULL DEFAULT 1,
             attended BOOLEAN NOT NULL,
             "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            UNIQUE("memberId", "meetingYear")
+            UNIQUE("memberId", "meetingYear", "meetingPeriod")
           )
         `);
 
@@ -83,12 +86,33 @@ class MeetingAttendanceRepository {
             id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
             "memberId" INTEGER NOT NULL REFERENCES test_members(id) ON DELETE CASCADE,
             "meetingYear" INTEGER NOT NULL,
+            "meetingPeriod" SMALLINT NOT NULL DEFAULT 1,
             attended BOOLEAN NOT NULL,
             "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            UNIQUE("memberId", "meetingYear")
+            UNIQUE("memberId", "meetingYear", "meetingPeriod")
           )
         `);
+
+        await pool.query(
+          'ALTER TABLE meeting_sources ADD COLUMN IF NOT EXISTS "meetingPeriod" SMALLINT NOT NULL DEFAULT 1',
+        );
+        await pool.query(
+          'ALTER TABLE test_meeting_sources ADD COLUMN IF NOT EXISTS "meetingPeriod" SMALLINT NOT NULL DEFAULT 1',
+        );
+        await pool.query(
+          'ALTER TABLE meeting_attendance_overrides ADD COLUMN IF NOT EXISTS "meetingPeriod" SMALLINT NOT NULL DEFAULT 1',
+        );
+        await pool.query(
+          'ALTER TABLE test_meeting_attendance_overrides ADD COLUMN IF NOT EXISTS "meetingPeriod" SMALLINT NOT NULL DEFAULT 1',
+        );
+
+        await pool.query(
+          'ALTER TABLE meeting_attendance_overrides DROP CONSTRAINT IF EXISTS "meeting_attendance_overrides_memberId_meetingYear_key"',
+        );
+        await pool.query(
+          'ALTER TABLE test_meeting_attendance_overrides DROP CONSTRAINT IF EXISTS "test_meeting_attendance_overrides_memberId_meetingYear_key"',
+        );
 
         await pool.query(
           'CREATE INDEX IF NOT EXISTS idx_meeting_sources_year ON meeting_sources ("meetingYear" DESC)',
@@ -97,16 +121,28 @@ class MeetingAttendanceRepository {
           'CREATE INDEX IF NOT EXISTS idx_test_meeting_sources_year ON test_meeting_sources ("meetingYear" DESC)',
         );
         await pool.query(
+          'CREATE INDEX IF NOT EXISTS idx_meeting_sources_year_period ON meeting_sources ("meetingYear" DESC, "meetingPeriod" ASC)',
+        );
+        await pool.query(
+          'CREATE INDEX IF NOT EXISTS idx_test_meeting_sources_year_period ON test_meeting_sources ("meetingYear" DESC, "meetingPeriod" ASC)',
+        );
+        await pool.query(
           'CREATE INDEX IF NOT EXISTS idx_meeting_attendance_member_id ON meeting_attendance ("memberId")',
         );
         await pool.query(
           'CREATE INDEX IF NOT EXISTS idx_test_meeting_attendance_member_id ON test_meeting_attendance ("memberId")',
         );
         await pool.query(
-          'CREATE INDEX IF NOT EXISTS idx_meeting_attendance_overrides_member_year ON meeting_attendance_overrides ("memberId", "meetingYear")',
+          'CREATE INDEX IF NOT EXISTS idx_meeting_attendance_overrides_member_year_period ON meeting_attendance_overrides ("memberId", "meetingYear", "meetingPeriod")',
         );
         await pool.query(
-          'CREATE INDEX IF NOT EXISTS idx_test_meeting_attendance_overrides_member_year ON test_meeting_attendance_overrides ("memberId", "meetingYear")',
+          'CREATE INDEX IF NOT EXISTS idx_test_meeting_attendance_overrides_member_year_period ON test_meeting_attendance_overrides ("memberId", "meetingYear", "meetingPeriod")',
+        );
+        await pool.query(
+          'CREATE UNIQUE INDEX IF NOT EXISTS idx_meeting_attendance_overrides_member_year_period_unique ON meeting_attendance_overrides ("memberId", "meetingYear", "meetingPeriod")',
+        );
+        await pool.query(
+          'CREATE UNIQUE INDEX IF NOT EXISTS idx_test_meeting_attendance_overrides_member_year_period_unique ON test_meeting_attendance_overrides ("memberId", "meetingYear", "meetingPeriod")',
         );
 
         await pool.query(`
@@ -252,17 +288,18 @@ class MeetingAttendanceRepository {
 
   async upsertMeetingSource(scope: DataScope, payload: MeetingSourceMutationPayload) {
     const { meetingSources: meetingSourcesTable } = getScopedTableNames(scope);
-    const result = await pool.query<MeetingSourceRow>(
-      `
-        INSERT INTO ${meetingSourcesTable} ("boardId", "meetingYear", title)
-        VALUES ($1, $2, $3)
+      const result = await pool.query<MeetingSourceRow>(
+        `
+        INSERT INTO ${meetingSourcesTable} ("boardId", "meetingYear", "meetingPeriod", title)
+        VALUES ($1, $2, $3, $4)
         ON CONFLICT ("boardId") DO UPDATE
         SET "meetingYear" = EXCLUDED."meetingYear",
+            "meetingPeriod" = EXCLUDED."meetingPeriod",
             title = EXCLUDED.title,
             "updatedAt" = NOW()
-        RETURNING id, "boardId", "meetingYear", title
+        RETURNING id, "boardId", "meetingYear", "meetingPeriod", title
       `,
-      [payload.boardId, payload.meetingYear, payload.title],
+      [payload.boardId, payload.meetingYear, payload.meetingPeriod, payload.title],
     );
 
     return result.rows[0] ?? null;
@@ -329,7 +366,7 @@ class MeetingAttendanceRepository {
       getScopedTableNames(scope);
     const result = await pool.query<MemberMeetingAttendanceRow>(
       `
-        SELECT attendance."memberId" AS "memberId", source."meetingYear" AS "meetingYear"
+        SELECT attendance."memberId" AS "memberId", source."meetingYear" AS "meetingYear", source."meetingPeriod" AS "meetingPeriod"
         FROM ${meetingAttendanceTable} attendance
         INNER JOIN ${meetingSourcesTable} source ON source.id = attendance."meetingSourceId"
       `,
@@ -341,24 +378,24 @@ class MeetingAttendanceRepository {
     const { meetingAttendanceOverrides: meetingAttendanceOverridesTable } = getScopedTableNames(scope);
     const result = await pool.query<MeetingAttendanceOverrideRow>(
       `
-        SELECT "memberId" AS "memberId", "meetingYear" AS "meetingYear", attended
+        SELECT "memberId" AS "memberId", "meetingYear" AS "meetingYear", "meetingPeriod" AS "meetingPeriod", attended
         FROM ${meetingAttendanceOverridesTable}
       `,
     );
     return result.rows;
   }
 
-  async findMeetingYears(scope: DataScope) {
+  async findMeetingPeriods(scope: DataScope) {
     const {
       meetingSources: meetingSourcesTable,
       meetingAttendanceOverrides: meetingAttendanceOverridesTable,
     } = getScopedTableNames(scope);
-    const result = await pool.query<{ meetingYear: number | string }>(
+    const result = await pool.query<{ meetingYear: number | string; meetingPeriod: number | string }>(
       `
-        SELECT DISTINCT "meetingYear" AS "meetingYear" FROM ${meetingSourcesTable}
+        SELECT DISTINCT "meetingYear" AS "meetingYear", "meetingPeriod" AS "meetingPeriod" FROM ${meetingSourcesTable}
         UNION
-        SELECT DISTINCT "meetingYear" AS "meetingYear" FROM ${meetingAttendanceOverridesTable}
-        ORDER BY "meetingYear" ASC
+        SELECT DISTINCT "meetingYear" AS "meetingYear", "meetingPeriod" AS "meetingPeriod" FROM ${meetingAttendanceOverridesTable}
+        ORDER BY "meetingYear" ASC, "meetingPeriod" ASC
       `,
     );
     return result.rows;
@@ -368,26 +405,32 @@ class MeetingAttendanceRepository {
     scope: DataScope,
     memberId: number,
     meetingYear: number,
+    meetingPeriod: number,
     attended: boolean,
   ) {
     const { meetingAttendanceOverrides: meetingAttendanceOverridesTable } = getScopedTableNames(scope);
     await pool.query(
       `
-        INSERT INTO ${meetingAttendanceOverridesTable} ("memberId", "meetingYear", attended)
-        VALUES ($1, $2, $3)
-        ON CONFLICT ("memberId", "meetingYear") DO UPDATE
+        INSERT INTO ${meetingAttendanceOverridesTable} ("memberId", "meetingYear", "meetingPeriod", attended)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT ("memberId", "meetingYear", "meetingPeriod") DO UPDATE
         SET attended = EXCLUDED.attended,
             "updatedAt" = NOW()
       `,
-      [memberId, meetingYear, attended],
+      [memberId, meetingYear, meetingPeriod, attended],
     );
   }
 
-  async deleteMeetingAttendanceOverride(scope: DataScope, memberId: number, meetingYear: number) {
+  async deleteMeetingAttendanceOverride(
+    scope: DataScope,
+    memberId: number,
+    meetingYear: number,
+    meetingPeriod: number,
+  ) {
     const { meetingAttendanceOverrides: meetingAttendanceOverridesTable } = getScopedTableNames(scope);
     await pool.query(
-      `DELETE FROM ${meetingAttendanceOverridesTable} WHERE "memberId" = $1 AND "meetingYear" = $2`,
-      [memberId, meetingYear],
+      `DELETE FROM ${meetingAttendanceOverridesTable} WHERE "memberId" = $1 AND "meetingYear" = $2 AND "meetingPeriod" = $3`,
+      [memberId, meetingYear, meetingPeriod],
     );
   }
 }

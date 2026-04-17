@@ -1,11 +1,18 @@
 import { meetingAttendanceRepository } from '../repositories/meetingAttendanceRepository.js';
 import { memberRepository } from '../repositories/memberRepository.js';
-import type { MeetingAttendanceUpsertRow, MeetingBoardSeedRow } from '../types/meetingAttendance.types.js';
+import type {
+  MeetingAttendanceUpsertRow,
+  MeetingBoardSeedRow,
+  MeetingPeriod,
+} from '../types/meetingAttendance.types.js';
 import { resolveDataScopeByUser, type DataScope } from '../utils/dataScope.js';
 import type { AuthenticatedUser } from '../types/common.types.js';
 
 const MEETING_TITLE_KEYWORD = '모임';
 const MEETING_YEAR_PATTERN = /(\d{4})\s*년/;
+const FIRST_PERIOD_PATTERNS = [/상반기/, /전반기/, /1\s*차/, /1\s*부/, /1st/i, /part\s*1/i];
+const SECOND_PERIOD_PATTERNS = [/하반기/, /후반기/, /2\s*차/, /2\s*부/, /2nd/i, /part\s*2/i];
+const MEETING_MONTH_PATTERN = /(\d{1,2})\s*월/;
 
 const normalizeBoolean = (rawValue: unknown, fallbackValue = false) => {
   if (typeof rawValue === 'boolean') {
@@ -34,14 +41,36 @@ const normalizeKoreanSearchText = (value: string) => {
   return value.normalize('NFC').replace(/\s+/g, '').trim();
 };
 
-const parseMeetingYear = (title: string) => {
+const parseMeetingSchedule = (title: string) => {
   const matched = title.match(MEETING_YEAR_PATTERN);
   if (!matched) {
     return null;
   }
 
   const meetingYear = Number(matched[1]);
-  return Number.isInteger(meetingYear) ? meetingYear : null;
+  if (!Number.isInteger(meetingYear)) {
+    return null;
+  }
+
+  const normalizedTitle = title.trim();
+
+  if (FIRST_PERIOD_PATTERNS.some((pattern) => pattern.test(normalizedTitle))) {
+    return { meetingYear, meetingPeriod: 1 as MeetingPeriod };
+  }
+
+  if (SECOND_PERIOD_PATTERNS.some((pattern) => pattern.test(normalizedTitle))) {
+    return { meetingYear, meetingPeriod: 2 as MeetingPeriod };
+  }
+
+  const monthMatch = normalizedTitle.match(MEETING_MONTH_PATTERN);
+  if (monthMatch) {
+    const month = Number(monthMatch[1]);
+    if (Number.isInteger(month) && month >= 1 && month <= 12) {
+      return { meetingYear, meetingPeriod: month <= 6 ? (1 as MeetingPeriod) : (2 as MeetingPeriod) };
+    }
+  }
+
+  return { meetingYear, meetingPeriod: 1 as MeetingPeriod };
 };
 
 const isEligibleMeetingBoard = (board: MeetingBoardSeedRow) => {
@@ -53,7 +82,7 @@ const isEligibleMeetingBoard = (board: MeetingBoardSeedRow) => {
     return false;
   }
 
-  return parseMeetingYear(board.title) !== null;
+  return parseMeetingSchedule(board.title) !== null;
 };
 
 class MeetingAttendanceService {
@@ -61,15 +90,16 @@ class MeetingAttendanceService {
     await memberRepository.ensureMembersSchema();
     await meetingAttendanceRepository.ensureMeetingAttendanceSchema();
 
-    const meetingYear = parseMeetingYear(board.title);
-    if (!meetingYear || !isEligibleMeetingBoard(board)) {
+    const meetingSchedule = parseMeetingSchedule(board.title);
+    if (!meetingSchedule || !isEligibleMeetingBoard(board)) {
       await meetingAttendanceRepository.deleteMeetingSourceByBoardId(scope, board.id);
       return;
     }
 
     const meetingSource = await meetingAttendanceRepository.upsertMeetingSource(scope, {
       boardId: board.id,
-      meetingYear,
+      meetingYear: meetingSchedule.meetingYear,
+      meetingPeriod: meetingSchedule.meetingPeriod,
       title: board.title.trim(),
     });
 

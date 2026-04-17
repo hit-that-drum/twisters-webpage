@@ -44,7 +44,7 @@ export type MemberDuesStatus = {
 export type MemberMeetingAttendanceStatus = {
   memberId: number;
   name: string;
-} & Record<`attendance${number}`, boolean>;
+} & Record<`attendance${number}_${number}`, boolean>;
 
 export interface MemberMeetingAttendanceOverrideDTO {
   attended?: unknown;

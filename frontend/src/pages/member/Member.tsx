@@ -26,8 +26,8 @@ interface ParsedMemberDuesStatus {
 }
 
 interface ParsedMemberAttendanceStatus {
-  years: number[];
-  byMemberId: Record<number, Record<number, boolean>>;
+  periods: Array<{ year: number; period: number }>;
+  byMemberId: Record<number, Record<string, boolean>>;
 }
 
 interface DuesDisplayMeta {
@@ -43,7 +43,27 @@ interface DetailInfoItem {
 }
 
 const DEPOSIT_KEY_PATTERN = /^deposit(\d{4})$/;
-const ATTENDANCE_KEY_PATTERN = /^attendance(\d{4})$/;
+const ATTENDANCE_KEY_PATTERN = /^attendance(\d{4})_(1|2)$/;
+
+const getAttendanceStatusKey = (year: number, period: number) => `${year}_${period}`;
+
+const getMeetingPeriodLabel = (period: number) => `${period}차 모임`;
+
+const isFutureMeetingPeriod = (year: number, period: number) => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  if (year > currentYear) {
+    return true;
+  }
+
+  if (year < currentYear) {
+    return false;
+  }
+
+  return period === 2 && currentMonth <= 6;
+};
 
 const createDefaultMemberForm = (): MemberFormState => ({
   name: '',
@@ -174,11 +194,11 @@ const parseMemberDuesStatus = (payload: unknown): ParsedMemberDuesStatus => {
 
 const parseMemberAttendanceStatus = (payload: unknown): ParsedMemberAttendanceStatus => {
   if (!Array.isArray(payload)) {
-    return { years: [], byMemberId: {} };
+    return { periods: [], byMemberId: {} };
   }
 
-  const years = new Set<number>();
-  const byMemberId: Record<number, Record<number, boolean>> = {};
+  const periods = new Map<string, { year: number; period: number }>();
+  const byMemberId: Record<number, Record<string, boolean>> = {};
 
   payload.forEach((item) => {
     if (!item || typeof item !== 'object') {
@@ -203,17 +223,19 @@ const parseMemberAttendanceStatus = (payload: unknown): ParsedMemberAttendanceSt
       }
 
       const year = Number(matched[1]);
-      if (!Number.isInteger(year)) {
+      const period = Number(matched[2]);
+      if (!Number.isInteger(year) || !Number.isInteger(period)) {
         return;
       }
 
-      years.add(year);
-      byMemberId[memberId][year] = parseBoolean(value);
+      const attendanceKey = getAttendanceStatusKey(year, period);
+      periods.set(attendanceKey, { year, period });
+      byMemberId[memberId][attendanceKey] = parseBoolean(value);
     });
   });
 
   return {
-    years: [...years].sort((a, b) => a - b),
+    periods: [...periods.values()].sort((left, right) => left.year - right.year || left.period - right.period),
     byMemberId,
   };
 };
@@ -286,10 +308,12 @@ const getDuesDisplayMeta = (year: number, isPaid: boolean): DuesDisplayMeta => {
   };
 };
 
-const getMeetingAttendanceDisplayMeta = (year: number, isAttended: boolean): DuesDisplayMeta => {
-  const currentYear = new Date().getFullYear();
-
-  if (year > currentYear) {
+const getMeetingAttendanceDisplayMeta = (
+  year: number,
+  period: number,
+  isAttended: boolean,
+): DuesDisplayMeta => {
+  if (isFutureMeetingPeriod(year, period)) {
     return {
       label: '예정',
       icon: '⌛',
@@ -391,11 +415,11 @@ export default function Member() {
   const [duesStatusByMemberId, setDuesStatusByMemberId] = useState<
     Record<number, Record<number, boolean>>
   >({});
-  const [attendanceYears, setAttendanceYears] = useState<number[]>([]);
+  const [attendancePeriods, setAttendancePeriods] = useState<Array<{ year: number; period: number }>>([]);
   const [attendanceStatusByMemberId, setAttendanceStatusByMemberId] = useState<
-    Record<number, Record<number, boolean>>
+    Record<number, Record<string, boolean>>
   >({});
-  const [updatingAttendanceYear, setUpdatingAttendanceYear] = useState<number | null>(null);
+  const [updatingAttendanceKey, setUpdatingAttendanceKey] = useState<string | null>(null);
 
   const canManageMembers = meInfo?.isAdmin === true;
 
@@ -500,13 +524,13 @@ export default function Member() {
             variant: 'error',
           },
         );
-        setAttendanceYears([]);
+        setAttendancePeriods([]);
         setAttendanceStatusByMemberId({});
         return;
       }
 
       const parsedAttendanceStatus = parseMemberAttendanceStatus(payload);
-      setAttendanceYears(parsedAttendanceStatus.years);
+      setAttendancePeriods(parsedAttendanceStatus.periods);
       setAttendanceStatusByMemberId(parsedAttendanceStatus.byMemberId);
     } catch (error) {
       console.error('Member meeting attendance status fetch error:', error);
@@ -549,10 +573,10 @@ export default function Member() {
 
   const selectedUserAttendanceStatus = useMemo(() => {
     if (!selectedUser) {
-      return {} as Record<number, boolean>;
+      return {} as Record<string, boolean>;
     }
 
-    return attendanceStatusByMemberId[selectedUser.id] ?? ({} as Record<number, boolean>);
+    return attendanceStatusByMemberId[selectedUser.id] ?? ({} as Record<string, boolean>);
   }, [attendanceStatusByMemberId, selectedUser]);
 
   const userDetailInfo = useMemo<DetailInfoItem[]>(() => {
@@ -772,18 +796,22 @@ export default function Member() {
   };
 
   const handleSetMeetingAttendance = useCallback(
-    async (year: number, attended: boolean) => {
+    async (year: number, period: number, attended: boolean) => {
       if (!selectedUser || !canManageMembers) {
         return;
       }
 
-      setUpdatingAttendanceYear(year);
+      const attendanceKey = getAttendanceStatusKey(year, period);
+      setUpdatingAttendanceKey(attendanceKey);
 
       try {
-        const response = await apiFetch(`/member/${selectedUser.id}/meeting/attendance/${year}`, {
+        const response = await apiFetch(
+          `/member/${selectedUser.id}/meeting/attendance/${year}/${period}`,
+          {
           method: 'PATCH',
           body: JSON.stringify({ attended }),
-        });
+          },
+        );
         const payload = await parseApiResponse(response);
 
         if (!response.ok) {
@@ -801,32 +829,39 @@ export default function Member() {
           return;
         }
 
-        enqueueSnackbar(getApiMessage(payload, `${year}년 모임 참석 여부가 저장되었습니다.`), {
-          variant: 'success',
-        });
+        enqueueSnackbar(
+          getApiMessage(payload, `${year}년 ${getMeetingPeriodLabel(period)} 참석 여부가 저장되었습니다.`),
+          {
+            variant: 'success',
+          },
+        );
         await loadMemberMeetingAttendanceStatus();
       } catch (error) {
         console.error('Member meeting attendance update error:', error);
         enqueueSnackbar('회원 모임 참석 상태 저장 중 오류가 발생했습니다.', { variant: 'error' });
       } finally {
-        setUpdatingAttendanceYear(null);
+        setUpdatingAttendanceKey(null);
       }
     },
     [canManageMembers, handleExpiredSession, loadMemberMeetingAttendanceStatus, selectedUser],
   );
 
   const handleResetMeetingAttendance = useCallback(
-    async (year: number) => {
+    async (year: number, period: number) => {
       if (!selectedUser || !canManageMembers) {
         return;
       }
 
-      setUpdatingAttendanceYear(year);
+      const attendanceKey = getAttendanceStatusKey(year, period);
+      setUpdatingAttendanceKey(attendanceKey);
 
       try {
-        const response = await apiFetch(`/member/${selectedUser.id}/meeting/attendance/${year}`, {
-          method: 'DELETE',
-        });
+        const response = await apiFetch(
+          `/member/${selectedUser.id}/meeting/attendance/${year}/${period}`,
+          {
+            method: 'DELETE',
+          },
+        );
         const payload = await parseApiResponse(response);
 
         if (!response.ok) {
@@ -844,9 +879,12 @@ export default function Member() {
           return;
         }
 
-        enqueueSnackbar(getApiMessage(payload, `${year}년 모임 참석 수동 설정을 해제했습니다.`), {
-          variant: 'success',
-        });
+        enqueueSnackbar(
+          getApiMessage(payload, `${year}년 ${getMeetingPeriodLabel(period)} 수동 설정을 해제했습니다.`),
+          {
+            variant: 'success',
+          },
+        );
         await loadMemberMeetingAttendanceStatus();
       } catch (error) {
         console.error('Member meeting attendance reset error:', error);
@@ -854,7 +892,7 @@ export default function Member() {
           variant: 'error',
         });
       } finally {
-        setUpdatingAttendanceYear(null);
+        setUpdatingAttendanceKey(null);
       }
     },
     [canManageMembers, handleExpiredSession, loadMemberMeetingAttendanceStatus, selectedUser],
@@ -1060,22 +1098,28 @@ export default function Member() {
                     <span aria-hidden="true" className="text-sky-500">
                       📅
                     </span>
-                    연도별 모임 참석 여부
+                    연도/차수별 모임 참석 여부
                   </h3>
 
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    {attendanceYears.length > 0 ? (
-                      attendanceYears.map((year) => {
-                        const isAttended = selectedUserAttendanceStatus[year] === true;
-                        const statusMeta = getMeetingAttendanceDisplayMeta(year, isAttended);
-                        const isUpdatingYear = updatingAttendanceYear === year;
+                    {attendancePeriods.length > 0 ? (
+                      attendancePeriods.map(({ year, period }) => {
+                        const attendanceKey = getAttendanceStatusKey(year, period);
+                        const isAttended = selectedUserAttendanceStatus[attendanceKey] === true;
+                        const statusMeta = getMeetingAttendanceDisplayMeta(year, period, isAttended);
+                        const isUpdatingYear = updatingAttendanceKey === attendanceKey;
 
                         return (
                           <div
-                            key={`attendance-${year}`}
+                            key={`attendance-${attendanceKey}`}
                             className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
                           >
-                            <span className="font-bold text-slate-600">{year}년</span>
+                            <div className="flex flex-col gap-1">
+                              <span className="font-bold text-slate-600">{year}년</span>
+                              <span className="text-xs font-semibold text-slate-400">
+                                {getMeetingPeriodLabel(period)}
+                              </span>
+                            </div>
                             <div className="flex flex-col items-end gap-2">
                               <span
                                 className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold ${statusMeta.className}`}
@@ -1089,7 +1133,7 @@ export default function Member() {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      void handleSetMeetingAttendance(year, true);
+                                      void handleSetMeetingAttendance(year, period, true);
                                     }}
                                     disabled={isUpdatingYear}
                                     className="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 transition-colors hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1099,7 +1143,7 @@ export default function Member() {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      void handleSetMeetingAttendance(year, false);
+                                      void handleSetMeetingAttendance(year, period, false);
                                     }}
                                     disabled={isUpdatingYear}
                                     className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1109,7 +1153,7 @@ export default function Member() {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      void handleResetMeetingAttendance(year);
+                                      void handleResetMeetingAttendance(year, period);
                                     }}
                                     disabled={isUpdatingYear}
                                     className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
