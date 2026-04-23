@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
+import { getApiMessage, parseApiResponse } from '@/common/lib/api/apiHelpers';
 import { EditDeleteButton, GlobalButton, useConfirmDialog } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import SettlementDetailModal, {
@@ -33,41 +34,6 @@ interface SettlementPayload {
   amount: number;
   relation: string;
 }
-
-const parseApiResponse = async (response: Response): Promise<unknown> => {
-  const contentType = response.headers.get('content-type') || '';
-
-  if (contentType.includes('application/json')) {
-    try {
-      return await response.json();
-    } catch {
-      return null;
-    }
-  }
-
-  const text = await response.text();
-  return text || null;
-};
-
-const getApiMessage = (payload: unknown, fallback: string) => {
-  if (payload && typeof payload === 'object') {
-    const errorMessage = (payload as { error?: unknown }).error;
-    if (typeof errorMessage === 'string' && errorMessage.trim()) {
-      return errorMessage;
-    }
-
-    const successMessage = (payload as { message?: unknown }).message;
-    if (typeof successMessage === 'string' && successMessage.trim()) {
-      return successMessage;
-    }
-  }
-
-  if (typeof payload === 'string' && payload.trim()) {
-    return payload;
-  }
-
-  return fallback;
-};
 
 const toInputDate = (rawDate: string) => {
   const normalized = rawDate.trim().replaceAll('/', '-');

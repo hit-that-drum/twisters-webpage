@@ -11,6 +11,12 @@ import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
+import {
+  formatDateTime,
+  formatRelativeTime,
+  getApiMessage,
+  parseApiResponse,
+} from '@/common/lib/api/apiHelpers';
 import { handleBulletListKeyDown } from '@/common/lib/textareaBulletList';
 import { EditDeleteButton, GlobalButton, useConfirmDialog } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
@@ -73,79 +79,6 @@ const BOARD_IMAGE_PRESETS = [
       'linear-gradient(135deg, rgba(59,62,82,0.95) 0%, rgba(109,130,171,0.84) 54%, rgba(236,223,170,0.76) 100%)',
   },
 ];
-
-const parseApiResponse = async (response: Response): Promise<unknown> => {
-  const contentType = response.headers.get('content-type') || '';
-
-  if (contentType.includes('application/json')) {
-    try {
-      return await response.json();
-    } catch {
-      return null;
-    }
-  }
-
-  const text = await response.text();
-  return text || null;
-};
-
-const getApiMessage = (payload: unknown, fallback: string) => {
-  if (payload && typeof payload === 'object') {
-    const errorMessage = (payload as { error?: unknown }).error;
-    if (typeof errorMessage === 'string' && errorMessage.trim()) {
-      return errorMessage;
-    }
-
-    const successMessage = (payload as { message?: unknown }).message;
-    if (typeof successMessage === 'string' && successMessage.trim()) {
-      return successMessage;
-    }
-  }
-
-  if (typeof payload === 'string' && payload.trim()) {
-    return payload;
-  }
-
-  return fallback;
-};
-
-const formatRelativeTime = (rawDate: string) => {
-  const parsedDate = new Date(rawDate);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return 'unknown';
-  }
-
-  const elapsedMs = Date.now() - parsedDate.getTime();
-  if (elapsedMs < 60_000) {
-    return 'just now';
-  }
-
-  const minutes = Math.floor(elapsedMs / 60_000);
-  if (minutes < 60) {
-    return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  }
-
-  const days = Math.floor(hours / 24);
-  if (days < 7) {
-    return `${days} day${days === 1 ? '' : 's'} ago`;
-  }
-
-  return parsedDate.toLocaleDateString();
-};
-
-const formatDateTime = (rawDate: string) => {
-  const parsedDate = new Date(rawDate);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return '-';
-  }
-
-  return parsedDate.toLocaleString();
-};
 
 const COLLAPSED_POST_CONTENT_STYLE: CSSProperties = {
   display: '-webkit-box',
