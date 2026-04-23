@@ -40,6 +40,31 @@
   }
 }
 
+@layer components {
+  .auth-input {
+    @apply w-full rounded-xl border border-gray-300 bg-white p-3.5 text-sm text-slate-900 transition-all placeholder:text-slate-400 focus:border-blue-700 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500;
+  }
+
+  .auth-input-reset:-webkit-autofill,
+  .auth-input-reset:-webkit-autofill:hover,
+  .auth-input-reset:-webkit-autofill:focus {
+    -webkit-text-fill-color: rgb(15 23 42);
+    caret-color: rgb(15 23 42);
+    -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+    box-shadow: 0 0 0 1000px #ffffff inset;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+
+  .auth-input-reset:disabled:-webkit-autofill,
+  .auth-input-reset:disabled:-webkit-autofill:hover,
+  .auth-input-reset:disabled:-webkit-autofill:focus {
+    -webkit-text-fill-color: rgb(107 114 128);
+    caret-color: rgb(107 114 128);
+    -webkit-box-shadow: 0 0 0 1000px rgb(243 244 246) inset;
+    box-shadow: 0 0 0 1000px rgb(243 244 246) inset;
+  }
+}
+
 /* 4. MUI 스타일이 들어갈 자리를 낮은 우선순위 레이어로 지정 */
 @layer mui {
   /* 여기에 코드를 적지 않아도 레이어 선언 순서만으로 

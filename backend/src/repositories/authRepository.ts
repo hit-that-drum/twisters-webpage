@@ -2,6 +2,7 @@ import pool from '../db.js';
 import {
   type AdminUserRow,
   type ApprovalUserRow,
+  type EmailVerificationLookupRow,
   type ManagedUserRow,
   type MeUserRow,
   type PasswordResetLookupRow,
@@ -12,6 +13,7 @@ import {
 } from '../types/auth.types.js';
 
 type ResetPasswordMutationResult = 'success' | 'already_used' | 'user_not_found';
+type VerifyEmailMutationResult = 'success' | 'already_used' | 'user_not_found';
 
 let ensureUsersSchemaPromise: Promise<void> | null = null;
 
@@ -22,8 +24,36 @@ class AuthRepository {
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isTest" BOOLEAN NOT NULL DEFAULT FALSE');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "profileImage" TEXT');
         await pool.query('ALTER TABLE users ALTER COLUMN "profileImage" TYPE TEXT');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "emailVerifiedAt" TIMESTAMPTZ');
+        await pool.query(
+          `
+            UPDATE users
+            SET "emailVerifiedAt" = COALESCE("createdAt", NOW())
+            WHERE password IS NOT NULL
+              AND "isAllowed" = TRUE
+              AND "emailVerifiedAt" IS NULL
+          `,
+        );
         await pool.query(
           'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower_unique ON users (LOWER(email))',
+        );
+        await pool.query(
+          `
+            CREATE TABLE IF NOT EXISTS email_verification_tokens (
+              id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+              user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              token_hash CHAR(64) NOT NULL UNIQUE,
+              expires_at TIMESTAMPTZ NOT NULL,
+              used_at TIMESTAMPTZ,
+              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+          `,
+        );
+        await pool.query(
+          'CREATE INDEX IF NOT EXISTS idx_email_verification_user ON email_verification_tokens (user_id)',
+        );
+        await pool.query(
+          'CREATE INDEX IF NOT EXISTS idx_email_verification_expires ON email_verification_tokens (expires_at)',
         );
       })().catch((error) => {
         ensureUsersSchemaPromise = null;
@@ -32,6 +62,10 @@ class AuthRepository {
     }
 
     await ensureUsersSchemaPromise;
+  }
+
+  async ensureAuthSchema() {
+    await this.ensureUsersSchema();
   }
 
   async createUser(name: string, email: string, hashedPassword: string, isTest: boolean) {
@@ -70,16 +104,18 @@ class AuthRepository {
   }
 
   async findApprovalUserByEmail(email: string) {
+    await this.ensureUsersSchema();
     const result = await pool.query<ApprovalUserRow>(
-      'SELECT id, name, email, "isAllowed" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1',
+      'SELECT id, name, email, "isAllowed", "emailVerifiedAt" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1',
       [email],
     );
     return result.rows[0] ?? null;
   }
 
   async findApprovalUserByKakaoId(kakaoId: string) {
+    await this.ensureUsersSchema();
     const result = await pool.query<ApprovalUserRow>(
-      'SELECT id, name, email, "isAllowed" FROM users WHERE kakao_id = $1 LIMIT 1',
+      'SELECT id, name, email, "isAllowed", "emailVerifiedAt" FROM users WHERE kakao_id = $1 LIMIT 1',
       [kakaoId],
     );
     return result.rows[0] ?? null;
@@ -94,7 +130,7 @@ class AuthRepository {
   ) {
     await this.ensureUsersSchema();
     await pool.query(
-      'INSERT INTO users (email, name, google_id, "profileImage", "isTest") VALUES ($1, $2, $3, $4, $5)',
+      'INSERT INTO users (email, name, google_id, "profileImage", "isTest", "emailVerifiedAt") VALUES ($1, $2, $3, $4, $5, NOW())',
       [email, name, googleId, profileImage, isTest],
     );
   }
@@ -117,7 +153,7 @@ class AuthRepository {
   ) {
     await this.ensureUsersSchema();
     await pool.query(
-      'INSERT INTO users (email, name, kakao_id, "profileImage", "isTest") VALUES ($1, $2, $3, $4, $5)',
+      'INSERT INTO users (email, name, kakao_id, "profileImage", "isTest", "emailVerifiedAt") VALUES ($1, $2, $3, $4, $5, NOW())',
       [email, name, kakaoId, profileImage, isTest],
     );
   }
@@ -142,14 +178,28 @@ class AuthRepository {
   }
 
   async findUserEmailByEmail(email: string) {
-    const result = await pool.query<UserEmailRow>('SELECT id, email FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1', [email]);
+    await this.ensureUsersSchema();
+    const result = await pool.query<UserEmailRow>(
+      'SELECT id, email, "emailVerifiedAt" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1',
+      [email],
+    );
     return result.rows[0] ?? null;
+  }
+
+  async markEmailVerifiedByUserId(userId: number) {
+    await this.ensureUsersSchema();
+    const result = await pool.query(
+      'UPDATE users SET "emailVerifiedAt" = COALESCE("emailVerifiedAt", NOW()) WHERE id = $1',
+      [userId],
+    );
+
+    return (result.rowCount ?? 0) > 0;
   }
 
   async findPendingUsers(onlyTestUsers = false) {
     const result = await pool.query<PendingUserRow>(
       `
-        SELECT id, name, email, "createdAt"
+        SELECT id, name, email, "createdAt", "emailVerifiedAt"
         FROM users
         WHERE "isAllowed" = FALSE
           AND ($1::boolean = FALSE OR ("isTest" = TRUE OR name ILIKE 'TEST%'))
@@ -164,7 +214,7 @@ class AuthRepository {
     await this.ensureUsersSchema();
     const result = await pool.query<AdminUserRow>(
       `
-        SELECT id, name, email, "profileImage", "isAdmin", "isAllowed", "createdAt"
+        SELECT id, name, email, "profileImage", "isAdmin", "isAllowed", "createdAt", "emailVerifiedAt"
         FROM users
         WHERE $1::boolean = FALSE OR ("isTest" = TRUE OR name ILIKE 'TEST%')
         ORDER BY "createdAt" DESC, id DESC
@@ -285,6 +335,14 @@ class AuthRepository {
     ]);
   }
 
+  async markUnusedEmailVerificationTokensAsUsed(userId: number) {
+    await this.ensureUsersSchema();
+    await pool.query(
+      'UPDATE email_verification_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL',
+      [userId],
+    );
+  }
+
   async createPasswordResetToken(userId: number, tokenHash: string, resetTokenTtlMinutes: number) {
     await pool.query(
       `
@@ -292,6 +350,21 @@ class AuthRepository {
         VALUES ($1, $2, NOW() + ($3 * INTERVAL '1 minute'))
       `,
       [userId, tokenHash, resetTokenTtlMinutes],
+    );
+  }
+
+  async createEmailVerificationToken(
+    userId: number,
+    tokenHash: string,
+    emailVerificationTokenTtlMinutes: number,
+  ) {
+    await this.ensureUsersSchema();
+    await pool.query(
+      `
+        INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+        VALUES ($1, $2, NOW() + ($3 * INTERVAL '1 minute'))
+      `,
+      [userId, tokenHash, emailVerificationTokenTtlMinutes],
     );
   }
 
@@ -303,6 +376,23 @@ class AuthRepository {
         JOIN users u ON u.id = prt.user_id
         WHERE prt.token_hash = $1
         ORDER BY prt.id DESC
+        LIMIT 1
+      `,
+      [tokenHash],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async findEmailVerificationLookupByTokenHash(tokenHash: string) {
+    await this.ensureUsersSchema();
+    const result = await pool.query<EmailVerificationLookupRow>(
+      `
+        SELECT evt.id, evt.user_id, evt.expires_at, evt.used_at, u.email, u."emailVerifiedAt" AS email_verified_at
+        FROM email_verification_tokens evt
+        JOIN users u ON u.id = evt.user_id
+        WHERE evt.token_hash = $1
+        ORDER BY evt.id DESC
         LIMIT 1
       `,
       [tokenHash],
@@ -339,6 +429,50 @@ class AuthRepository {
         hashedPassword,
         userId,
       ]);
+
+      if ((updateResult.rowCount ?? 0) === 0) {
+        await client.query('ROLLBACK');
+        return 'user_not_found';
+      }
+
+      await client.query('COMMIT');
+      return 'success';
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async verifyEmailByToken(
+    verificationTokenId: number,
+    userId: number,
+  ): Promise<VerifyEmailMutationResult> {
+    await this.ensureUsersSchema();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const consumeResult = await client.query(
+        `
+          UPDATE email_verification_tokens
+          SET used_at = NOW()
+          WHERE id = $1 AND used_at IS NULL
+        `,
+        [verificationTokenId],
+      );
+
+      if ((consumeResult.rowCount ?? 0) === 0) {
+        await client.query('ROLLBACK');
+        return 'already_used';
+      }
+
+      const updateResult = await client.query(
+        'UPDATE users SET "emailVerifiedAt" = COALESCE("emailVerifiedAt", NOW()) WHERE id = $1',
+        [userId],
+      );
 
       if ((updateResult.rowCount ?? 0) === 0) {
         await client.query('ROLLBACK');

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { EditDeleteButton, GlobalButton } from '@/common/components';
+import { EditDeleteButton, GlobalButton, useConfirmDialog } from '@/common/components';
 import MemberDetailModal, { type MemberFormState } from './MemberDetailModal';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import { BiMoneyWithdraw } from 'react-icons/bi';
@@ -25,6 +25,11 @@ interface ParsedMemberDuesStatus {
   byMemberId: Record<number, Record<number, boolean>>;
 }
 
+interface ParsedMemberAttendanceStatus {
+  periods: Array<{ year: number; period: number }>;
+  byMemberId: Record<number, Record<string, boolean>>;
+}
+
 interface DuesDisplayMeta {
   label: string;
   icon: string;
@@ -38,6 +43,27 @@ interface DetailInfoItem {
 }
 
 const DEPOSIT_KEY_PATTERN = /^deposit(\d{4})$/;
+const ATTENDANCE_KEY_PATTERN = /^attendance(\d{4})_(1|2)$/;
+
+const getAttendanceStatusKey = (year: number, period: number) => `${year}_${period}`;
+
+const getMeetingPeriodLabel = (period: number) => `${period}차 모임`;
+
+const isFutureMeetingPeriod = (year: number, period: number) => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  if (year > currentYear) {
+    return true;
+  }
+
+  if (year < currentYear) {
+    return false;
+  }
+
+  return period === 2 && currentMonth <= 6;
+};
 
 const createDefaultMemberForm = (): MemberFormState => ({
   name: '',
@@ -166,6 +192,54 @@ const parseMemberDuesStatus = (payload: unknown): ParsedMemberDuesStatus => {
   };
 };
 
+const parseMemberAttendanceStatus = (payload: unknown): ParsedMemberAttendanceStatus => {
+  if (!Array.isArray(payload)) {
+    return { periods: [], byMemberId: {} };
+  }
+
+  const periods = new Map<string, { year: number; period: number }>();
+  const byMemberId: Record<number, Record<string, boolean>> = {};
+
+  payload.forEach((item) => {
+    if (!item || typeof item !== 'object') {
+      return;
+    }
+
+    const row = item as Record<string, unknown>;
+    const memberId =
+      typeof row.memberId === 'number' && Number.isInteger(row.memberId) ? row.memberId : null;
+    if (!memberId) {
+      return;
+    }
+
+    if (!byMemberId[memberId]) {
+      byMemberId[memberId] = {};
+    }
+
+    Object.entries(row).forEach(([key, value]) => {
+      const matched = ATTENDANCE_KEY_PATTERN.exec(key);
+      if (!matched) {
+        return;
+      }
+
+      const year = Number(matched[1]);
+      const period = Number(matched[2]);
+      if (!Number.isInteger(year) || !Number.isInteger(period)) {
+        return;
+      }
+
+      const attendanceKey = getAttendanceStatusKey(year, period);
+      periods.set(attendanceKey, { year, period });
+      byMemberId[memberId][attendanceKey] = parseBoolean(value);
+    });
+  });
+
+  return {
+    periods: [...periods.values()].sort((left, right) => left.year - right.year || left.period - right.period),
+    byMemberId,
+  };
+};
+
 const toEditForm = (member: MemberUser): MemberFormState => ({
   name: member.name,
   email: member.email ?? '',
@@ -234,6 +308,34 @@ const getDuesDisplayMeta = (year: number, isPaid: boolean): DuesDisplayMeta => {
   };
 };
 
+const getMeetingAttendanceDisplayMeta = (
+  year: number,
+  period: number,
+  isAttended: boolean,
+): DuesDisplayMeta => {
+  if (isFutureMeetingPeriod(year, period)) {
+    return {
+      label: '예정',
+      icon: '⌛',
+      className: 'bg-slate-100 text-slate-500',
+    };
+  }
+
+  if (isAttended) {
+    return {
+      label: '참석',
+      icon: '✓',
+      className: 'bg-sky-50 text-sky-700',
+    };
+  }
+
+  return {
+    label: '미참석',
+    icon: '•',
+    className: 'bg-rose-50 text-rose-700',
+  };
+};
+
 const renderDetailValue = (value: string | null) => {
   if (!value || !value.trim()) {
     return '-';
@@ -294,6 +396,7 @@ const DetailInfoDesc = (detailInfo: DetailInfoItem[]) => {
 export default function Member() {
   const navigate = useNavigate();
   const { meInfo, isAuthLoading, logout } = useAuth();
+  const { confirm, confirmDialog } = useConfirmDialog();
 
   const [users, setUsers] = useState<MemberUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -312,6 +415,11 @@ export default function Member() {
   const [duesStatusByMemberId, setDuesStatusByMemberId] = useState<
     Record<number, Record<number, boolean>>
   >({});
+  const [attendancePeriods, setAttendancePeriods] = useState<Array<{ year: number; period: number }>>([]);
+  const [attendanceStatusByMemberId, setAttendanceStatusByMemberId] = useState<
+    Record<number, Record<string, boolean>>
+  >({});
+  const [updatingAttendanceKey, setUpdatingAttendanceKey] = useState<string | null>(null);
 
   const canManageMembers = meInfo?.isAdmin === true;
 
@@ -399,6 +507,37 @@ export default function Member() {
     }
   }, [handleExpiredSession]);
 
+  const loadMemberMeetingAttendanceStatus = useCallback(async () => {
+    try {
+      const response = await apiFetch('/member/meeting/attendance-status');
+      const payload = await parseApiResponse(response);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          handleExpiredSession();
+          return;
+        }
+
+        enqueueSnackbar(
+          `회원 모임 참석 현황을 불러오지 못했습니다: ${getApiMessage(payload, '알 수 없는 에러')}`,
+          {
+            variant: 'error',
+          },
+        );
+        setAttendancePeriods([]);
+        setAttendanceStatusByMemberId({});
+        return;
+      }
+
+      const parsedAttendanceStatus = parseMemberAttendanceStatus(payload);
+      setAttendancePeriods(parsedAttendanceStatus.periods);
+      setAttendanceStatusByMemberId(parsedAttendanceStatus.byMemberId);
+    } catch (error) {
+      console.error('Member meeting attendance status fetch error:', error);
+      enqueueSnackbar('회원 모임 참석 현황 조회 중 오류가 발생했습니다.', { variant: 'error' });
+    }
+  }, [handleExpiredSession]);
+
   useEffect(() => {
     if (isAuthLoading) {
       return;
@@ -409,8 +548,15 @@ export default function Member() {
       return;
     }
 
-    void Promise.all([loadMembers(), loadMemberDuesStatus()]);
-  }, [handleExpiredSession, isAuthLoading, loadMemberDuesStatus, loadMembers, meInfo]);
+    void Promise.all([loadMembers(), loadMemberDuesStatus(), loadMemberMeetingAttendanceStatus()]);
+  }, [
+    handleExpiredSession,
+    isAuthLoading,
+    loadMemberDuesStatus,
+    loadMemberMeetingAttendanceStatus,
+    loadMembers,
+    meInfo,
+  ]);
 
   const selectedUser = useMemo(
     () => users.find((user) => user.id === selectedUserId) ?? null,
@@ -424,6 +570,14 @@ export default function Member() {
 
     return duesStatusByMemberId[selectedUser.id] ?? ({} as Record<number, boolean>);
   }, [duesStatusByMemberId, selectedUser]);
+
+  const selectedUserAttendanceStatus = useMemo(() => {
+    if (!selectedUser) {
+      return {} as Record<string, boolean>;
+    }
+
+    return attendanceStatusByMemberId[selectedUser.id] ?? ({} as Record<string, boolean>);
+  }, [attendanceStatusByMemberId, selectedUser]);
 
   const userDetailInfo = useMemo<DetailInfoItem[]>(() => {
     if (!selectedUser) {
@@ -545,7 +699,7 @@ export default function Member() {
 
       enqueueSnackbar(getApiMessage(payload, '회원이 등록되었습니다.'), { variant: 'success' });
       setOpenAddDialog(false);
-      await Promise.all([loadMembers(), loadMemberDuesStatus()]);
+      await Promise.all([loadMembers(), loadMemberDuesStatus(), loadMemberMeetingAttendanceStatus()]);
     } catch (error) {
       console.error('Member create error:', error);
       enqueueSnackbar('회원 등록 중 오류가 발생했습니다.', { variant: 'error' });
@@ -585,7 +739,7 @@ export default function Member() {
         variant: 'success',
       });
       setOpenEditDialog(false);
-      await Promise.all([loadMembers(), loadMemberDuesStatus()]);
+      await Promise.all([loadMembers(), loadMemberDuesStatus(), loadMemberMeetingAttendanceStatus()]);
     } catch (error) {
       console.error('Member update error:', error);
       enqueueSnackbar('회원 수정 중 오류가 발생했습니다.', { variant: 'error' });
@@ -600,7 +754,12 @@ export default function Member() {
       return;
     }
 
-    const isConfirmed = window.confirm(`정말로 '${selectedUser.name}' 회원을 삭제하시겠습니까?`);
+    const isConfirmed = await confirm({
+      title: '회원 삭제',
+      description: `정말로 '${selectedUser.name}' 회원을 삭제하시겠습니까?`,
+      confirmLabel: '삭제',
+      confirmButtonStyle: 'error',
+    });
     if (!isConfirmed) {
       return;
     }
@@ -627,7 +786,7 @@ export default function Member() {
 
       enqueueSnackbar(getApiMessage(payload, '회원이 삭제되었습니다.'), { variant: 'success' });
       setOpenEditDialog(false);
-      await Promise.all([loadMembers(), loadMemberDuesStatus()]);
+      await Promise.all([loadMembers(), loadMemberDuesStatus(), loadMemberMeetingAttendanceStatus()]);
     } catch (error) {
       console.error('Member delete error:', error);
       enqueueSnackbar('회원 삭제 중 오류가 발생했습니다.', { variant: 'error' });
@@ -635,6 +794,109 @@ export default function Member() {
       setIsSubmitting(false);
     }
   };
+
+  const handleSetMeetingAttendance = useCallback(
+    async (year: number, period: number, attended: boolean) => {
+      if (!selectedUser || !canManageMembers) {
+        return;
+      }
+
+      const attendanceKey = getAttendanceStatusKey(year, period);
+      setUpdatingAttendanceKey(attendanceKey);
+
+      try {
+        const response = await apiFetch(
+          `/member/${selectedUser.id}/meeting/attendance/${year}/${period}`,
+          {
+          method: 'PATCH',
+          body: JSON.stringify({ attended }),
+          },
+        );
+        const payload = await parseApiResponse(response);
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            handleExpiredSession();
+            return;
+          }
+
+          enqueueSnackbar(
+            `회원 모임 참석 상태 저장 실패: ${getApiMessage(payload, '알 수 없는 에러')}`,
+            {
+              variant: 'error',
+            },
+          );
+          return;
+        }
+
+        enqueueSnackbar(
+          getApiMessage(payload, `${year}년 ${getMeetingPeriodLabel(period)} 참석 여부가 저장되었습니다.`),
+          {
+            variant: 'success',
+          },
+        );
+        await loadMemberMeetingAttendanceStatus();
+      } catch (error) {
+        console.error('Member meeting attendance update error:', error);
+        enqueueSnackbar('회원 모임 참석 상태 저장 중 오류가 발생했습니다.', { variant: 'error' });
+      } finally {
+        setUpdatingAttendanceKey(null);
+      }
+    },
+    [canManageMembers, handleExpiredSession, loadMemberMeetingAttendanceStatus, selectedUser],
+  );
+
+  const handleResetMeetingAttendance = useCallback(
+    async (year: number, period: number) => {
+      if (!selectedUser || !canManageMembers) {
+        return;
+      }
+
+      const attendanceKey = getAttendanceStatusKey(year, period);
+      setUpdatingAttendanceKey(attendanceKey);
+
+      try {
+        const response = await apiFetch(
+          `/member/${selectedUser.id}/meeting/attendance/${year}/${period}`,
+          {
+            method: 'DELETE',
+          },
+        );
+        const payload = await parseApiResponse(response);
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            handleExpiredSession();
+            return;
+          }
+
+          enqueueSnackbar(
+            `회원 모임 참석 수동 설정 해제 실패: ${getApiMessage(payload, '알 수 없는 에러')}`,
+            {
+              variant: 'error',
+            },
+          );
+          return;
+        }
+
+        enqueueSnackbar(
+          getApiMessage(payload, `${year}년 ${getMeetingPeriodLabel(period)} 수동 설정을 해제했습니다.`),
+          {
+            variant: 'success',
+          },
+        );
+        await loadMemberMeetingAttendanceStatus();
+      } catch (error) {
+        console.error('Member meeting attendance reset error:', error);
+        enqueueSnackbar('회원 모임 참석 수동 설정 해제 중 오류가 발생했습니다.', {
+          variant: 'error',
+        });
+      } finally {
+        setUpdatingAttendanceKey(null);
+      }
+    },
+    [canManageMembers, handleExpiredSession, loadMemberMeetingAttendanceStatus, selectedUser],
+  );
 
   // ===== 정리한 코드 =====
 
@@ -830,6 +1092,87 @@ export default function Member() {
                     )}
                   </div>
                 </div>
+
+                <div className="border-t border-slate-100 bg-white px-6 py-6 md:px-8">
+                  <h3 className="mb-5 flex items-center gap-2 text-lg font-bold text-slate-900">
+                    <span aria-hidden="true" className="text-sky-500">
+                      📅
+                    </span>
+                    연도/차수별 모임 참석 여부
+                  </h3>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    {attendancePeriods.length > 0 ? (
+                      attendancePeriods.map(({ year, period }) => {
+                        const attendanceKey = getAttendanceStatusKey(year, period);
+                        const isAttended = selectedUserAttendanceStatus[attendanceKey] === true;
+                        const statusMeta = getMeetingAttendanceDisplayMeta(year, period, isAttended);
+                        const isUpdatingYear = updatingAttendanceKey === attendanceKey;
+
+                        return (
+                          <div
+                            key={`attendance-${attendanceKey}`}
+                            className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                          >
+                            <div className="flex flex-col gap-1">
+                              <span className="font-bold text-slate-600">{year}년</span>
+                              <span className="text-xs font-semibold text-slate-400">
+                                {getMeetingPeriodLabel(period)}
+                              </span>
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold ${statusMeta.className}`}
+                              >
+                                <span aria-hidden="true">{statusMeta.icon}</span>
+                                {statusMeta.label}
+                              </span>
+
+                              {canManageMembers && (
+                                <div className="flex flex-wrap justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      void handleSetMeetingAttendance(year, period, true);
+                                    }}
+                                    disabled={isUpdatingYear}
+                                    className="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 transition-colors hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    {isUpdatingYear ? '저장 중...' : '참석'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      void handleSetMeetingAttendance(year, period, false);
+                                    }}
+                                    disabled={isUpdatingYear}
+                                    className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    미참석
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      void handleResetMeetingAttendance(year, period);
+                                    }}
+                                    disabled={isUpdatingYear}
+                                    className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    자동
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">
+                        모임 참석 데이터 없음
+                      </div>
+                    )}
+                  </div>
+                </div>
               </article>
             ) : (
               <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-sm font-semibold text-slate-500 shadow-sm">
@@ -863,6 +1206,8 @@ export default function Member() {
         onFormChange={handleChangeEditForm}
         onDateChange={handleEditDateChange}
       />
+
+      {confirmDialog}
     </section>
   );
 }

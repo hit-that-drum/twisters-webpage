@@ -1,6 +1,7 @@
 import { Checkbox, FormControlLabel, TextField } from '@mui/material';
 import type { ChangeEvent, ReactNode } from 'react';
 import { GlobalImageUpload, GlobalModal } from '@/common/components';
+import { handleBulletListKeyDown } from '@/common/lib/textareaBulletList';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 
 export type BoardModalType = 'ADD' | 'EDIT';
@@ -65,6 +66,8 @@ function BoardDetailForm({
         minRows={5}
         value={form.content}
         onChange={onFormChange}
+        onKeyDown={handleBulletListKeyDown}
+        helperText="tab키를 사용하면 불렛포인트를 사용 할 수 있습니다(최대 3 depth)"
         disabled={isSubmitting}
         placeholder="내용을 입력해주세요"
       />

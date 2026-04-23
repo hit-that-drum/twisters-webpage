@@ -242,8 +242,8 @@ class BoardRepository {
 
   async create(scope: DataScope, payload: BoardMutationPayload) {
     const boardTableName = getScopedTableNames(scope).board;
-    await pool.query(
-      `INSERT INTO ${boardTableName} ("authorId", title, "createUser", "updateUser", "imageUrl", content, pinned) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    const result = await pool.query<{ id: number }>(
+      `INSERT INTO ${boardTableName} ("authorId", title, "createUser", "updateUser", "imageUrl", content, pinned) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
       [
         payload.authorId,
         payload.title,
@@ -254,6 +254,8 @@ class BoardRepository {
         payload.pinned,
       ],
     );
+
+    return result.rows[0]?.id ?? null;
   }
 
   async updateById(scope: DataScope, boardId: number, payload: BoardMutationPayload) {

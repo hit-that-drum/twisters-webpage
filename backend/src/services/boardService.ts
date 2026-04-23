@@ -1,5 +1,6 @@
 import { HttpError } from '../errors/httpError.js';
 import { boardRepository } from '../repositories/boardRepository.js';
+import { meetingAttendanceService } from './meetingAttendanceService.js';
 import { type AuthenticatedUser } from '../types/common.types.js';
 import {
   type Board,
@@ -241,7 +242,11 @@ class BoardService {
     const sessionUser = requireAuthenticatedUser(authenticatedUser);
     const normalizedPayload = normalizeBoardMutationPayload(payload, sessionUser, false);
     const scope = resolveDataScopeByUser(sessionUser);
-    await boardRepository.create(scope, normalizedPayload);
+    const boardId = await boardRepository.create(scope, normalizedPayload);
+
+    if (boardId) {
+      await meetingAttendanceService.syncMeetingAttendanceForBoard(sessionUser, boardId);
+    }
   }
 
   async updateBoard(
@@ -277,6 +282,8 @@ class BoardService {
     if (updatedCount === 0) {
       throw new HttpError(404, '해당 게시글을 찾을 수 없습니다.');
     }
+
+    await meetingAttendanceService.syncMeetingAttendanceForBoard(sessionUser, boardId);
   }
 
   async deleteBoard(authenticatedUser: AuthenticatedUser | undefined, rawBoardId: string | undefined) {
@@ -341,6 +348,7 @@ class BoardService {
 
     const normalizedPayload = normalizeBoardCommentPayload(payload, sessionUser, boardId);
     await boardRepository.createComment(scope, normalizedPayload);
+    await meetingAttendanceService.syncMeetingAttendanceForBoard(sessionUser, boardId);
   }
 
   async deleteBoardComment(
@@ -381,6 +389,8 @@ class BoardService {
     if (deletedCount === 0) {
       throw new HttpError(404, '해당 댓글을 찾을 수 없습니다.');
     }
+
+    await meetingAttendanceService.syncMeetingAttendanceForBoard(sessionUser, boardId);
   }
 }
 
