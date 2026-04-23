@@ -1,5 +1,5 @@
 import app from './app.js';
-import { query } from './db.js';
+import { query } from './config/database.js';
 import { boardRepository } from './repositories/boardRepository.js';
 import { memberRepository } from './repositories/memberRepository.js';
 import { noticeRepository } from './repositories/noticeRepository.js';

@@ -1,4 +1,4 @@
-import pool from '../db.js';
+import pool from '../config/database.js';
 import {
   type AdminUserRow,
   type ApprovalUserRow,

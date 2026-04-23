@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { loadEnvironment } from './config/env.js';
+import { loadEnvironment } from '../config/env.js';
 
 loadEnvironment();
 

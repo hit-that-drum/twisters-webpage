@@ -9,17 +9,7 @@ import MemberDetailModal, { type MemberFormState } from './MemberDetailModal';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import { BiMoneyWithdraw } from 'react-icons/bi';
 import LoadingComponent from '@/common/LoadingComponent';
-
-interface MemberUser {
-  id: number;
-  name: string;
-  email: string | null;
-  profileImage: string | null;
-  isAdmin: boolean;
-  phone: string | null;
-  joinedAt: string | null;
-  birthDate: string | null;
-}
+import type { MemberUser } from '@/entities/user/types';
 
 interface ParsedMemberDuesStatus {
   years: number[];

@@ -14,7 +14,7 @@ import {
   refreshSessionAuthResponse,
   revokeSessionById,
   touchSessionActivity,
-} from '../sessionService.js';
+} from './sessionService.js';
 import { type AuthenticatedUser } from '../types/common.types.js';
 import {
   type AdminUserMutationDTO,

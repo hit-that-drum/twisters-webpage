@@ -10,28 +10,7 @@ import GlobalButton from '@/common/components/GlobalButton';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import AdminUserDetailModal, { type AdminUserFormState } from './AdminUserDetailModal';
 import LoadingComponent from '@/common/LoadingComponent';
-
-interface PendingUserRecord {
-  id: number;
-  name: string;
-  email: string;
-  createdAt: string;
-  emailVerifiedAt: string | null;
-}
-
-interface AdminUserRecord {
-  id: number;
-  name: string;
-  email: string;
-  profileImage: string | null;
-  isAdmin: boolean;
-  isAllowed: boolean;
-  createdAt: string;
-  emailVerifiedAt: string | null;
-  phone?: string | null;
-  department?: string | null;
-  joinedAt?: string | null;
-}
+import type { AdminUserRecord, PendingUserRecord } from '@/entities/user/types';
 
 type UserStatusFilter = 'all' | 'active' | 'inactive';
 
