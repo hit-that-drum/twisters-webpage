@@ -27,7 +27,6 @@ import {
   buildSettlementPayload,
   createDefaultForm,
   toFormStateFromRecord,
-  toInputDate,
 } from '@/pages/settlement/lib/settlementHelpers';
 
 export default function Settlement() {
