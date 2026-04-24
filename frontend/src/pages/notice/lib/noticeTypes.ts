@@ -12,7 +12,12 @@ export interface NoticeItem {
 
 export const DEFAULT_VISIBLE_NOTICES = 5;
 
-export const NOTICE_IMAGE_PRESETS = [
+export interface NoticeImagePreset {
+  alt: string;
+  gradient: string;
+}
+
+export const NOTICE_IMAGE_PRESETS: NoticeImagePreset[] = [
   {
     alt: 'Community meeting visual',
     gradient:
