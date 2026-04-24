@@ -1,27 +1,5 @@
+import { normalizeBoolean } from '@/common/lib/parseUtils';
 import type { AdminUserRecord, PendingUserRecord } from '@/entities/user/types';
-
-const normalizeBoolean = (rawValue: unknown, fallbackValue = false) => {
-  if (typeof rawValue === 'boolean') {
-    return rawValue;
-  }
-
-  if (typeof rawValue === 'number') {
-    return rawValue === 1;
-  }
-
-  if (typeof rawValue === 'string') {
-    const normalized = rawValue.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') {
-      return true;
-    }
-
-    if (normalized === 'false' || normalized === '0') {
-      return false;
-    }
-  }
-
-  return fallbackValue;
-};
 
 export const parsePendingUsers = (payload: unknown): PendingUserRecord[] => {
   if (!Array.isArray(payload)) {

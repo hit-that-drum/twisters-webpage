@@ -1,29 +1,7 @@
 import { type NextFunction, type Request, type Response } from 'express';
 import { HttpError } from '../errors/httpError.js';
 import { type AuthenticatedRequest } from '../types/common.types.js';
-
-const normalizeBoolean = (rawValue: unknown, fallbackValue = false) => {
-  if (typeof rawValue === 'boolean') {
-    return rawValue;
-  }
-
-  if (typeof rawValue === 'number') {
-    return rawValue === 1;
-  }
-
-  if (typeof rawValue === 'string') {
-    const normalized = rawValue.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') {
-      return true;
-    }
-
-    if (normalized === 'false' || normalized === '0') {
-      return false;
-    }
-  }
-
-  return fallbackValue;
-};
+import { normalizeBoolean } from './parseUtils.js';
 
 export const requireAdmin = (req: Request, _res: Response, next: NextFunction) => {
   const authenticatedUser = (req as AuthenticatedRequest).user;

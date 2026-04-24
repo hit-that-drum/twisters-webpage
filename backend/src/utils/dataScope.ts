@@ -1,4 +1,5 @@
 import { type AuthenticatedUser } from '../types/common.types.js';
+import { normalizeBoolean } from './parseUtils.js';
 
 export type DataScope = 'real' | 'test';
 
@@ -34,29 +35,6 @@ const TABLE_NAMES_BY_SCOPE: Record<DataScope, ScopedTableNames> = {
     meetingAttendance: 'test_meeting_attendance',
     meetingAttendanceOverrides: 'test_meeting_attendance_overrides',
   },
-};
-
-const normalizeBoolean = (rawValue: unknown, fallbackValue = false) => {
-  if (typeof rawValue === 'boolean') {
-    return rawValue;
-  }
-
-  if (typeof rawValue === 'number') {
-    return rawValue === 1;
-  }
-
-  if (typeof rawValue === 'string') {
-    const normalized = rawValue.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') {
-      return true;
-    }
-
-    if (normalized === 'false' || normalized === '0') {
-      return false;
-    }
-  }
-
-  return fallbackValue;
 };
 
 export const resolveDataScopeByUser = (authenticatedUser: AuthenticatedUser | undefined): DataScope => {

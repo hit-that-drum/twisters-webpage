@@ -1,33 +1,14 @@
 /**
- * Cross-service auth helpers: authenticated-user validation, boolean
- * normalization for DB rows, and the TEST-scoped-admin visibility rules
- * used by admin-facing features.
+ * Cross-service auth helpers: authenticated-user validation and the
+ * TEST-scoped-admin visibility rules used by admin-facing features.
+ * Generic value parsers live in `./parseUtils.ts`; this module re-exports
+ * `normalizeBoolean` from there so existing consumers keep working.
  */
 import { HttpError } from '../errors/httpError.js';
 import { type AuthenticatedUser } from '../types/common.types.js';
+import { normalizeBoolean } from './parseUtils.js';
 
-export const normalizeBoolean = (rawValue: unknown, fallbackValue = false) => {
-  if (typeof rawValue === 'boolean') {
-    return rawValue;
-  }
-
-  if (typeof rawValue === 'number') {
-    return rawValue === 1;
-  }
-
-  if (typeof rawValue === 'string') {
-    const normalized = rawValue.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') {
-      return true;
-    }
-
-    if (normalized === 'false' || normalized === '0') {
-      return false;
-    }
-  }
-
-  return fallbackValue;
-};
+export { normalizeBoolean };
 
 export const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 

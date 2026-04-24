@@ -6,6 +6,7 @@ import type {
   MeetingPeriod,
 } from '../types/meetingAttendance.types.js';
 import { resolveDataScopeByUser, type DataScope } from '../utils/dataScope.js';
+import { normalizeBoolean } from '../utils/parseUtils.js';
 import type { AuthenticatedUser } from '../types/common.types.js';
 
 const MEETING_TITLE_KEYWORD = '모임';
@@ -13,29 +14,6 @@ const MEETING_YEAR_PATTERN = /(\d{4})\s*년/;
 const FIRST_PERIOD_PATTERNS = [/상반기/, /전반기/, /1\s*차/, /1\s*부/, /1st/i, /part\s*1/i];
 const SECOND_PERIOD_PATTERNS = [/하반기/, /후반기/, /2\s*차/, /2\s*부/, /2nd/i, /part\s*2/i];
 const MEETING_MONTH_PATTERN = /(\d{1,2})\s*월/;
-
-const normalizeBoolean = (rawValue: unknown, fallbackValue = false) => {
-  if (typeof rawValue === 'boolean') {
-    return rawValue;
-  }
-
-  if (typeof rawValue === 'number') {
-    return rawValue === 1;
-  }
-
-  if (typeof rawValue === 'string') {
-    const normalized = rawValue.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') {
-      return true;
-    }
-
-    if (normalized === 'false' || normalized === '0') {
-      return false;
-    }
-  }
-
-  return fallbackValue;
-};
 
 const normalizeKoreanSearchText = (value: string) => {
   return value.normalize('NFC').replace(/\s+/g, '').trim();

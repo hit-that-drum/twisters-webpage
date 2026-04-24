@@ -8,6 +8,7 @@ import {
 } from '../types/notice.types.js';
 import { type AuthenticatedUser } from '../types/common.types.js';
 import { resolveDataScopeByUser } from '../utils/dataScope.js';
+import { normalizeBoolean } from '../utils/parseUtils.js';
 
 const MAX_INLINE_IMAGE_CHARS = 5_000_000;
 
@@ -18,29 +19,6 @@ const parseNoticeId = (rawNoticeId?: string) => {
   }
 
   return noticeId;
-};
-
-const parsePinned = (rawPinned: unknown, defaultValue = false) => {
-  if (typeof rawPinned === 'boolean') {
-    return rawPinned;
-  }
-
-  if (typeof rawPinned === 'number') {
-    return rawPinned === 1;
-  }
-
-  if (typeof rawPinned === 'string') {
-    const normalized = rawPinned.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') {
-      return true;
-    }
-
-    if (normalized === 'false' || normalized === '0') {
-      return false;
-    }
-  }
-
-  return defaultValue;
 };
 
 const resolveAuditUser = (authenticatedUser: AuthenticatedUser) => {
@@ -106,7 +84,7 @@ const normalizeNoticeMutationPayload = (
     title,
     imageUrl,
     content,
-    pinned: parsePinned(payload.pinned, false),
+    pinned: normalizeBoolean(payload.pinned, false),
     auditUser: resolveAuditUser(authenticatedUser),
   };
 };

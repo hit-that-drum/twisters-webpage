@@ -12,6 +12,7 @@ import {
 } from '../types/member.types.js';
 import { meetingAttendanceService } from './meetingAttendanceService.js';
 import { resolveDataScopeByUser } from '../utils/dataScope.js';
+import { normalizeBoolean } from '../utils/parseUtils.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DUES_BASE_YEAR = 2024;
@@ -153,29 +154,6 @@ const normalizeOptionalDate = (rawValue: unknown, fieldName: string) => {
   }
 
   return normalizedDate;
-};
-
-const normalizeBoolean = (rawValue: unknown, fallbackValue = false) => {
-  if (typeof rawValue === 'boolean') {
-    return rawValue;
-  }
-
-  if (typeof rawValue === 'number') {
-    return rawValue === 1;
-  }
-
-  if (typeof rawValue === 'string') {
-    const normalized = rawValue.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') {
-      return true;
-    }
-
-    if (normalized === 'false' || normalized === '0') {
-      return false;
-    }
-  }
-
-  return fallbackValue;
 };
 
 const isAdminUser = (authenticatedUser: AuthenticatedUser) => {

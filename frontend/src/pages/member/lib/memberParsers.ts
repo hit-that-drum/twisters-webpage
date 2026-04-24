@@ -1,3 +1,4 @@
+import { normalizeBoolean, normalizeNullableString } from '@/common/lib/parseUtils';
 import type { MemberUser } from '@/entities/user/types';
 import {
   ATTENDANCE_KEY_PATTERN,
@@ -7,28 +8,6 @@ import {
 } from './memberTypes';
 
 export const getAttendanceStatusKey = (year: number, period: number) => `${year}_${period}`;
-
-const parseBoolean = (rawValue: unknown) => {
-  if (typeof rawValue === 'boolean') {
-    return rawValue;
-  }
-
-  if (typeof rawValue === 'number') {
-    return rawValue === 1;
-  }
-
-  if (typeof rawValue === 'string') {
-    const normalized = rawValue.trim().toLowerCase();
-    if (normalized === '1' || normalized === 'true') {
-      return true;
-    }
-    if (normalized === '0' || normalized === 'false') {
-      return false;
-    }
-  }
-
-  return false;
-};
 
 export const parseMembers = (payload: unknown): MemberUser[] => {
   if (!Array.isArray(payload)) {
@@ -60,20 +39,12 @@ export const parseMembers = (payload: unknown): MemberUser[] => {
         return null;
       }
 
-      const normalizeNullableString = (rawValue: unknown) => {
-        if (rawValue === null || rawValue === undefined) {
-          return null;
-        }
-
-        return typeof rawValue === 'string' ? rawValue : null;
-      };
-
       return {
         id: row.id,
         name: row.name,
         email: normalizeNullableString(row.email),
         profileImage: normalizeNullableString(row.profileImage),
-        isAdmin: parseBoolean(row.isAdmin),
+        isAdmin: normalizeBoolean(row.isAdmin),
         phone: normalizeNullableString(row.phone),
         joinedAt: normalizeNullableString(row.joinedAt),
         birthDate: normalizeNullableString(row.birthDate),
@@ -118,7 +89,7 @@ export const parseMemberDuesStatus = (payload: unknown): ParsedMemberDuesStatus 
       }
 
       years.add(year);
-      byMemberId[memberId][year] = parseBoolean(value);
+      byMemberId[memberId][year] = normalizeBoolean(value);
     });
   });
 
@@ -166,7 +137,7 @@ export const parseMemberAttendanceStatus = (payload: unknown): ParsedMemberAtten
 
       const attendanceKey = getAttendanceStatusKey(year, period);
       periods.set(attendanceKey, { year, period });
-      byMemberId[memberId][attendanceKey] = parseBoolean(value);
+      byMemberId[memberId][attendanceKey] = normalizeBoolean(value);
     });
   });
 
