@@ -13,6 +13,7 @@ import { apiFetch } from '@/common/lib/api/apiClient';
 import { getApiMessage, parseApiResponse } from '@/common/lib/api/apiHelpers';
 import { useConfirmDialog } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
+import useExpiredSession from '@/common/hooks/useExpiredSession';
 import SettlementDetailModal, {
   type SettlementAmountType,
   type SettlementFormState,
@@ -31,8 +32,9 @@ import {
 
 export default function Settlement() {
   const navigate = useNavigate();
-  const { meInfo, logout } = useAuth();
+  const { meInfo } = useAuth();
   const { confirm, confirmDialog } = useConfirmDialog();
+  const handleExpiredSession = useExpiredSession();
   const [settlementRows, setSettlementRows] = useState<SettlementRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,9 +75,7 @@ export default function Settlement() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          logout();
-          enqueueSnackbar('로그인이 만료되었습니다. 다시 로그인해주세요.', { variant: 'error' });
-          navigate('/signin', { replace: true });
+          handleExpiredSession();
           return;
         }
 
@@ -138,7 +138,7 @@ export default function Settlement() {
     } finally {
       setIsLoading(false);
     }
-  }, [logout, navigate]);
+  }, [handleExpiredSession]);
 
   useEffect(() => {
     void loadSettlements();
@@ -259,9 +259,7 @@ export default function Settlement() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          logout();
-          enqueueSnackbar('로그인이 만료되었습니다. 다시 로그인해주세요.', { variant: 'error' });
-          navigate('/signin', { replace: true });
+          handleExpiredSession();
           return;
         }
 
@@ -314,9 +312,7 @@ export default function Settlement() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          logout();
-          enqueueSnackbar('로그인이 만료되었습니다. 다시 로그인해주세요.', { variant: 'error' });
-          navigate('/signin', { replace: true });
+          handleExpiredSession();
           return;
         }
 
@@ -369,9 +365,7 @@ export default function Settlement() {
 
         if (!response.ok) {
           if (response.status === 401) {
-            logout();
-            enqueueSnackbar('로그인이 만료되었습니다. 다시 로그인해주세요.', { variant: 'error' });
-            navigate('/signin', { replace: true });
+            handleExpiredSession();
             return;
           }
 
@@ -392,7 +386,7 @@ export default function Settlement() {
         setDeletingSettlementId(null);
       }
     },
-    [confirm, loadSettlements, logout, navigate, requireAdminAction],
+    [confirm, handleExpiredSession, loadSettlements, requireAdminAction],
   );
 
   const addSettlementActions: TAction[] = [

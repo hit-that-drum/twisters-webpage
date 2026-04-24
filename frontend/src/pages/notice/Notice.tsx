@@ -11,6 +11,7 @@ import {
 } from '@/common/lib/api/apiHelpers';
 import { EditDeleteButton, GlobalButton, useConfirmDialog } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
+import useExpiredSession from '@/common/hooks/useExpiredSession';
 import NoticeDetailModal, { type NoticeFormState } from './NoticeDetailModal';
 import { AiTwotonePushpin } from 'react-icons/ai';
 import { IoPersonCircleSharp } from 'react-icons/io5';
@@ -25,8 +26,9 @@ import { parseNoticeList } from '@/pages/notice/lib/noticeParsers';
 
 export default function Notice() {
   const navigate = useNavigate();
-  const { meInfo, logout } = useAuth();
+  const { meInfo } = useAuth();
   const { confirm, confirmDialog } = useConfirmDialog();
+  const handleExpiredSession = useExpiredSession();
   const [noticeList, setNoticeList] = useState<NoticeItem[]>([]);
   const [visibleNoticeCount, setVisibleNoticeCount] = useState(DEFAULT_VISIBLE_NOTICES);
   const [isLoading, setIsLoading] = useState(false);
@@ -213,9 +215,7 @@ export default function Notice() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          logout();
-          enqueueSnackbar('로그인이 만료되었습니다. 다시 로그인해주세요.', { variant: 'error' });
-          navigate('/signin', { replace: true });
+          handleExpiredSession();
           return;
         }
 
@@ -271,9 +271,7 @@ export default function Notice() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          logout();
-          enqueueSnackbar('로그인이 만료되었습니다. 다시 로그인해주세요.', { variant: 'error' });
-          navigate('/signin', { replace: true });
+          handleExpiredSession();
           return;
         }
 
@@ -320,9 +318,7 @@ export default function Notice() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          logout();
-          enqueueSnackbar('로그인이 만료되었습니다. 다시 로그인해주세요.', { variant: 'error' });
-          navigate('/signin', { replace: true });
+          handleExpiredSession();
           return;
         }
 
