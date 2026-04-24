@@ -1,5 +1,9 @@
 import { type Request, type Response } from 'express';
-import { memberService } from '../services/memberService.js';
+import {
+  memberAttendanceService,
+  memberDuesService,
+  memberService,
+} from '../services/memberService.js';
 import { type AuthenticatedRequest } from '../types/common.types.js';
 import { type MemberMeetingAttendanceOverrideDTO, type MemberMutationDTO } from '../types/member.types.js';
 import { handleControllerError } from '../utils/controllerErrorHandler.js';
@@ -17,7 +21,8 @@ export const getMembers = async (_req: Request, res: Response) => {
 export const getMemberDuesDepositStatus = async (_req: Request, res: Response) => {
   try {
     const authenticatedUser = (_req as AuthenticatedRequest).user;
-    const memberDuesDepositStatus = await memberService.getMemberDuesDepositStatus(authenticatedUser);
+    const memberDuesDepositStatus =
+      await memberDuesService.getMemberDuesDepositStatus(authenticatedUser);
     return res.json(memberDuesDepositStatus);
   } catch (error) {
     return handleControllerError(
@@ -33,7 +38,7 @@ export const getMemberMeetingAttendanceStatus = async (_req: Request, res: Respo
   try {
     const authenticatedUser = (_req as AuthenticatedRequest).user;
     const memberMeetingAttendanceStatus =
-      await memberService.getMemberMeetingAttendanceStatus(authenticatedUser);
+      await memberAttendanceService.getMemberMeetingAttendanceStatus(authenticatedUser);
     return res.json(memberMeetingAttendanceStatus);
   } catch (error) {
     return handleControllerError(
@@ -49,7 +54,7 @@ export const updateMemberMeetingAttendanceStatus = async (req: Request, res: Res
   try {
     const authenticatedUser = (req as AuthenticatedRequest).user;
     const payload = req.body as MemberMeetingAttendanceOverrideDTO;
-    await memberService.updateMemberMeetingAttendanceStatus(
+    await memberAttendanceService.updateMemberMeetingAttendanceStatus(
       authenticatedUser,
       req.params.memberId,
       req.params.meetingYear,
@@ -70,7 +75,7 @@ export const updateMemberMeetingAttendanceStatus = async (req: Request, res: Res
 export const clearMemberMeetingAttendanceStatus = async (req: Request, res: Response) => {
   try {
     const authenticatedUser = (req as AuthenticatedRequest).user;
-    await memberService.clearMemberMeetingAttendanceStatus(
+    await memberAttendanceService.clearMemberMeetingAttendanceStatus(
       authenticatedUser,
       req.params.memberId,
       req.params.meetingYear,
