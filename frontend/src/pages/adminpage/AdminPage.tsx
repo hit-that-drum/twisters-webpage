@@ -4,6 +4,7 @@ import { enqueueSnackbar } from 'notistack';
 import useConfirmDialog from '@/common/components/useConfirmDialog';
 import GlobalButton from '@/common/components/GlobalButton';
 import type { TAction } from '@/common/components/GlobalModal';
+import useExpiredSession from '@/common/hooks/useExpiredSession';
 import LoadingComponent from '@/common/LoadingComponent';
 import { useAuth } from '@/features';
 import AdminPendingUsersPanel from '@/pages/adminpage/components/AdminPendingUsersPanel';
@@ -14,7 +15,6 @@ import useAdminUserActions from '@/pages/adminpage/hooks/useAdminUserActions';
 import useAdminUserEditing from '@/pages/adminpage/hooks/useAdminUserEditing';
 import useAdminUserFilter from '@/pages/adminpage/hooks/useAdminUserFilter';
 import useAdminUserList from '@/pages/adminpage/hooks/useAdminUserList';
-import useExpiredSession from '@/pages/adminpage/hooks/useExpiredSession';
 import { formatJoinedDate } from '@/pages/adminpage/lib/adminFormatters';
 
 export default function AdminPage() {

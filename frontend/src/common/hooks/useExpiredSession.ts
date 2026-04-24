@@ -4,9 +4,9 @@ import { enqueueSnackbar } from 'notistack';
 import { useAuth } from '@/features';
 
 /**
- * Shared 401-handler for the admin page hooks. Logs the user out, surfaces a
- * snackbar, and bounces to the sign-in page. Factored out so every API call
- * in the admin page reacts to session expiry consistently.
+ * Shared 401-handler used by every page that calls authenticated APIs. Logs
+ * the user out, surfaces a snackbar, and bounces to the sign-in page so every
+ * expired-session response produces the same visible behavior.
  */
 export default function useExpiredSession() {
   const navigate = useNavigate();
