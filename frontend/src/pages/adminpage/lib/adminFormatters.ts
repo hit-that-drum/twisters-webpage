@@ -4,7 +4,13 @@ import { AVATAR_TONES } from './adminConstants';
 
 const countFormatter = new Intl.NumberFormat('en-US');
 
-export const formatDateTime = (raw: string) => {
+/**
+ * Admin-specific date+time formatting — always Korean locale with explicit
+ * YYYY-MM-DD HH:MM fields. Deliberately named differently from the shared
+ * `formatDateTime` in `@/common/lib/api/apiHelpers` so importers pick the
+ * intended behavior.
+ */
+export const formatKoreanDateTime = (raw: string) => {
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) {
     return '-';
@@ -44,7 +50,7 @@ export const getEmailVerificationMeta = (raw: string | null) => {
 
   return {
     label: 'Verified',
-    detail: formatDateTime(raw),
+    detail: formatKoreanDateTime(raw),
     className: 'bg-emerald-50 text-emerald-700',
     dotClassName: 'bg-emerald-500',
   };

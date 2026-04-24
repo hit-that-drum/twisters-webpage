@@ -20,8 +20,8 @@ import {
 } from '@/pages/adminpage/lib/adminConstants';
 import {
   formatCount,
-  formatDateTime,
   formatJoinedDate,
+  formatKoreanDateTime,
   getEmailVerificationMeta,
   isValidEmail,
   toAdminUserForm,
@@ -674,7 +674,7 @@ export default function AdminPage() {
                       <p className="text-base font-bold text-slate-900">{user.name}</p>
                       <p className="text-sm text-slate-500">{user.email}</p>
                       <p className="text-xs text-slate-400">
-                        Requested at {formatDateTime(user.createdAt)}
+                        Requested at {formatKoreanDateTime(user.createdAt)}
                       </p>
                       <div className="mt-2 flex items-center gap-2 text-xs font-semibold">
                         <span

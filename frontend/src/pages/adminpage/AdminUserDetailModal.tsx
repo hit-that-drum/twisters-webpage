@@ -2,8 +2,7 @@ import { MenuItem, TextField } from '@mui/material';
 import type { ChangeEvent, ReactNode } from 'react';
 import { FormModal } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
-
-const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+import { isValidEmail } from '@/pages/adminpage/lib/adminFormatters';
 
 const formatRoleLabel = (role: AdminUserFormState['role']) => {
   return role === 'admin' ? 'Moderator' : 'Member';
