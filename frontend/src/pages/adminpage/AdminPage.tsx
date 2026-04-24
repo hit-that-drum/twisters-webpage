@@ -9,263 +9,24 @@ import { useAuth } from '@/features';
 import GlobalButton from '@/common/components/GlobalButton';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import AdminUserDetailModal, { type AdminUserFormState } from './AdminUserDetailModal';
+import AdminUserAvatar from './AdminUserAvatar';
 import LoadingComponent from '@/common/LoadingComponent';
 import type { AdminUserRecord, PendingUserRecord } from '@/entities/user/types';
-
-type UserStatusFilter = 'all' | 'active' | 'inactive';
-
-const USERS_PAGE_SIZE = 3;
-const USER_STATUS_FILTER_LABEL: Record<UserStatusFilter, string> = {
-  all: 'All',
-  active: 'Active',
-  inactive: 'Inactive',
-};
-
-const AVATAR_TONES = [
-  'bg-sky-100 text-sky-700',
-  'bg-emerald-100 text-emerald-700',
-  'bg-amber-100 text-amber-700',
-  'bg-violet-100 text-violet-700',
-  'bg-rose-100 text-rose-700',
-] as const;
-
-const countFormatter = new Intl.NumberFormat('en-US');
-
-const normalizeBoolean = (rawValue: unknown, fallbackValue = false) => {
-  if (typeof rawValue === 'boolean') {
-    return rawValue;
-  }
-
-  if (typeof rawValue === 'number') {
-    return rawValue === 1;
-  }
-
-  if (typeof rawValue === 'string') {
-    const normalized = rawValue.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') {
-      return true;
-    }
-
-    if (normalized === 'false' || normalized === '0') {
-      return false;
-    }
-  }
-
-  return fallbackValue;
-};
-
-const parsePendingUsers = (payload: unknown): PendingUserRecord[] => {
-  if (!Array.isArray(payload)) {
-    return [];
-  }
-
-  return payload
-    .map((row) => {
-      if (!row || typeof row !== 'object') {
-        return null;
-      }
-
-      const parsed = row as {
-          id?: unknown;
-          name?: unknown;
-          email?: unknown;
-          createdAt?: unknown;
-          emailVerifiedAt?: unknown;
-        };
-
-      if (
-        typeof parsed.id !== 'number' ||
-        typeof parsed.name !== 'string' ||
-        typeof parsed.email !== 'string'
-      ) {
-        return null;
-      }
-
-      const createdAtValue =
-        typeof parsed.createdAt === 'string' ? parsed.createdAt : new Date().toISOString();
-
-      return {
-        id: parsed.id,
-        name: parsed.name,
-        email: parsed.email,
-        createdAt: createdAtValue,
-        emailVerifiedAt:
-          typeof parsed.emailVerifiedAt === 'string' ? parsed.emailVerifiedAt : null,
-      } satisfies PendingUserRecord;
-    })
-    .filter((row): row is PendingUserRecord => row !== null);
-};
-
-const parseAdminUsers = (payload: unknown): AdminUserRecord[] => {
-  if (!Array.isArray(payload)) {
-    return [];
-  }
-
-  return payload
-    .map((row) => {
-      if (!row || typeof row !== 'object') {
-        return null;
-      }
-
-      const parsed = row as {
-          id?: unknown;
-          name?: unknown;
-          email?: unknown;
-          profileImage?: unknown;
-          isAdmin?: unknown;
-          isAllowed?: unknown;
-          createdAt?: unknown;
-          emailVerifiedAt?: unknown;
-        };
-
-      if (
-        typeof parsed.id !== 'number' ||
-        typeof parsed.name !== 'string' ||
-        typeof parsed.email !== 'string'
-      ) {
-        return null;
-      }
-
-      const createdAtValue =
-        typeof parsed.createdAt === 'string' ? parsed.createdAt : new Date().toISOString();
-      const profileImageValue =
-        typeof parsed.profileImage === 'string' && parsed.profileImage.trim().length > 0
-          ? parsed.profileImage.trim()
-          : null;
-
-      return {
-        id: parsed.id,
-        name: parsed.name,
-        email: parsed.email,
-        profileImage: profileImageValue,
-        isAdmin: normalizeBoolean(parsed.isAdmin, false),
-        isAllowed: normalizeBoolean(parsed.isAllowed, false),
-        createdAt: createdAtValue,
-        emailVerifiedAt:
-          typeof parsed.emailVerifiedAt === 'string' ? parsed.emailVerifiedAt : null,
-      } satisfies AdminUserRecord;
-    })
-    .filter((row): row is AdminUserRecord => row !== null);
-};
-
-const formatDateTime = (raw: string) => {
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) {
-    return '-';
-  }
-
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
-const formatJoinedDate = (raw: string) => {
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) {
-    return '-';
-  }
-
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: '2-digit',
-    year: 'numeric',
-  });
-};
-
-const getEmailVerificationMeta = (raw: string | null) => {
-  if (!raw) {
-    return {
-      label: 'Not verified',
-      detail: 'Waiting for email verification',
-      className: 'bg-amber-50 text-amber-700',
-      dotClassName: 'bg-amber-500',
-    };
-  }
-
-  return {
-    label: 'Verified',
-    detail: formatDateTime(raw),
-    className: 'bg-emerald-50 text-emerald-700',
-    dotClassName: 'bg-emerald-500',
-  };
-};
-
-const getInitials = (name: string) => {
-  const trimmed = name.trim();
-  if (!trimmed) {
-    return '?';
-  }
-
-  const tokens = trimmed.split(/\s+/).filter(Boolean);
-  if (tokens.length === 1) {
-    return tokens[0].slice(0, 2).toUpperCase();
-  }
-
-  const first = tokens[0]?.charAt(0) ?? '';
-  const last = tokens[tokens.length - 1]?.charAt(0) ?? '';
-  return `${first}${last}`.toUpperCase();
-};
-
-const getAvatarToneClassName = (userId: number) => {
-  return AVATAR_TONES[userId % AVATAR_TONES.length] ?? AVATAR_TONES[0];
-};
-
-function UserAvatar({
-  userId,
-  name,
-  profileImage,
-}: {
-  userId: number;
-  name: string;
-  profileImage: string | null;
-}) {
-  const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
-
-  const shouldShowProfileImage = Boolean(profileImage && profileImage !== failedImageSrc);
-
-  return (
-    <div
-      className={`flex size-10 items-center justify-center overflow-hidden rounded-full text-xs font-bold ${getAvatarToneClassName(
-        userId,
-      )}`}
-    >
-      {shouldShowProfileImage ? (
-        <img
-          src={profileImage ?? undefined}
-          alt={`${name} profile`}
-          className="h-full w-full object-cover"
-          onError={() => setFailedImageSrc(profileImage)}
-        />
-      ) : (
-        getInitials(name)
-      )}
-    </div>
-  );
-}
-
-const formatCount = (count: number) => {
-  return countFormatter.format(count);
-};
-
-const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-
-const toAdminUserForm = (user: AdminUserRecord): AdminUserFormState => ({
-  name: user.name,
-  email: user.email,
-  role: user.isAdmin ? 'admin' : 'member',
-  status: user.isAllowed ? 'active' : 'inactive',
-});
-
-const EMPTY_ADMIN_USER_FORM: AdminUserFormState = {
-  name: '',
-  email: '',
-  role: 'member',
-  status: 'active',
-};
+import {
+  EMPTY_ADMIN_USER_FORM,
+  USERS_PAGE_SIZE,
+  USER_STATUS_FILTER_LABEL,
+  type UserStatusFilter,
+} from '@/pages/adminpage/lib/adminConstants';
+import {
+  formatCount,
+  formatDateTime,
+  formatJoinedDate,
+  getEmailVerificationMeta,
+  isValidEmail,
+  toAdminUserForm,
+} from '@/pages/adminpage/lib/adminFormatters';
+import { parseAdminUsers, parsePendingUsers } from '@/pages/adminpage/lib/adminParsers';
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -1055,7 +816,7 @@ export default function AdminPage() {
                       <tr key={user.id} className="transition-colors hover:bg-slate-50/50">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <UserAvatar
+                            <AdminUserAvatar
                               userId={user.id}
                               name={user.name}
                               profileImage={user.profileImage}

@@ -1,5 +1,4 @@
 import {
-  type CSSProperties,
   type ChangeEvent,
   type FormEvent,
   useCallback,
@@ -27,218 +26,22 @@ import { IoPersonCircleSharp } from 'react-icons/io5';
 import { FaClock } from 'react-icons/fa';
 import { IoIosArrowBack, IoIosArrowDown, IoIosArrowForward, IoIosArrowUp } from 'react-icons/io';
 import LoadingComponent from '@/common/LoadingComponent';
-
-interface BoardPostItem {
-  id: number;
-  authorId: number | null;
-  title: string;
-  createUser: string;
-  createDate: string;
-  updateUser: string;
-  updateDate: string;
-  imageUrl: string[];
-  content: string;
-  pinned: boolean;
-}
-
-interface BoardCommentItem {
-  id: number;
-  boardId: number;
-  authorId: number | null;
-  authorName: string;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-type BoardSortOption = 'latest' | 'oldest' | 'updated' | 'pinned';
-
-const DEFAULT_VISIBLE_POSTS = 5;
-
-const BOARD_SORT_OPTIONS: Array<{ value: BoardSortOption; label: string }> = [
-  { value: 'latest', label: 'Latest' },
-  { value: 'oldest', label: 'Oldest' },
-  { value: 'updated', label: 'Recently Updated' },
-  { value: 'pinned', label: 'Pinned First' },
-];
-
-const BOARD_IMAGE_PRESETS = [
-  {
-    alt: 'Community board post visual',
-    gradient:
-      'linear-gradient(135deg, rgba(26,54,93,0.95) 0%, rgba(60,114,178,0.82) 55%, rgba(178,214,242,0.75) 100%)',
-  },
-  {
-    alt: 'Discussion and policy visual',
-    gradient:
-      'linear-gradient(135deg, rgba(26,49,66,0.96) 0%, rgba(74,104,129,0.86) 55%, rgba(191,211,230,0.75) 100%)',
-  },
-  {
-    alt: 'Project and maintenance visual',
-    gradient:
-      'linear-gradient(135deg, rgba(59,62,82,0.95) 0%, rgba(109,130,171,0.84) 54%, rgba(236,223,170,0.76) 100%)',
-  },
-];
-
-const COLLAPSED_POST_CONTENT_STYLE: CSSProperties = {
-  display: '-webkit-box',
-  overflow: 'hidden',
-  WebkitBoxOrient: 'vertical',
-  WebkitLineClamp: 5,
-};
-
-const normalizeImageUrlList = (rawValue: unknown): string[] => {
-  if (Array.isArray(rawValue)) {
-    return rawValue
-      .filter((item): item is string => typeof item === 'string')
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0);
-  }
-
-  if (typeof rawValue === 'string' && rawValue.trim()) {
-    return [rawValue.trim()];
-  }
-
-  return [];
-};
-
-const parseBoardPosts = (payload: unknown): BoardPostItem[] => {
-  if (!Array.isArray(payload)) {
-    return [];
-  }
-
-  return payload
-    .map((item) => {
-      if (!item || typeof item !== 'object') {
-        return null;
-      }
-
-      const row = item as {
-        id?: unknown;
-        authorId?: unknown;
-        title?: unknown;
-        createUser?: unknown;
-        createDate?: unknown;
-        updateUser?: unknown;
-        updateDate?: unknown;
-        imageUrl?: unknown;
-        content?: unknown;
-        pinned?: unknown;
-      };
-
-      if (
-        typeof row.id !== 'number' ||
-        typeof row.title !== 'string' ||
-        typeof row.createUser !== 'string' ||
-        typeof row.createDate !== 'string' ||
-        typeof row.content !== 'string'
-      ) {
-        return null;
-      }
-
-      const normalizedAuthorId =
-        typeof row.authorId === 'number' && Number.isInteger(row.authorId) ? row.authorId : null;
-
-      const normalizedUpdateUser =
-        typeof row.updateUser === 'string' && row.updateUser.trim().length > 0
-          ? row.updateUser
-          : row.createUser;
-
-      const normalizedUpdateDate =
-        typeof row.updateDate === 'string' && row.updateDate.trim().length > 0
-          ? row.updateDate
-          : row.createDate;
-
-      const normalizedPinned =
-        row.pinned === true || row.pinned === 1 || row.pinned === '1' || row.pinned === 'true';
-
-      const normalizedImageUrl = normalizeImageUrlList(row.imageUrl);
-
-      return {
-        id: row.id,
-        authorId: normalizedAuthorId,
-        title: row.title,
-        createUser: row.createUser,
-        createDate: row.createDate,
-        updateUser: normalizedUpdateUser,
-        updateDate: normalizedUpdateDate,
-        imageUrl: normalizedImageUrl,
-        content: row.content,
-        pinned: normalizedPinned,
-      } satisfies BoardPostItem;
-    })
-    .filter((item): item is BoardPostItem => item !== null);
-};
-
-const parseBoardComments = (payload: unknown): BoardCommentItem[] => {
-  if (!Array.isArray(payload)) {
-    return [];
-  }
-
-  return payload
-    .map((item) => {
-      if (!item || typeof item !== 'object') {
-        return null;
-      }
-
-      const row = item as {
-        id?: unknown;
-        boardId?: unknown;
-        authorId?: unknown;
-        authorName?: unknown;
-        content?: unknown;
-        createdAt?: unknown;
-        updatedAt?: unknown;
-      };
-
-      if (
-        typeof row.id !== 'number' ||
-        typeof row.boardId !== 'number' ||
-        typeof row.authorName !== 'string' ||
-        typeof row.content !== 'string' ||
-        typeof row.createdAt !== 'string'
-      ) {
-        return null;
-      }
-
-      const normalizedAuthorId =
-        typeof row.authorId === 'number' && Number.isInteger(row.authorId) ? row.authorId : null;
-
-      const normalizedUpdatedAt =
-        typeof row.updatedAt === 'string' && row.updatedAt.trim().length > 0
-          ? row.updatedAt
-          : row.createdAt;
-
-      return {
-        id: row.id,
-        boardId: row.boardId,
-        authorId: normalizedAuthorId,
-        authorName: row.authorName,
-        content: row.content,
-        createdAt: row.createdAt,
-        updatedAt: normalizedUpdatedAt,
-      } satisfies BoardCommentItem;
-    })
-    .filter((item): item is BoardCommentItem => item !== null);
-};
-
-const buildBoardListPath = (search: string, sort: BoardSortOption) => {
-  const queryParams = new URLSearchParams();
-  if (search.trim()) {
-    queryParams.set('search', search.trim());
-  }
-
-  if (sort !== 'latest') {
-    queryParams.set('sort', sort);
-  }
-
-  const queryString = queryParams.toString();
-  if (!queryString) {
-    return '/board';
-  }
-
-  return `/board?${queryString}`;
-};
+import type {
+  BoardCommentItem,
+  BoardPostItem,
+  BoardSortOption,
+} from '@/pages/board/lib/boardTypes';
+import {
+  BOARD_IMAGE_PRESETS,
+  BOARD_SORT_OPTIONS,
+  COLLAPSED_POST_CONTENT_STYLE,
+  DEFAULT_VISIBLE_POSTS,
+} from '@/pages/board/lib/boardConstants';
+import {
+  buildBoardListPath,
+  parseBoardComments,
+  parseBoardPosts,
+} from '@/pages/board/lib/boardParsers';
 
 export default function Board() {
   const navigate = useNavigate();

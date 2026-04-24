@@ -1,6 +1,6 @@
 import { Checkbox, FormControlLabel, TextField } from '@mui/material';
 import type { ChangeEvent, ReactNode } from 'react';
-import { GlobalImageUpload, GlobalModal } from '@/common/components';
+import { FormModal, GlobalImageUpload } from '@/common/components';
 import { handleBulletListKeyDown } from '@/common/lib/textareaBulletList';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 
@@ -96,21 +96,21 @@ export default function NoticeDetailModal({
   onPinnedChange,
 }: NoticeDetailModalProps) {
   return (
-    <GlobalModal
+    <FormModal
       open={open}
       handleClose={handleClose}
       title={title}
       actions={actions}
+      formKey={type}
       maxWidth="md"
     >
       <NoticeDetailForm
-        key={type}
         form={form}
         isSubmitting={isSubmitting}
         onFormChange={onFormChange}
         onImageUrlsChange={onImageUrlsChange}
         onPinnedChange={onPinnedChange}
       />
-    </GlobalModal>
+    </FormModal>
   );
 }

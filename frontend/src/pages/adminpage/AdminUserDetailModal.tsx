@@ -1,6 +1,6 @@
 import { MenuItem, TextField } from '@mui/material';
 import type { ChangeEvent, ReactNode } from 'react';
-import { GlobalModal } from '@/common/components';
+import { FormModal } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -225,7 +225,7 @@ export default function AdminUserDetailModal({
   onFormChange,
 }: AdminUserDetailModalProps) {
   return (
-    <GlobalModal open={open} handleClose={handleClose} title={title} actions={actions}>
+    <FormModal open={open} handleClose={handleClose} title={title} actions={actions}>
       <AdminUserDetailForm
         form={form}
         initialForm={initialForm}
@@ -238,6 +238,6 @@ export default function AdminUserDetailModal({
         joinedLabel={joinedLabel}
         onFormChange={onFormChange}
       />
-    </GlobalModal>
+    </FormModal>
   );
 }

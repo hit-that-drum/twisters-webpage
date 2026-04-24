@@ -1,6 +1,8 @@
 {
   "scripts": {
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "sync:password-policy": "node scripts/syncPasswordPolicy.mjs",
+    "check:password-policy": "node scripts/syncPasswordPolicy.mjs --check"
   },
   "engines": {
     "node": ">=22.12.0"

@@ -16,104 +16,12 @@ import { AiTwotonePushpin } from 'react-icons/ai';
 import { IoPersonCircleSharp } from 'react-icons/io5';
 import { FaClock } from 'react-icons/fa';
 import LoadingComponent from '@/common/LoadingComponent';
-
-interface NoticeItem {
-  id: number;
-  title: string;
-  createUser: string;
-  createDate: string;
-  updateUser: string;
-  updateDate: string;
-  imageUrl: string | null;
-  content: string;
-  pinned: boolean;
-}
-
-const DEFAULT_VISIBLE_NOTICES = 5;
-
-const NOTICE_IMAGE_PRESETS = [
-  {
-    alt: 'Community meeting visual',
-    gradient:
-      'linear-gradient(135deg, rgba(26,54,93,0.95) 0%, rgba(60,114,178,0.82) 55%, rgba(178,214,242,0.75) 100%)',
-  },
-  {
-    alt: 'Parking zone visual',
-    gradient:
-      'linear-gradient(135deg, rgba(26,49,66,0.96) 0%, rgba(74,104,129,0.86) 55%, rgba(191,211,230,0.75) 100%)',
-  },
-  {
-    alt: 'Maintenance and tools visual',
-    gradient:
-      'linear-gradient(135deg, rgba(59,62,82,0.95) 0%, rgba(109,130,171,0.84) 54%, rgba(236,223,170,0.76) 100%)',
-  },
-];
-
-const parseNoticeList = (payload: unknown): NoticeItem[] => {
-  if (!Array.isArray(payload)) {
-    return [];
-  }
-
-  return payload
-    .map((item) => {
-      if (!item || typeof item !== 'object') {
-        return null;
-      }
-
-      const row = item as {
-        id?: unknown;
-        title?: unknown;
-        createUser?: unknown;
-        createDate?: unknown;
-        updateUser?: unknown;
-        updateDate?: unknown;
-        imageUrl?: unknown;
-        content?: unknown;
-        pinned?: unknown;
-      };
-
-      if (
-        typeof row.id !== 'number' ||
-        typeof row.title !== 'string' ||
-        typeof row.createUser !== 'string' ||
-        typeof row.createDate !== 'string' ||
-        typeof row.content !== 'string'
-      ) {
-        return null;
-      }
-
-      const normalizedPinned =
-        row.pinned === true || row.pinned === 1 || row.pinned === '1' || row.pinned === 'true';
-
-      const normalizedUpdateUser =
-        typeof row.updateUser === 'string' && row.updateUser.trim().length > 0
-          ? row.updateUser
-          : row.createUser;
-
-      const normalizedUpdateDate =
-        typeof row.updateDate === 'string' && row.updateDate.trim().length > 0
-          ? row.updateDate
-          : row.createDate;
-
-      const normalizedImageUrl =
-        typeof row.imageUrl === 'string' && row.imageUrl.trim().length > 0
-          ? row.imageUrl.trim()
-          : null;
-
-      return {
-        id: row.id,
-        title: row.title,
-        createUser: row.createUser,
-        createDate: row.createDate,
-        updateUser: normalizedUpdateUser,
-        updateDate: normalizedUpdateDate,
-        imageUrl: normalizedImageUrl,
-        content: row.content,
-        pinned: normalizedPinned,
-      } satisfies NoticeItem;
-    })
-    .filter((item): item is NoticeItem => item !== null);
-};
+import {
+  DEFAULT_VISIBLE_NOTICES,
+  NOTICE_IMAGE_PRESETS,
+  type NoticeItem,
+} from '@/pages/notice/lib/noticeTypes';
+import { parseNoticeList } from '@/pages/notice/lib/noticeParsers';
 
 export default function Notice() {
   const navigate = useNavigate();

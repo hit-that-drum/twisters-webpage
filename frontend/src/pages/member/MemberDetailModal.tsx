@@ -1,7 +1,7 @@
 import { TextField } from '@mui/material';
 import type { ChangeEvent, ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
-import { GlobalModal } from '@/common/components';
+import { FormModal } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -106,13 +106,13 @@ export default function MemberDetailModal({
   onDateChange,
 }: MemberDetailModalProps) {
   return (
-    <GlobalModal open={open} handleClose={handleClose} title={title} actions={actions}>
+    <FormModal open={open} handleClose={handleClose} title={title} actions={actions}>
       <MemberDetailForm
         form={form}
         isSubmitting={isSubmitting}
         onFormChange={onFormChange}
         onDateChange={onDateChange}
       />
-    </GlobalModal>
+    </FormModal>
   );
 }

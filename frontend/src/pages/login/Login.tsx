@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
+import { type CredentialResponse } from '@react-oauth/google';
 import loginPageRightImage from '/login_page_right_image.png';
-import { CircularProgress, Dialog, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
+import { CircularProgress } from '@mui/material';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '@/common/lib/api/apiClient';
 import PasswordField from '@/common/components/PasswordField';
@@ -12,146 +12,29 @@ import {
 } from '@/common/lib/passwordPolicy';
 import LoadingComponent from '@/common/LoadingComponent.tsx';
 import { useAuth } from '@/features';
-import { SiKakaotalk } from 'react-icons/si';
-
-const WRONG_PASSWORD_ATTEMPTS_KEY = 'wrongPasswordAttemptsByEmail';
-const MAX_WRONG_PASSWORD_ATTEMPTS = 5;
-const KAKAO_OAUTH_STATE_KEY = 'kakaoOAuthState';
-const KAKAO_OAUTH_PROCESSED_CODE_KEY = 'kakaoOAuthProcessedCode';
-const GOOGLE_OAUTH_LOADING_MESSAGE = 'Google 로그인 정보를 확인하고 있어요. 잠시만 기다려주세요.';
-const KAKAO_OAUTH_LOADING_MESSAGE = '카카오 로그인 정보를 확인하고 있어요. 잠시만 기다려주세요.';
-const KAKAO_REDIRECT_LOADING_MESSAGE = '카카오 로그인 페이지로 이동하고 있어요. 잠시만 기다려주세요.';
-const EMAIL_VERIFICATION_LOADING_MESSAGE = '이메일 인증 링크를 확인하고 있어요. 잠시만 기다려주세요.';
-const VERIFICATION_REQUIRED_MESSAGE =
-  '이메일 인증이 필요합니다. 가입 후 받은 메일의 인증 링크를 확인해주세요.';
-
-type WrongPasswordAttemptsByEmail = Record<string, number>;
-
-const decodeGoogleCredentialPayload = (credentialToken: string) => {
-  const payloadToken = credentialToken.split('.')[1];
-  if (!payloadToken) {
-    return null;
-  }
-
-  try {
-    const base64 = payloadToken.replace(/-/g, '+').replace(/_/g, '/');
-    const paddedBase64 = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-    const decoded = atob(paddedBase64);
-    return JSON.parse(decoded) as Record<string, unknown>;
-  } catch (error) {
-    console.error('Failed to decode Google credential payload:', error);
-    return null;
-  }
-};
-
-const logGoogleOAuthDebug = (...args: unknown[]) => {
-  if (import.meta.env.DEV) {
-    console.log(...args);
-  }
-};
-
-const logKakaoOAuthDebug = (...args: unknown[]) => {
-  if (import.meta.env.DEV) {
-    console.log(...args);
-  }
-};
-
-const createOAuthState = () => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-};
-
-const readWrongPasswordAttempts = (): WrongPasswordAttemptsByEmail => {
-  try {
-    const storedValue = localStorage.getItem(WRONG_PASSWORD_ATTEMPTS_KEY);
-    if (!storedValue) {
-      return {};
-    }
-
-    const parsedValue = JSON.parse(storedValue);
-    if (!parsedValue || typeof parsedValue !== 'object') {
-      return {};
-    }
-
-    return parsedValue as WrongPasswordAttemptsByEmail;
-  } catch {
-    return {};
-  }
-};
-
-const writeWrongPasswordAttempts = (attempts: WrongPasswordAttemptsByEmail) => {
-  localStorage.setItem(WRONG_PASSWORD_ATTEMPTS_KEY, JSON.stringify(attempts));
-};
-
-const increaseWrongPasswordAttempt = (email: string) => {
-  const attempts = readWrongPasswordAttempts();
-  const nextAttempts = (attempts[email] || 0) + 1;
-  attempts[email] = nextAttempts;
-  writeWrongPasswordAttempts(attempts);
-  return nextAttempts;
-};
-
-const clearWrongPasswordAttempt = (email: string) => {
-  if (!email) {
-    return;
-  }
-
-  const attempts = readWrongPasswordAttempts();
-  if (!(email in attempts)) {
-    return;
-  }
-
-  delete attempts[email];
-  writeWrongPasswordAttempts(attempts);
-};
-
-const getWrongPasswordAttempt = (email: string) => {
-  if (!email) {
-    return 0;
-  }
-
-  const attempts = readWrongPasswordAttempts();
-  return attempts[email] || 0;
-};
-
-const getAuthErrorMessage = (error: unknown, code: unknown) => {
-  if (code === 'ACCOUNT_PENDING_APPROVAL') {
-    return '관리자 승인 대기 중입니다. 승인 후 로그인해주세요.';
-  }
-
-  if (code === 'EMAIL_VERIFICATION_REQUIRED') {
-    return VERIFICATION_REQUIRED_MESSAGE;
-  }
-
-  if (code === 'EMAIL_VERIFICATION_EXPIRED') {
-    return '이메일 인증 링크가 만료되었습니다. 인증 메일을 다시 보내주세요.';
-  }
-
-  if (code === 'INVALID_EMAIL_VERIFICATION_TOKEN') {
-    return '유효하지 않은 이메일 인증 링크입니다. 인증 메일을 다시 보내주세요.';
-  }
-
-  if (code === 'EMAIL_VERIFICATION_EMAIL_MISMATCH') {
-    return '인증 링크 정보가 일치하지 않습니다. 최신 인증 메일을 다시 열어주세요.';
-  }
-
-  if (code === 'EMAIL_ALREADY_VERIFIED') {
-    return '이미 이메일 인증이 완료되었습니다. 관리자 승인 후 로그인해주세요.';
-  }
-
-  if (code === 'EMAIL_VERIFICATION_ALREADY_USED') {
-    return '이미 사용된 이메일 인증 링크입니다. 필요하면 인증 메일을 다시 보내주세요.';
-  }
-
-  if (code === 'EMAIL_DELIVERY_FAILED') {
-    return '인증 메일 전송에 실패했습니다. 잠시 후 다시 보내기를 시도해주세요.';
-  }
-
-  return typeof error === 'string' ? error : '알 수 없는 에러';
-};
+import {
+  clearWrongPasswordAttempt,
+  getWrongPasswordAttempt,
+  increaseWrongPasswordAttempt,
+  MAX_WRONG_PASSWORD_ATTEMPTS,
+} from '@/pages/login/lib/wrongPasswordAttempts';
+import {
+  createOAuthState,
+  decodeGoogleCredentialPayload,
+  KAKAO_OAUTH_PROCESSED_CODE_KEY,
+  KAKAO_OAUTH_STATE_KEY,
+  logGoogleOAuthDebug,
+  logKakaoOAuthDebug,
+} from '@/pages/login/lib/oauthHelpers';
+import { getAuthErrorMessage } from '@/pages/login/lib/authErrorMessages';
+import {
+  EMAIL_VERIFICATION_LOADING_MESSAGE,
+  GOOGLE_OAUTH_LOADING_MESSAGE,
+  KAKAO_OAUTH_LOADING_MESSAGE,
+  KAKAO_REDIRECT_LOADING_MESSAGE,
+} from '@/pages/login/lib/loadingMessages';
+import LoginPasswordResetDialog from '@/pages/login/LoginPasswordResetDialog';
+import LoginSocialButtons from '@/pages/login/LoginSocialButtons';
 
 export default function Login({ isLogin }: { isLogin: boolean }) {
   const navigate = useNavigate();
@@ -1151,43 +1034,14 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
               </div>
 
               {/* Social Buttons */}
-              <div
-                className="flex flex-wrap items-center justify-center gap-3"
-                aria-busy={isSubmitLoading}
-              >
-                {isGoogleOAuthEnabled ? isSubmitLoading ? (
-                  <div className="inline-flex h-10 w-48 items-center justify-center rounded-sm border border-gray-200 bg-gray-100 px-4 text-sm font-semibold text-gray-500">
-                    Google 로그인 대기 중...
-                  </div>
-                ) : (
-                  <GoogleLogin
-                    onSuccess={handleGoogleSuccess}
-                    onError={handleGoogleError}
-                    width="192"
-                  />
-                ) : (
-                  <p className="w-full text-center text-xs text-gray-400">
-                    Google 로그인을 사용하려면 `VITE_GOOGLE_CLIENT_ID` 설정이 필요합니다.
-                  </p>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleKakaoLogin}
-                  disabled={isSubmitLoading || !isKakaoOAuthEnabled}
-                  className="inline-flex h-10 w-48 items-center justify-center gap-2 rounded-sm bg-[#FEE500] px-4 text-sm font-semibold text-[#191919] transition hover:bg-[#fada0a] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
-                >
-                  <SiKakaotalk size={20} />
-                  <span>카카오로 로그인</span>
-                </button>
-
-                {!isKakaoOAuthEnabled && (
-                  <p className="w-full text-center text-xs text-gray-400">
-                    Kakao 로그인을 사용하려면 `VITE_KAKAO_REST_API_KEY`, `VITE_KAKAO_REDIRECT_URI`
-                    설정이 필요합니다.
-                  </p>
-                )}
-              </div>
+              <LoginSocialButtons
+                isSubmitLoading={isSubmitLoading}
+                isGoogleOAuthEnabled={isGoogleOAuthEnabled}
+                isKakaoOAuthEnabled={isKakaoOAuthEnabled}
+                onGoogleSuccess={handleGoogleSuccess}
+                onGoogleError={handleGoogleError}
+                onKakaoLogin={handleKakaoLogin}
+              />
 
               {/* Footer: 클릭 시 모드 전환 */}
               <p className="mt-10 text-center text-sm text-gray-600">
@@ -1219,59 +1073,16 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
         </div>
       </div>
 
-      <Dialog
+      <LoginPasswordResetDialog
         open={openForgotPasswordDialog}
         onClose={() => setOpenForgotPasswordDialog(false)}
-        fullWidth
-        maxWidth="xs"
-      >
-        <DialogTitle>비밀번호 재설정</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {isResetLinkFlow
-              ? '토큰이 확인되었습니다. 이메일과 새 비밀번호를 입력해 재설정을 완료하세요.'
-              : '가입한 이메일을 입력하면 재설정 링크를 발송합니다.'}
-          </DialogContentText>
-          <div className="mt-4 mb-4">
-            <label htmlFor="resetEmail" className="mb-2 block text-sm font-semibold text-gray-800">
-              Email address
-            </label>
-            <input
-              id="resetEmail"
-              type="email"
-              name="resetEmail"
-              value={resetFormData.resetEmail}
-              onChange={handleResetChange}
-              placeholder="E-MAIL을 입력해주세요"
-              className="auth-input auth-input-reset"
-              required
-            />
-          </div>
-          {isResetLinkFlow && (
-            <div className="mb-4">
-              <PasswordField
-                id="resetPassword"
-                name="resetPassword"
-                label="Password"
-                value={resetFormData.resetPassword}
-                onChange={handleResetChange}
-                disabled={isResetSubmitting}
-                placeholder="비밀번호를 입력해주세요"
-                required
-                showValidation
-              />
-            </div>
-          )}
-          <button
-            type="button"
-            disabled={isResetSubmitting}
-            className="mt-4 w-full rounded-xl bg-blue-700 py-4 text-sm font-bold text-white transition-all hover:bg-blue-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={handleResetPassword}
-          >
-            {isResetSubmitting ? '처리 중...' : isResetLinkFlow ? '비밀번호 재설정' : '재설정 링크 보내기'}
-          </button>
-        </DialogContent>
-      </Dialog>
+        isResetLinkFlow={isResetLinkFlow}
+        isResetSubmitting={isResetSubmitting}
+        resetEmail={resetFormData.resetEmail}
+        resetPassword={resetFormData.resetPassword}
+        onResetChange={handleResetChange}
+        onResetPassword={handleResetPassword}
+      />
     </>
   );
 }
