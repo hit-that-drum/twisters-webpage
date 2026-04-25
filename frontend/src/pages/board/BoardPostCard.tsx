@@ -1,12 +1,17 @@
 import { AiTwotonePushpin } from 'react-icons/ai';
 import { IoPersonCircleSharp } from 'react-icons/io5';
-import { FaClock } from 'react-icons/fa';
+import { FaClock, FaHeart, FaStar, FaThumbsDown, FaThumbsUp } from 'react-icons/fa';
 import { IoIosArrowBack, IoIosArrowDown, IoIosArrowForward, IoIosArrowUp } from 'react-icons/io';
 import { EditDeleteButton } from '@/common/components';
 import { formatDateTime, formatRelativeTime } from '@/common/lib/api/apiHelpers';
 import { COLLAPSED_POST_CONTENT_STYLE } from '@/pages/board/lib/boardConstants';
 import BoardCommentSection from '@/pages/board/BoardCommentSection';
-import type { BoardCommentItem, BoardPostItem } from '@/pages/board/lib/boardTypes';
+import type {
+  BoardCommentItem,
+  BoardPostItem,
+  BoardReactionSummary,
+  BoardReactionType,
+} from '@/pages/board/lib/boardTypes';
 
 interface BoardImagePreset {
   alt: string;
@@ -25,6 +30,8 @@ interface BoardPostCardProps {
   commentDraft: string;
   isSubmittingComment: boolean;
   deletingCommentKey: string | null;
+  reactions: BoardReactionSummary;
+  isSubmittingReaction: boolean;
   isLoggedIn: boolean;
   canDeleteComment: (comment: BoardCommentItem) => boolean;
   onOpenImageModal: (postId: number) => void;
@@ -33,6 +40,7 @@ interface BoardPostCardProps {
   onTogglePostExpand: (postId: number) => void;
   onOpenEditDialog: (post: BoardPostItem) => void;
   onDeletePost: (post: BoardPostItem) => void;
+  onToggleReaction: (postId: number, reactionType: BoardReactionType) => void;
   onCommentDraftChange: (postId: number, value: string) => void;
   onCreateComment: (postId: number) => void;
   onDeleteComment: (postId: number, comment: BoardCommentItem) => void;
@@ -50,6 +58,8 @@ export default function BoardPostCard({
   commentDraft,
   isSubmittingComment,
   deletingCommentKey,
+  reactions,
+  isSubmittingReaction,
   isLoggedIn,
   canDeleteComment,
   onOpenImageModal,
@@ -58,6 +68,7 @@ export default function BoardPostCard({
   onTogglePostExpand,
   onOpenEditDialog,
   onDeletePost,
+  onToggleReaction,
   onCommentDraftChange,
   onCreateComment,
   onDeleteComment,
@@ -73,6 +84,37 @@ export default function BoardPostCard({
     : {
         background: imagePreset.gradient,
       };
+  const reactionButtons: Array<{
+    key: BoardReactionType;
+    label: string;
+    count: number;
+    icon: typeof FaThumbsUp;
+  }> = [
+    {
+      key: 'thumbsUp',
+      label: 'Thumbs up',
+      count: reactions.thumbsUpCount,
+      icon: FaThumbsUp,
+    },
+    {
+      key: 'thumbsDown',
+      label: 'Thumbs down',
+      count: reactions.thumbsDownCount,
+      icon: FaThumbsDown,
+    },
+    {
+      key: 'favorite',
+      label: 'Favorite',
+      count: reactions.favoriteCount,
+      icon: FaStar,
+    },
+    {
+      key: 'heart',
+      label: 'Heart',
+      count: reactions.heartCount,
+      icon: FaHeart,
+    },
+  ];
 
   return (
     <article className="group">
@@ -249,6 +291,46 @@ export default function BoardPostCard({
                   {postContent}
                 </p>
               </div>
+
+              {isExpanded && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  {reactionButtons.map(({ key, label, count, icon: Icon }) => {
+                    const isActive = reactions.userReactions.includes(key);
+
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => onToggleReaction(post.id, key)}
+                        disabled={isSubmittingReaction}
+                        aria-pressed={isActive}
+                        aria-label={`${label} ${count}`}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                          isActive
+                            ? 'border-slate-900 bg-slate-900 text-white'
+                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-slate-100'
+                        } ${isSubmittingReaction ? 'cursor-wait opacity-70' : ''}`}
+                      >
+                        <Icon className={isActive ? 'text-white' : 'text-slate-500'} size="12px" />
+                        <span>{label}</span>
+                        <span
+                          className={`min-w-5 rounded-full px-1.5 py-0.5 text-[11px] ${
+                            isActive ? 'bg-white/15 text-white' : 'bg-white text-slate-600'
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  {!isLoggedIn && (
+                    <span className="text-xs font-medium text-slate-400">
+                      Login to react to this post.
+                    </span>
+                  )}
+                </div>
+              )}
 
               {isExpanded && (
                 <BoardCommentSection

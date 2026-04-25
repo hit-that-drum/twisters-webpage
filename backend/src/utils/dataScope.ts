@@ -9,6 +9,7 @@ interface ScopedTableNames {
   settlement: string;
   board: string;
   boardComments: string;
+  boardReactions: string;
   meetingSources: string;
   meetingAttendance: string;
   meetingAttendanceOverrides: string;
@@ -21,6 +22,7 @@ const TABLE_NAMES_BY_SCOPE: Record<DataScope, ScopedTableNames> = {
     settlement: 'settlement',
     board: 'board',
     boardComments: 'board_comments',
+    boardReactions: 'board_reactions',
     meetingSources: 'meeting_sources',
     meetingAttendance: 'meeting_attendance',
     meetingAttendanceOverrides: 'meeting_attendance_overrides',
@@ -31,6 +33,7 @@ const TABLE_NAMES_BY_SCOPE: Record<DataScope, ScopedTableNames> = {
     settlement: 'test_settlement',
     board: 'test_board',
     boardComments: 'test_board_comments',
+    boardReactions: 'test_board_reactions',
     meetingSources: 'test_meeting_sources',
     meetingAttendance: 'test_meeting_attendance',
     meetingAttendanceOverrides: 'test_meeting_attendance_overrides',

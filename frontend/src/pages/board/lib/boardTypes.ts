@@ -1,3 +1,15 @@
+export const BOARD_REACTION_TYPES = ['thumbsUp', 'thumbsDown', 'favorite', 'heart'] as const;
+
+export type BoardReactionType = (typeof BOARD_REACTION_TYPES)[number];
+
+export interface BoardReactionSummary {
+  thumbsUpCount: number;
+  thumbsDownCount: number;
+  favoriteCount: number;
+  heartCount: number;
+  userReactions: BoardReactionType[];
+}
+
 export interface BoardPostItem {
   id: number;
   authorId: number | null;
@@ -9,6 +21,7 @@ export interface BoardPostItem {
   imageUrl: string[];
   content: string;
   pinned: boolean;
+  reactions: BoardReactionSummary;
 }
 
 export interface BoardCommentItem {

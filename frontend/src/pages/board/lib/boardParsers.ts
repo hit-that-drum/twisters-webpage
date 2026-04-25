@@ -1,4 +1,47 @@
-import type { BoardCommentItem, BoardPostItem, BoardSortOption } from './boardTypes';
+import {
+  BOARD_REACTION_TYPES,
+  type BoardCommentItem,
+  type BoardPostItem,
+  type BoardReactionSummary,
+  type BoardReactionType,
+  type BoardSortOption,
+} from './boardTypes';
+
+export const createEmptyBoardReactionSummary = (): BoardReactionSummary => ({
+  thumbsUpCount: 0,
+  thumbsDownCount: 0,
+  favoriteCount: 0,
+  heartCount: 0,
+  userReactions: [],
+});
+
+const isBoardReactionType = (value: unknown): value is BoardReactionType => {
+  return typeof value === 'string' && BOARD_REACTION_TYPES.includes(value as BoardReactionType);
+};
+
+export const normalizeBoardReactionSummary = (rawValue: unknown): BoardReactionSummary => {
+  if (!rawValue || typeof rawValue !== 'object') {
+    return createEmptyBoardReactionSummary();
+  }
+
+  const row = rawValue as {
+    thumbsUpCount?: unknown;
+    thumbsDownCount?: unknown;
+    favoriteCount?: unknown;
+    heartCount?: unknown;
+    userReactions?: unknown;
+  };
+
+  return {
+    thumbsUpCount: typeof row.thumbsUpCount === 'number' ? row.thumbsUpCount : 0,
+    thumbsDownCount: typeof row.thumbsDownCount === 'number' ? row.thumbsDownCount : 0,
+    favoriteCount: typeof row.favoriteCount === 'number' ? row.favoriteCount : 0,
+    heartCount: typeof row.heartCount === 'number' ? row.heartCount : 0,
+    userReactions: Array.isArray(row.userReactions)
+      ? row.userReactions.filter((item): item is BoardReactionType => isBoardReactionType(item))
+      : [],
+  };
+};
 
 const normalizeImageUrlList = (rawValue: unknown): string[] => {
   if (Array.isArray(rawValue)) {
@@ -37,6 +80,7 @@ export const parseBoardPosts = (payload: unknown): BoardPostItem[] => {
         imageUrl?: unknown;
         content?: unknown;
         pinned?: unknown;
+        reactions?: unknown;
       };
 
       if (
@@ -78,6 +122,7 @@ export const parseBoardPosts = (payload: unknown): BoardPostItem[] => {
         imageUrl: normalizedImageUrl,
         content: row.content,
         pinned: normalizedPinned,
+        reactions: normalizeBoardReactionSummary(row.reactions),
       } satisfies BoardPostItem;
     })
     .filter((item): item is BoardPostItem => item !== null);

@@ -4,6 +4,7 @@ import { type AuthenticatedRequest } from '../types/common.types.js';
 import {
   type CreateBoardCommentDTO,
   type CreateBoardDTO,
+  type ToggleBoardReactionDTO,
   type UpdateBoardDTO,
 } from '../types/board.types.js';
 import { handleControllerError } from '../utils/controllerErrorHandler.js';
@@ -87,5 +88,19 @@ export const deleteBoardComment = async (req: Request, res: Response) => {
     return res.json({ message: '댓글이 삭제되었습니다.' });
   } catch (error) {
     return handleControllerError(res, error, '댓글 삭제 중 오류가 발생했습니다.', 'Board comment delete error');
+  }
+};
+
+export const toggleBoardReaction = async (req: Request, res: Response) => {
+  try {
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const payload = req.body as ToggleBoardReactionDTO;
+    const result = await boardService.toggleBoardReaction(authenticatedUser, req.params.id, payload);
+    return res.json({
+      message: result.active ? '게시글 반응이 등록되었습니다.' : '게시글 반응이 취소되었습니다.',
+      reactions: result.reactions,
+    });
+  } catch (error) {
+    return handleControllerError(res, error, '게시글 반응 처리 중 오류가 발생했습니다.', 'Board reaction toggle error');
   }
 };

@@ -1,13 +1,21 @@
 import pool from '../config/database.js';
 import {
+  BOARD_REACTION_TYPES,
   type BoardCommentLookupRow,
   type BoardCommentMutationPayload,
   type BoardCommentRow,
   type BoardListFilters,
   type BoardLookupRow,
   type BoardMutationPayload,
+  type BoardReactionCountRow,
+  type BoardReactionLookupRow,
+  type BoardReactionMutationPayload,
+  type BoardReactionSummary,
+  type BoardReactionType,
   type BoardRow,
   type BoardSortOption,
+  type BoardUserReactionRow,
+  createEmptyBoardReactionSummary,
 } from '../types/board.types.js';
 import { getScopedTableNames, type DataScope } from '../utils/dataScope.js';
 
@@ -23,6 +31,31 @@ let ensureBoardSchemaPromise: Promise<void> | null = null;
 type BoardImageColumnMeta = {
   data_type: string;
   udt_name: string;
+};
+
+const isBoardReactionType = (value: string): value is BoardReactionType => {
+  return BOARD_REACTION_TYPES.includes(value as BoardReactionType);
+};
+
+const assignReactionCount = (
+  summary: BoardReactionSummary,
+  reactionType: BoardReactionType,
+  count: number,
+) => {
+  switch (reactionType) {
+    case 'thumbsUp':
+      summary.thumbsUpCount = count;
+      return;
+    case 'thumbsDown':
+      summary.thumbsDownCount = count;
+      return;
+    case 'favorite':
+      summary.favoriteCount = count;
+      return;
+    case 'heart':
+      summary.heartCount = count;
+      return;
+  }
 };
 
 class BoardRepository {
@@ -131,6 +164,28 @@ class BoardRepository {
           )
         `);
 
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS board_reactions (
+            id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+            "boardId" INTEGER NOT NULL REFERENCES board(id) ON DELETE CASCADE,
+            "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            type VARCHAR(20) NOT NULL CHECK (type IN ('thumbsUp', 'thumbsDown', 'favorite', 'heart')),
+            "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE ("boardId", "userId", type)
+          )
+        `);
+
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS test_board_reactions (
+            id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+            "boardId" INTEGER NOT NULL REFERENCES test_board(id) ON DELETE CASCADE,
+            "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            type VARCHAR(20) NOT NULL CHECK (type IN ('thumbsUp', 'thumbsDown', 'favorite', 'heart')),
+            "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE ("boardId", "userId", type)
+          )
+        `);
+
         await pool.query('CREATE INDEX IF NOT EXISTS idx_board_create_date ON board ("createDate" DESC)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_board_author_id ON board ("authorId")');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_test_board_create_date ON test_board ("createDate" DESC)');
@@ -146,6 +201,18 @@ class BoardRepository {
         );
         await pool.query(
           'CREATE INDEX IF NOT EXISTS idx_test_board_comments_author_id ON test_board_comments ("authorId")',
+        );
+        await pool.query(
+          'CREATE INDEX IF NOT EXISTS idx_board_reactions_board_id ON board_reactions ("boardId", type)',
+        );
+        await pool.query(
+          'CREATE INDEX IF NOT EXISTS idx_board_reactions_user_id ON board_reactions ("userId")',
+        );
+        await pool.query(
+          'CREATE INDEX IF NOT EXISTS idx_test_board_reactions_board_id ON test_board_reactions ("boardId", type)',
+        );
+        await pool.query(
+          'CREATE INDEX IF NOT EXISTS idx_test_board_reactions_user_id ON test_board_reactions ("userId")',
         );
 
         await pool.query(`
@@ -231,6 +298,69 @@ class BoardRepository {
     return result.rows;
   }
 
+  async findReactionSummariesByBoardIds(
+    scope: DataScope,
+    boardIds: number[],
+    userId: number | null,
+  ): Promise<Record<number, BoardReactionSummary>> {
+    if (boardIds.length === 0) {
+      return {};
+    }
+
+    const boardReactionsTableName = getScopedTableNames(scope).boardReactions;
+    const summaryByBoardId = Object.fromEntries(
+      boardIds.map((boardId) => [boardId, createEmptyBoardReactionSummary()]),
+    ) as Record<number, BoardReactionSummary>;
+
+    const reactionCountsResult = await pool.query<BoardReactionCountRow>(
+      `SELECT "boardId", type, COUNT(*)::int AS "reactionCount"
+         FROM ${boardReactionsTableName}
+        WHERE "boardId" = ANY($1::int[])
+        GROUP BY "boardId", type`,
+      [boardIds],
+    );
+
+    reactionCountsResult.rows.forEach((row) => {
+      if (!isBoardReactionType(row.type)) {
+        return;
+      }
+
+      const summary = summaryByBoardId[row.boardId];
+      if (!summary) {
+        return;
+      }
+
+      assignReactionCount(summary, row.type, row.reactionCount);
+    });
+
+    if (userId === null) {
+      return summaryByBoardId;
+    }
+
+    const userReactionsResult = await pool.query<BoardUserReactionRow>(
+      `SELECT "boardId", type
+         FROM ${boardReactionsTableName}
+        WHERE "boardId" = ANY($1::int[])
+          AND "userId" = $2`,
+      [boardIds, userId],
+    );
+
+    userReactionsResult.rows.forEach((row) => {
+      if (!isBoardReactionType(row.type)) {
+        return;
+      }
+
+      const summary = summaryByBoardId[row.boardId];
+      if (!summary) {
+        return;
+      }
+
+      summary.userReactions.push(row.type);
+    });
+
+    return summaryByBoardId;
+  }
+
   async findById(scope: DataScope, boardId: number) {
     const boardTableName = getScopedTableNames(scope).board;
     const result = await pool.query<BoardLookupRow>(
@@ -256,6 +386,54 @@ class BoardRepository {
     );
 
     return result.rows[0]?.id ?? null;
+  }
+
+  async findReaction(
+    scope: DataScope,
+    boardId: number,
+    userId: number,
+    reactionType: BoardReactionType,
+  ) {
+    const boardReactionsTableName = getScopedTableNames(scope).boardReactions;
+    const result = await pool.query<BoardReactionLookupRow>(
+      `SELECT id
+         FROM ${boardReactionsTableName}
+        WHERE "boardId" = $1
+          AND "userId" = $2
+          AND type = $3
+        LIMIT 1`,
+      [boardId, userId, reactionType],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async createReaction(scope: DataScope, payload: BoardReactionMutationPayload) {
+    const boardReactionsTableName = getScopedTableNames(scope).boardReactions;
+    await pool.query(
+      `INSERT INTO ${boardReactionsTableName} ("boardId", "userId", type)
+       VALUES ($1, $2, $3)
+       ON CONFLICT ("boardId", "userId", type) DO NOTHING`,
+      [payload.boardId, payload.userId, payload.reactionType],
+    );
+  }
+
+  async deleteReaction(
+    scope: DataScope,
+    boardId: number,
+    userId: number,
+    reactionType: BoardReactionType,
+  ) {
+    const boardReactionsTableName = getScopedTableNames(scope).boardReactions;
+    const result = await pool.query(
+      `DELETE FROM ${boardReactionsTableName}
+        WHERE "boardId" = $1
+          AND "userId" = $2
+          AND type = $3`,
+      [boardId, userId, reactionType],
+    );
+
+    return result.rowCount ?? 0;
   }
 
   async updateById(scope: DataScope, boardId: number, payload: BoardMutationPayload) {

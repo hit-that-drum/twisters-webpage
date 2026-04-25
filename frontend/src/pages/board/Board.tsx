@@ -14,6 +14,7 @@ import useBoardComments from '@/pages/board/hooks/useBoardComments';
 import useBoardImageModal from '@/pages/board/hooks/useBoardImageModal';
 import useBoardPostMutations from '@/pages/board/hooks/useBoardPostMutations';
 import useBoardPosts from '@/pages/board/hooks/useBoardPosts';
+import useBoardReactions from '@/pages/board/hooks/useBoardReactions';
 import { BOARD_IMAGE_PRESETS } from '@/pages/board/lib/boardConstants';
 import type { BoardCommentItem, BoardPostItem } from '@/pages/board/lib/boardTypes';
 
@@ -29,7 +30,7 @@ export default function Board() {
 
   const requireAuthenticatedAction = useCallback(() => {
     if (!meInfo) {
-      enqueueSnackbar('로그인 후 게시글을 등록/수정/삭제할 수 있습니다.', { variant: 'error' });
+      enqueueSnackbar('로그인 후 게시판 기능을 이용할 수 있습니다.', { variant: 'error' });
       navigate('/signin', { replace: true });
       return false;
     }
@@ -90,6 +91,12 @@ export default function Board() {
     canDeleteComment,
     requireAuthenticatedAction,
     confirm,
+    onExpiredSession: handleExpiredSession,
+  });
+
+  const reactions = useBoardReactions({
+    boardPosts,
+    requireAuthenticatedAction,
     onExpiredSession: handleExpiredSession,
   });
 
@@ -176,6 +183,8 @@ export default function Board() {
                 commentDraft={comments.commentDraftByPost[post.id] ?? ''}
                 isSubmittingComment={comments.submittingCommentPostId === post.id}
                 deletingCommentKey={comments.deletingCommentKey}
+                reactions={reactions.reactionSummaryByPost[post.id] ?? post.reactions}
+                isSubmittingReaction={reactions.submittingReactionPostId === post.id}
                 isLoggedIn={Boolean(meInfo)}
                 canDeleteComment={canDeleteComment}
                 onOpenImageModal={imageModal.handleOpenImageModal}
@@ -185,6 +194,9 @@ export default function Board() {
                 onOpenEditDialog={mutations.handleOpenEditDialog}
                 onDeletePost={(targetPost) => {
                   void mutations.handleDeletePost(targetPost);
+                }}
+                onToggleReaction={(targetPostId, reactionType) => {
+                  void reactions.handleToggleReaction(targetPostId, reactionType);
                 }}
                 onCommentDraftChange={comments.handleCommentDraftChange}
                 onCreateComment={(targetPostId) => {

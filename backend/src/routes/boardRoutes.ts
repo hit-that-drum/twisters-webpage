@@ -14,6 +14,11 @@ router.post(
   passport.authenticate('jwt', { session: false }),
   boardController.createBoardComment,
 );
+router.post(
+  '/:id/reactions',
+  passport.authenticate('jwt', { session: false }),
+  boardController.toggleBoardReaction,
+);
 router.delete(
   '/:id/comments/:commentId',
   passport.authenticate('jwt', { session: false }),

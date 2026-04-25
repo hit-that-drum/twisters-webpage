@@ -13,6 +13,13 @@ interface BoardPostItem {
   imageUrl: string[];
   content: string;
   pinned: boolean;
+  reactions: {
+    thumbsUpCount: number;
+    thumbsDownCount: number;
+    favoriteCount: number;
+    heartCount: number;
+    userReactions: Array<'thumbsUp' | 'thumbsDown' | 'favorite' | 'heart'>;
+  };
 }
 
 interface BoardCommentItem {
@@ -37,6 +44,13 @@ const createPosts = (): BoardPostItem[] => [
     imageUrl: ['https://example.com/pinned-1.jpg', 'https://example.com/pinned-2.jpg'],
     content: 'Pinned content for the board page.',
     pinned: true,
+    reactions: {
+      thumbsUpCount: 6,
+      thumbsDownCount: 0,
+      favoriteCount: 2,
+      heartCount: 4,
+      userReactions: [],
+    },
   },
   {
     id: 102,
@@ -49,6 +63,13 @@ const createPosts = (): BoardPostItem[] => [
     imageUrl: [],
     content: 'Alpha body for search filtering.',
     pinned: false,
+    reactions: {
+      thumbsUpCount: 1,
+      thumbsDownCount: 0,
+      favoriteCount: 0,
+      heartCount: 1,
+      userReactions: [],
+    },
   },
   {
     id: 103,
@@ -61,6 +82,13 @@ const createPosts = (): BoardPostItem[] => [
     imageUrl: [],
     content: 'Beta content.',
     pinned: false,
+    reactions: {
+      thumbsUpCount: 0,
+      thumbsDownCount: 0,
+      favoriteCount: 1,
+      heartCount: 0,
+      userReactions: [],
+    },
   },
   {
     id: 104,
@@ -73,6 +101,13 @@ const createPosts = (): BoardPostItem[] => [
     imageUrl: [],
     content: 'Gamma content.',
     pinned: false,
+    reactions: {
+      thumbsUpCount: 0,
+      thumbsDownCount: 2,
+      favoriteCount: 0,
+      heartCount: 0,
+      userReactions: [],
+    },
   },
   {
     id: 105,
@@ -85,6 +120,13 @@ const createPosts = (): BoardPostItem[] => [
     imageUrl: [],
     content: 'Delta content.',
     pinned: false,
+    reactions: {
+      thumbsUpCount: 3,
+      thumbsDownCount: 1,
+      favoriteCount: 0,
+      heartCount: 2,
+      userReactions: [],
+    },
   },
   {
     id: 106,
@@ -97,6 +139,13 @@ const createPosts = (): BoardPostItem[] => [
     imageUrl: [],
     content: 'Epsilon content.',
     pinned: false,
+    reactions: {
+      thumbsUpCount: 0,
+      thumbsDownCount: 0,
+      favoriteCount: 0,
+      heartCount: 0,
+      userReactions: [],
+    },
   },
 ];
 
@@ -127,7 +176,9 @@ const findAccountByAuthorizationHeader = (
 };
 
 const resolvePostIdFromUrl = (route: Route) => {
-  const matches = route.request().url().match(/\/board\/(\d+)(?:\/comments(?:\/\d+)?)?(?:\?.*)?$/);
+  const matches = route.request().url().match(
+    /\/board\/(\d+)(?:\/comments(?:\/\d+)?|\/reactions)?(?:\?.*)?$/,
+  );
   return matches ? Number(matches[1]) : null;
 };
 
@@ -223,6 +274,13 @@ const installBoardMockServer = async (context: BrowserContext) => {
       imageUrl: Array.isArray(payload?.imageUrl) ? payload.imageUrl : [],
       content: payload?.content ?? '',
       pinned: account.isAdmin ? payload?.pinned === true : false,
+      reactions: {
+        thumbsUpCount: 0,
+        thumbsDownCount: 0,
+        favoriteCount: 0,
+        heartCount: 0,
+        userReactions: [],
+      },
     };
 
     posts = [createdPost, ...posts];
