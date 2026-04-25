@@ -2,6 +2,7 @@ import { memo } from 'react';
 import EditDeleteButton from '@/common/components/EditDeleteButton';
 import type { AdminUserRecord } from '@/entities/user/types';
 import AdminUserAvatar from '@/pages/adminpage/AdminUserAvatar';
+import AdminAuthProviderBadge from '@/pages/adminpage/components/AdminAuthProviderBadge';
 import {
   USER_STATUS_FILTER_LABEL,
   type UserStatusFilter,
@@ -100,6 +101,12 @@ function AdminUsersTable({
                   scope="col"
                   className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500"
                 >
+                  Sign-up Method
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500"
+                >
                   Email Verification
                 </th>
                 <th
@@ -121,18 +128,18 @@ function AdminUsersTable({
               {isLoading ? (
                 <tr>
                   <td
-                    colSpan={6}
-                    className="px-6 py-8 text-center text-sm font-medium text-slate-500"
-                  >
+                      colSpan={7}
+                      className="px-6 py-8 text-center text-sm font-medium text-slate-500"
+                    >
                     Loading users...
                   </td>
                 </tr>
               ) : pagedUsers.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
-                    className="px-6 py-8 text-center text-sm font-medium text-slate-500"
-                  >
+                      colSpan={7}
+                      className="px-6 py-8 text-center text-sm font-medium text-slate-500"
+                    >
                     No users found for this filter.
                   </td>
                 </tr>
@@ -177,6 +184,10 @@ function AdminUsersTable({
                           <span className={`size-2 rounded-full ${statusDotClassName}`} />
                           {statusLabel}
                         </div>
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <AdminAuthProviderBadge provider={user.authProvider} />
                       </td>
 
                       <td className="px-6 py-4">

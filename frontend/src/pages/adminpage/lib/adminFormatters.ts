@@ -1,6 +1,21 @@
-import type { AdminUserRecord } from '@/entities/user/types';
+import type { AdminUserRecord, AuthProvider } from '@/entities/user/types';
 import type { AdminUserFormState } from '@/pages/adminpage/AdminUserDetailModal';
 import { AVATAR_TONES } from './adminConstants';
+
+const AUTH_PROVIDER_META: Record<AuthProvider, { label: string; className: string }> = {
+  email: {
+    label: 'Email',
+    className: 'border-slate-200 bg-slate-50 text-slate-700',
+  },
+  google: {
+    label: 'Google',
+    className: 'border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-200/70',
+  },
+  kakao: {
+    label: 'Kakao',
+    className: 'border-[#E2C900] bg-[#FEE500] text-[#3C1E1E]',
+  },
+};
 
 const countFormatter = new Intl.NumberFormat('en-US');
 
@@ -54,6 +69,10 @@ export const getEmailVerificationMeta = (raw: string | null) => {
     className: 'bg-emerald-50 text-emerald-700',
     dotClassName: 'bg-emerald-500',
   };
+};
+
+export const getAuthProviderMeta = (provider: AuthProvider) => {
+  return AUTH_PROVIDER_META[provider];
 };
 
 export const getInitials = (name: string) => {

@@ -152,7 +152,7 @@ export default function PasswordField({
                 nested
               />
               <RuleStatus
-                passed={validation.hasNoTripleRepeat}
+                passed={hasValue && validation.hasNoTripleRepeat}
                 label="같은 문자는 3번 이상 반복 불가"
               />
             </ul>

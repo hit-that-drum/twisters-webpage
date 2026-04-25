@@ -79,6 +79,8 @@ export interface ManagedUserRow {
   isAllowed: boolean | number;
 }
 
+export type AdminAuthProvider = 'email' | 'google' | 'kakao';
+
 export interface AdminUserRow {
   id: number;
   name: string;
@@ -88,6 +90,8 @@ export interface AdminUserRow {
   isAllowed: boolean | number;
   createdAt: Date;
   emailVerifiedAt: Date | null;
+  hasGoogleAuth: boolean | number;
+  hasKakaoAuth: boolean | number;
 }
 
 export interface UserEmailRow {

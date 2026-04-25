@@ -198,6 +198,7 @@ export default function AdminPage() {
         emailOptional={false}
         userName={editingUser?.name}
         joinedLabel={editingUser ? formatJoinedDate(editingUser.createdAt) : undefined}
+        authProvider={editingUser?.authProvider}
         onFormChange={handleEditFormChange}
       />
 

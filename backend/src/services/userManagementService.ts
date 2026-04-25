@@ -7,7 +7,7 @@
 import { HttpError } from '../errors/httpError.js';
 import { authRepository } from '../repositories/authRepository.js';
 import { type AuthenticatedUser } from '../types/common.types.js';
-import { type AdminUserMutationDTO } from '../types/auth.types.js';
+import { type AdminAuthProvider, type AdminUserMutationDTO } from '../types/auth.types.js';
 import {
   isTestScopedAdmin,
   isValidEmail,
@@ -15,6 +15,21 @@ import {
   requireAuthenticatedUser,
   requireScopedAdminTarget,
 } from '../utils/authScope.js';
+
+const getAuthProvider = (row: {
+  hasGoogleAuth: boolean | number;
+  hasKakaoAuth: boolean | number;
+}): AdminAuthProvider => {
+  if (normalizeBoolean(row.hasGoogleAuth, false)) {
+    return 'google';
+  }
+
+  if (normalizeBoolean(row.hasKakaoAuth, false)) {
+    return 'kakao';
+  }
+
+  return 'email';
+};
 
 export const getPendingUsers = async (authenticatedUser: AuthenticatedUser | undefined) => {
   const currentUser = requireAuthenticatedUser(authenticatedUser);
@@ -45,6 +60,7 @@ export const getAdminUsers = async (authenticatedUser: AuthenticatedUser | undef
     isAllowed: normalizeBoolean(row.isAllowed, false),
     createdAt: row.createdAt,
     emailVerifiedAt: row.emailVerifiedAt,
+    authProvider: getAuthProvider(row),
   }));
 };
 

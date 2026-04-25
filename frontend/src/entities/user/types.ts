@@ -49,6 +49,8 @@ export interface PendingUserRecord {
   emailVerifiedAt: string | null;
 }
 
+export type AuthProvider = 'email' | 'google' | 'kakao';
+
 /** Full admin-console user row, including approval + role flags. */
 export interface AdminUserRecord {
   id: number;
@@ -59,6 +61,7 @@ export interface AdminUserRecord {
   isAllowed: boolean;
   createdAt: string;
   emailVerifiedAt: string | null;
+  authProvider: AuthProvider;
   phone?: string | null;
   department?: string | null;
   joinedAt?: string | null;

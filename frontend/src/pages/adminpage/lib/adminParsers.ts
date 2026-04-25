@@ -1,5 +1,11 @@
 import { normalizeBoolean } from '@/common/lib/parseUtils';
-import type { AdminUserRecord, PendingUserRecord } from '@/entities/user/types';
+import type { AdminUserRecord, AuthProvider, PendingUserRecord } from '@/entities/user/types';
+
+const parseAuthProvider = (rawValue: unknown): AuthProvider => {
+  return rawValue === 'google' || rawValue === 'kakao' || rawValue === 'email'
+    ? rawValue
+    : 'email';
+};
 
 export const parsePendingUsers = (payload: unknown): PendingUserRecord[] => {
   if (!Array.isArray(payload)) {
@@ -63,6 +69,7 @@ export const parseAdminUsers = (payload: unknown): AdminUserRecord[] => {
           isAllowed?: unknown;
           createdAt?: unknown;
           emailVerifiedAt?: unknown;
+          authProvider?: unknown;
         };
 
       if (
@@ -90,6 +97,7 @@ export const parseAdminUsers = (payload: unknown): AdminUserRecord[] => {
         createdAt: createdAtValue,
         emailVerifiedAt:
           typeof parsed.emailVerifiedAt === 'string' ? parsed.emailVerifiedAt : null,
+        authProvider: parseAuthProvider(parsed.authProvider),
       } satisfies AdminUserRecord;
     })
     .filter((row): row is AdminUserRecord => row !== null);
