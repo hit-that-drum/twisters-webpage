@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import EditDeleteButton from '@/common/components/EditDeleteButton';
+import { formatDateTime } from '@/common/lib/api/apiHelpers';
 import type { AdminUserRecord } from '@/entities/user/types';
 import AdminUserAvatar from '@/pages/adminpage/AdminUserAvatar';
 import AdminAuthProviderBadge from '@/pages/adminpage/components/AdminAuthProviderBadge';
@@ -9,7 +10,6 @@ import {
 } from '@/pages/adminpage/lib/adminConstants';
 import {
   formatCount,
-  formatJoinedDate,
   getEmailVerificationMeta,
 } from '@/pages/adminpage/lib/adminFormatters';
 
@@ -206,7 +206,7 @@ function AdminUsersTable({
                       </td>
 
                       <td className="px-6 py-4 text-sm text-slate-500">
-                        {formatJoinedDate(user.createdAt)}
+                        {formatDateTime(user.createdAt)}
                       </td>
 
                       <td className="px-6 py-4">

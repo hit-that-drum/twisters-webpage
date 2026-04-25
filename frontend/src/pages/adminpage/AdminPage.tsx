@@ -6,6 +6,7 @@ import GlobalButton from '@/common/components/GlobalButton';
 import type { TAction } from '@/common/components/GlobalModal';
 import useExpiredSession from '@/common/hooks/useExpiredSession';
 import LoadingComponent from '@/common/LoadingComponent';
+import { formatDateTime } from '@/common/lib/api/apiHelpers';
 import { useAuth } from '@/features';
 import AdminPendingUsersPanel from '@/pages/adminpage/components/AdminPendingUsersPanel';
 import AdminStatsCards from '@/pages/adminpage/components/AdminStatsCards';
@@ -15,7 +16,6 @@ import useAdminUserActions from '@/pages/adminpage/hooks/useAdminUserActions';
 import useAdminUserEditing from '@/pages/adminpage/hooks/useAdminUserEditing';
 import useAdminUserFilter from '@/pages/adminpage/hooks/useAdminUserFilter';
 import useAdminUserList from '@/pages/adminpage/hooks/useAdminUserList';
-import { formatJoinedDate } from '@/pages/adminpage/lib/adminFormatters';
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -197,7 +197,7 @@ export default function AdminPage() {
         disableStatusControl={false}
         emailOptional={false}
         userName={editingUser?.name}
-        joinedLabel={editingUser ? formatJoinedDate(editingUser.createdAt) : undefined}
+        joinedLabel={editingUser ? formatDateTime(editingUser.createdAt) : undefined}
         authProvider={editingUser?.authProvider}
         onFormChange={handleEditFormChange}
       />

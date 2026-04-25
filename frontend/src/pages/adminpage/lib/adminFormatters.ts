@@ -40,19 +40,6 @@ export const formatKoreanDateTime = (raw: string) => {
   });
 };
 
-export const formatJoinedDate = (raw: string) => {
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) {
-    return '-';
-  }
-
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: '2-digit',
-    year: 'numeric',
-  });
-};
-
 export const getEmailVerificationMeta = (raw: string | null) => {
   if (!raw) {
     return {
