@@ -89,30 +89,35 @@ export default function BoardPostCard({
     label: string;
     count: number;
     icon: typeof FaThumbsUp;
+    accentClassName: string;
   }> = [
     {
       key: 'thumbsUp',
       label: 'Thumbs up',
       count: reactions.thumbsUpCount,
       icon: FaThumbsUp,
+      accentClassName: 'text-emerald-600 bg-emerald-50 border-emerald-200',
     },
     {
       key: 'thumbsDown',
       label: 'Thumbs down',
       count: reactions.thumbsDownCount,
       icon: FaThumbsDown,
+      accentClassName: 'text-rose-600 bg-rose-50 border-rose-200',
     },
     {
       key: 'favorite',
       label: 'Favorite',
       count: reactions.favoriteCount,
       icon: FaStar,
+      accentClassName: 'text-amber-600 bg-amber-50 border-amber-200',
     },
     {
       key: 'heart',
       label: 'Heart',
       count: reactions.heartCount,
       icon: FaHeart,
+      accentClassName: 'text-pink-600 bg-pink-50 border-pink-200',
     },
   ];
 
@@ -294,7 +299,7 @@ export default function BoardPostCard({
 
               {isExpanded && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  {reactionButtons.map(({ key, label, count, icon: Icon }) => {
+                  {reactionButtons.map(({ key, label, count, icon: Icon, accentClassName }) => {
                     const isActive = reactions.userReactions.includes(key);
 
                     return (
@@ -305,18 +310,14 @@ export default function BoardPostCard({
                         disabled={isSubmittingReaction}
                         aria-pressed={isActive}
                         aria-label={`${label} ${count}`}
-                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                          isActive
-                            ? 'border-slate-900 bg-slate-900 text-white'
-                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-slate-100'
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${accentClassName} ${
+                          isActive ? 'shadow-sm ring-1 ring-current/10' : 'opacity-70 hover:opacity-100'
                         } ${isSubmittingReaction ? 'cursor-wait opacity-70' : ''}`}
                       >
-                        <Icon className={isActive ? 'text-white' : 'text-slate-500'} size="12px" />
+                        <Icon size="12px" />
                         <span>{label}</span>
                         <span
-                          className={`min-w-5 rounded-full px-1.5 py-0.5 text-[11px] ${
-                            isActive ? 'bg-white/15 text-white' : 'bg-white text-slate-600'
-                          }`}
+                          className="min-w-5 rounded-full border border-white/70 bg-white/80 px-1.5 py-0.5 text-[11px] text-current"
                         >
                           {count}
                         </span>
