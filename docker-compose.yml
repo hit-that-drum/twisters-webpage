@@ -28,10 +28,6 @@ services:
     environment:
       SUPABASE_DB_URL: postgresql://postgres:postgres@db:5432/twisters_db
       DB_SSL: 'false'
-      PORT: ${PORT}
-      JWT_SECRET: ${JWT_SECRET}
-      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL}
-      VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
     depends_on:
       - db
 
@@ -45,9 +41,6 @@ services:
       - frontend_node_modules:/app/node_modules
     ports:
       - '5173:5173'
-    environment:
-      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
-      - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
     depends_on:
       - backend
 

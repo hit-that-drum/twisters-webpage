@@ -7,4 +7,5 @@ export { default as ConfirmDialog } from '@/common/components/ConfirmDialog';
 export { default as GlobalButton } from '@/common/components/GlobalButton';
 export { default as GlobalImageUpload } from '@/common/components/GlobalImageUpload';
 export { default as GlobalModal } from '@/common/components/GlobalModal';
+export { default as FormModal } from '@/common/components/FormModal';
 export { default as useConfirmDialog } from '@/common/components/useConfirmDialog';

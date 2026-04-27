@@ -8,6 +8,8 @@ CREATE TABLE public.users (
   google_id VARCHAR(255),
   kakao_id VARCHAR(255),
   "profileImage" TEXT,
+  phone VARCHAR(30),
+  "birthDate" DATE,
   "emailVerifiedAt" TIMESTAMPTZ,
   "isAdmin" BOOLEAN NOT NULL DEFAULT FALSE,
   "isAllowed" BOOLEAN NOT NULL DEFAULT FALSE,

@@ -1,542 +1,75 @@
-import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { enqueueSnackbar } from 'notistack';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useAuth } from '@/features';
-import { apiFetch } from '@/common/lib/api/apiClient';
-import { EditDeleteButton, GlobalButton, useConfirmDialog } from '@/common/components';
-import MemberDetailModal, { type MemberFormState } from './MemberDetailModal';
-import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
-import { BiMoneyWithdraw } from 'react-icons/bi';
+import { GlobalButton, useConfirmDialog } from '@/common/components';
+import type { TAction } from '@/common/components/GlobalModal';
+import useExpiredSession from '@/common/hooks/useExpiredSession';
 import LoadingComponent from '@/common/LoadingComponent';
-
-interface MemberUser {
-  id: number;
-  name: string;
-  email: string | null;
-  profileImage: string | null;
-  isAdmin: boolean;
-  phone: string | null;
-  joinedAt: string | null;
-  birthDate: string | null;
-}
-
-interface ParsedMemberDuesStatus {
-  years: number[];
-  byMemberId: Record<number, Record<number, boolean>>;
-}
-
-interface ParsedMemberAttendanceStatus {
-  periods: Array<{ year: number; period: number }>;
-  byMemberId: Record<number, Record<string, boolean>>;
-}
-
-interface DuesDisplayMeta {
-  label: string;
-  icon: string;
-  className: string;
-}
-
-interface DetailInfoItem {
-  key: string;
-  label: string;
-  value: string | null;
-}
-
-const DEPOSIT_KEY_PATTERN = /^deposit(\d{4})$/;
-const ATTENDANCE_KEY_PATTERN = /^attendance(\d{4})_(1|2)$/;
-
-const getAttendanceStatusKey = (year: number, period: number) => `${year}_${period}`;
-
-const getMeetingPeriodLabel = (period: number) => `${period}차 모임`;
-
-const isFutureMeetingPeriod = (year: number, period: number) => {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-
-  if (year > currentYear) {
-    return true;
-  }
-
-  if (year < currentYear) {
-    return false;
-  }
-
-  return period === 2 && currentMonth <= 6;
-};
-
-const createDefaultMemberForm = (): MemberFormState => ({
-  name: '',
-  email: '',
-  phone: '',
-  birthDate: '',
-});
-
-const parseBoolean = (rawValue: unknown) => {
-  if (typeof rawValue === 'boolean') {
-    return rawValue;
-  }
-
-  if (typeof rawValue === 'number') {
-    return rawValue === 1;
-  }
-
-  if (typeof rawValue === 'string') {
-    const normalized = rawValue.trim().toLowerCase();
-    if (normalized === '1' || normalized === 'true') {
-      return true;
-    }
-    if (normalized === '0' || normalized === 'false') {
-      return false;
-    }
-  }
-
-  return false;
-};
-
-const parseMembers = (payload: unknown): MemberUser[] => {
-  if (!Array.isArray(payload)) {
-    return [];
-  }
-
-  return payload
-    .map((item) => {
-      if (!item || typeof item !== 'object') {
-        return null;
-      }
-
-      const row = item as {
-        id?: unknown;
-        name?: unknown;
-        email?: unknown;
-        profileImage?: unknown;
-        isAdmin?: unknown;
-        phone?: unknown;
-        joinedAt?: unknown;
-        birthDate?: unknown;
-      };
-
-      if (
-        typeof row.id !== 'number' ||
-        typeof row.name !== 'string' ||
-        (row.email !== null && row.email !== undefined && typeof row.email !== 'string')
-      ) {
-        return null;
-      }
-
-      const normalizeNullableString = (rawValue: unknown) => {
-        if (rawValue === null || rawValue === undefined) {
-          return null;
-        }
-
-        return typeof rawValue === 'string' ? rawValue : null;
-      };
-
-      return {
-        id: row.id,
-        name: row.name,
-        email: normalizeNullableString(row.email),
-        profileImage: normalizeNullableString(row.profileImage),
-        isAdmin: parseBoolean(row.isAdmin),
-        phone: normalizeNullableString(row.phone),
-        joinedAt: normalizeNullableString(row.joinedAt),
-        birthDate: normalizeNullableString(row.birthDate),
-      };
-    })
-    .filter((item): item is MemberUser => item !== null);
-};
-
-const parseMemberDuesStatus = (payload: unknown): ParsedMemberDuesStatus => {
-  if (!Array.isArray(payload)) {
-    return { years: [], byMemberId: {} };
-  }
-
-  const years = new Set<number>();
-  const byMemberId: Record<number, Record<number, boolean>> = {};
-
-  payload.forEach((item) => {
-    if (!item || typeof item !== 'object') {
-      return;
-    }
-
-    const row = item as Record<string, unknown>;
-    const memberId =
-      typeof row.memberId === 'number' && Number.isInteger(row.memberId) ? row.memberId : null;
-    if (!memberId) {
-      return;
-    }
-
-    if (!byMemberId[memberId]) {
-      byMemberId[memberId] = {};
-    }
-
-    Object.entries(row).forEach(([key, value]) => {
-      const matched = DEPOSIT_KEY_PATTERN.exec(key);
-      if (!matched) {
-        return;
-      }
-
-      const year = Number(matched[1]);
-      if (!Number.isInteger(year)) {
-        return;
-      }
-
-      years.add(year);
-      byMemberId[memberId][year] = parseBoolean(value);
-    });
-  });
-
-  return {
-    years: [...years].sort((a, b) => a - b),
-    byMemberId,
-  };
-};
-
-const parseMemberAttendanceStatus = (payload: unknown): ParsedMemberAttendanceStatus => {
-  if (!Array.isArray(payload)) {
-    return { periods: [], byMemberId: {} };
-  }
-
-  const periods = new Map<string, { year: number; period: number }>();
-  const byMemberId: Record<number, Record<string, boolean>> = {};
-
-  payload.forEach((item) => {
-    if (!item || typeof item !== 'object') {
-      return;
-    }
-
-    const row = item as Record<string, unknown>;
-    const memberId =
-      typeof row.memberId === 'number' && Number.isInteger(row.memberId) ? row.memberId : null;
-    if (!memberId) {
-      return;
-    }
-
-    if (!byMemberId[memberId]) {
-      byMemberId[memberId] = {};
-    }
-
-    Object.entries(row).forEach(([key, value]) => {
-      const matched = ATTENDANCE_KEY_PATTERN.exec(key);
-      if (!matched) {
-        return;
-      }
-
-      const year = Number(matched[1]);
-      const period = Number(matched[2]);
-      if (!Number.isInteger(year) || !Number.isInteger(period)) {
-        return;
-      }
-
-      const attendanceKey = getAttendanceStatusKey(year, period);
-      periods.set(attendanceKey, { year, period });
-      byMemberId[memberId][attendanceKey] = parseBoolean(value);
-    });
-  });
-
-  return {
-    periods: [...periods.values()].sort((left, right) => left.year - right.year || left.period - right.period),
-    byMemberId,
-  };
-};
-
-const toEditForm = (member: MemberUser): MemberFormState => ({
-  name: member.name,
-  email: member.email ?? '',
-  phone: member.phone ?? '',
-  birthDate: member.birthDate ?? '',
-});
-
-const parseApiResponse = async (response: Response): Promise<unknown> => {
-  const contentType = response.headers.get('content-type') || '';
-
-  if (contentType.includes('application/json')) {
-    try {
-      return await response.json();
-    } catch {
-      return null;
-    }
-  }
-
-  const text = await response.text();
-  return text || null;
-};
-
-const getApiMessage = (payload: unknown, fallback: string) => {
-  if (payload && typeof payload === 'object') {
-    const errorMessage = (payload as { error?: unknown }).error;
-    if (typeof errorMessage === 'string' && errorMessage.trim()) {
-      return errorMessage;
-    }
-
-    const successMessage = (payload as { message?: unknown }).message;
-    if (typeof successMessage === 'string' && successMessage.trim()) {
-      return successMessage;
-    }
-  }
-
-  if (typeof payload === 'string' && payload.trim()) {
-    return payload;
-  }
-
-  return fallback;
-};
-
-const getDuesDisplayMeta = (year: number, isPaid: boolean): DuesDisplayMeta => {
-  const currentYear = new Date().getFullYear();
-
-  if (year > currentYear) {
-    return {
-      label: '예정',
-      icon: '⌛',
-      className: 'bg-slate-100 text-slate-500',
-    };
-  }
-
-  if (isPaid) {
-    return {
-      label: '완납',
-      icon: '✓',
-      className: 'bg-emerald-50 text-emerald-700',
-    };
-  }
-
-  return {
-    label: '미납',
-    icon: '•',
-    className: 'bg-amber-50 text-amber-700',
-  };
-};
-
-const getMeetingAttendanceDisplayMeta = (
-  year: number,
-  period: number,
-  isAttended: boolean,
-): DuesDisplayMeta => {
-  if (isFutureMeetingPeriod(year, period)) {
-    return {
-      label: '예정',
-      icon: '⌛',
-      className: 'bg-slate-100 text-slate-500',
-    };
-  }
-
-  if (isAttended) {
-    return {
-      label: '참석',
-      icon: '✓',
-      className: 'bg-sky-50 text-sky-700',
-    };
-  }
-
-  return {
-    label: '미참석',
-    icon: '•',
-    className: 'bg-rose-50 text-rose-700',
-  };
-};
-
-const renderDetailValue = (value: string | null) => {
-  if (!value || !value.trim()) {
-    return '-';
-  }
-
-  return value;
-};
-
-const getMemberInitial = (name: string) => {
-  return name.trim().charAt(0).toUpperCase() || '?';
-};
-
-function MemberAvatar({
-  name,
-  profileImage,
-  containerClassName,
-  fallbackClassName,
-}: {
-  name: string;
-  profileImage: string | null;
-  containerClassName: string;
-  fallbackClassName: string;
-}) {
-  const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
-  const shouldShowProfileImage = Boolean(profileImage && profileImage !== failedImageSrc);
-
-  return (
-    <div aria-hidden="true" className={containerClassName}>
-      {shouldShowProfileImage ? (
-        <img
-          src={profileImage ?? undefined}
-          alt=""
-          className="h-full w-full object-cover"
-          onError={() => setFailedImageSrc(profileImage)}
-        />
-      ) : (
-        <span className={fallbackClassName}>{getMemberInitial(name)}</span>
-      )}
-    </div>
-  );
-}
-
-const DetailInfoDesc = (detailInfo: DetailInfoItem[]) => {
-  return (
-    <div className="grid grid-cols-1 gap-x-12 gap-y-7 md:grid-cols-2 xl:grid-cols-2">
-      {detailInfo.map((el) => {
-        return (
-          <div key={el.key} className="flex flex-col gap-1">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">{el.label}</p>
-            <p className="text-lg font-semibold text-slate-800">{renderDetailValue(el.value)}</p>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+import MemberDetailModal from '@/pages/member/MemberDetailModal';
+import MemberSidebar from '@/pages/member/components/MemberSidebar';
+import MemberProfileHeader from '@/pages/member/components/MemberProfileHeader';
+import MemberDuesPanel from '@/pages/member/components/MemberDuesPanel';
+import MemberAttendancePanel from '@/pages/member/components/MemberAttendancePanel';
+import useMemberList from '@/pages/member/hooks/useMemberList';
+import useMemberDues from '@/pages/member/hooks/useMemberDues';
+import useMemberAttendance from '@/pages/member/hooks/useMemberAttendance';
+import useMemberMutations from '@/pages/member/hooks/useMemberMutations';
+import type { DetailInfoItem } from '@/pages/member/lib/memberTypes';
 
 export default function Member() {
-  const navigate = useNavigate();
-  const { meInfo, isAuthLoading, logout } = useAuth();
+  const { meInfo, isAuthLoading } = useAuth();
   const { confirm, confirmDialog } = useConfirmDialog();
-
-  const [users, setUsers] = useState<MemberUser[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [openAddDialog, setOpenAddDialog] = useState(false);
-  const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [addMemberForm, setAddMemberForm] = useState<MemberFormState>(() =>
-    createDefaultMemberForm(),
-  );
-  const [editMemberForm, setEditMemberForm] = useState<MemberFormState>(() =>
-    createDefaultMemberForm(),
-  );
-  const [duesYears, setDuesYears] = useState<number[]>([]);
-  const [duesStatusByMemberId, setDuesStatusByMemberId] = useState<
-    Record<number, Record<number, boolean>>
-  >({});
-  const [attendancePeriods, setAttendancePeriods] = useState<Array<{ year: number; period: number }>>([]);
-  const [attendanceStatusByMemberId, setAttendanceStatusByMemberId] = useState<
-    Record<number, Record<string, boolean>>
-  >({});
-  const [updatingAttendanceKey, setUpdatingAttendanceKey] = useState<string | null>(null);
+  const handleExpiredSession = useExpiredSession();
 
   const canManageMembers = meInfo?.isAdmin === true;
+  const isAuthenticated = Boolean(meInfo);
 
-  const handleExpiredSession = useCallback(() => {
-    logout();
-    enqueueSnackbar('로그인이 만료되었습니다. 다시 로그인해주세요.', { variant: 'error' });
-    navigate('/signin', { replace: true });
-  }, [logout, navigate]);
+  const {
+    users,
+    selectedUser,
+    selectedUserId,
+    setSelectedUserId,
+    isLoading,
+    loadMembers,
+  } = useMemberList({
+    isAuthLoading,
+    isAuthenticated,
+    onExpiredSession: handleExpiredSession,
+  });
 
-  const loadMembers = useCallback(async () => {
-    setIsLoading(true);
+  const { duesYears, selectedUserDuesStatus, loadMemberDuesStatus } = useMemberDues({
+    isAuthLoading,
+    isAuthenticated,
+    selectedUserId,
+    onExpiredSession: handleExpiredSession,
+  });
 
-    try {
-      const response = await apiFetch('/member');
-      const payload = await parseApiResponse(response);
+  const {
+    attendancePeriods,
+    selectedUserAttendanceStatus,
+    updatingAttendanceKey,
+    loadMemberMeetingAttendanceStatus,
+    handleSetMeetingAttendance,
+    handleResetMeetingAttendance,
+  } = useMemberAttendance({
+    isAuthLoading,
+    isAuthenticated,
+    selectedUserId,
+    canManageMembers,
+    onExpiredSession: handleExpiredSession,
+  });
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          handleExpiredSession();
-          return;
-        }
+  const refetchAll = useCallback(
+    () =>
+      Promise.all([loadMembers(), loadMemberDuesStatus(), loadMemberMeetingAttendanceStatus()]),
+    [loadMembers, loadMemberDuesStatus, loadMemberMeetingAttendanceStatus],
+  );
 
-        enqueueSnackbar(
-          `회원 목록을 불러오지 못했습니다: ${getApiMessage(payload, '알 수 없는 에러')}`,
-          {
-            variant: 'error',
-          },
-        );
-        setUsers([]);
-        setSelectedUserId(null);
-        return;
-      }
-
-      const parsedMembers = parseMembers(payload);
-      setUsers(parsedMembers);
-
-      if (parsedMembers.length === 0) {
-        setSelectedUserId(null);
-        return;
-      }
-
-      setSelectedUserId((previous) => {
-        if (previous && parsedMembers.some((member) => member.id === previous)) {
-          return previous;
-        }
-
-        return parsedMembers[0]?.id ?? null;
-      });
-    } catch (error) {
-      console.error('Member list fetch error:', error);
-      enqueueSnackbar('회원 목록 조회 중 오류가 발생했습니다.', { variant: 'error' });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [handleExpiredSession]);
-
-  const loadMemberDuesStatus = useCallback(async () => {
-    try {
-      const response = await apiFetch('/member/dues/deposit-status');
-      const payload = await parseApiResponse(response);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          handleExpiredSession();
-          return;
-        }
-
-        enqueueSnackbar(
-          `회원 회비 현황을 불러오지 못했습니다: ${getApiMessage(payload, '알 수 없는 에러')}`,
-          {
-            variant: 'error',
-          },
-        );
-        setDuesYears([]);
-        setDuesStatusByMemberId({});
-        return;
-      }
-
-      const parsedDuesStatus = parseMemberDuesStatus(payload);
-      setDuesYears(parsedDuesStatus.years);
-      setDuesStatusByMemberId(parsedDuesStatus.byMemberId);
-    } catch (error) {
-      console.error('Member dues status fetch error:', error);
-      enqueueSnackbar('회원 회비 현황 조회 중 오류가 발생했습니다.', { variant: 'error' });
-    }
-  }, [handleExpiredSession]);
-
-  const loadMemberMeetingAttendanceStatus = useCallback(async () => {
-    try {
-      const response = await apiFetch('/member/meeting/attendance-status');
-      const payload = await parseApiResponse(response);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          handleExpiredSession();
-          return;
-        }
-
-        enqueueSnackbar(
-          `회원 모임 참석 현황을 불러오지 못했습니다: ${getApiMessage(payload, '알 수 없는 에러')}`,
-          {
-            variant: 'error',
-          },
-        );
-        setAttendancePeriods([]);
-        setAttendanceStatusByMemberId({});
-        return;
-      }
-
-      const parsedAttendanceStatus = parseMemberAttendanceStatus(payload);
-      setAttendancePeriods(parsedAttendanceStatus.periods);
-      setAttendanceStatusByMemberId(parsedAttendanceStatus.byMemberId);
-    } catch (error) {
-      console.error('Member meeting attendance status fetch error:', error);
-      enqueueSnackbar('회원 모임 참석 현황 조회 중 오류가 발생했습니다.', { variant: 'error' });
-    }
-  }, [handleExpiredSession]);
+  const mutations = useMemberMutations({
+    selectedUser,
+    confirm,
+    refetchAll,
+    onExpiredSession: handleExpiredSession,
+  });
 
   useEffect(() => {
     if (isAuthLoading) {
@@ -545,39 +78,8 @@ export default function Member() {
 
     if (!meInfo) {
       handleExpiredSession();
-      return;
     }
-
-    void Promise.all([loadMembers(), loadMemberDuesStatus(), loadMemberMeetingAttendanceStatus()]);
-  }, [
-    handleExpiredSession,
-    isAuthLoading,
-    loadMemberDuesStatus,
-    loadMemberMeetingAttendanceStatus,
-    loadMembers,
-    meInfo,
-  ]);
-
-  const selectedUser = useMemo(
-    () => users.find((user) => user.id === selectedUserId) ?? null,
-    [selectedUserId, users],
-  );
-
-  const selectedUserDuesStatus = useMemo(() => {
-    if (!selectedUser) {
-      return {} as Record<number, boolean>;
-    }
-
-    return duesStatusByMemberId[selectedUser.id] ?? ({} as Record<number, boolean>);
-  }, [duesStatusByMemberId, selectedUser]);
-
-  const selectedUserAttendanceStatus = useMemo(() => {
-    if (!selectedUser) {
-      return {} as Record<string, boolean>;
-    }
-
-    return attendanceStatusByMemberId[selectedUser.id] ?? ({} as Record<string, boolean>);
-  }, [attendanceStatusByMemberId, selectedUser]);
+  }, [handleExpiredSession, isAuthLoading, meInfo]);
 
   const userDetailInfo = useMemo<DetailInfoItem[]>(() => {
     if (!selectedUser) {
@@ -585,329 +87,21 @@ export default function Member() {
     }
 
     return [
-      {
-        key: 'email',
-        label: 'Email',
-        value: selectedUser.email,
-      },
-      {
-        key: 'phone',
-        label: 'Phone',
-        value: selectedUser.phone,
-      },
-      {
-        key: 'birthDate',
-        label: 'Birth Date',
-        value: selectedUser.birthDate,
-      },
-      {
-        key: 'joinedAt',
-        label: 'Joined At',
-        value: selectedUser.joinedAt,
-      },
+      { key: 'email', label: 'Email', value: selectedUser.email },
+      { key: 'phone', label: 'Phone', value: selectedUser.phone },
+      { key: 'birthDate', label: 'Birth Date', value: selectedUser.birthDate },
+      { key: 'joinedAt', label: 'Joined At', value: selectedUser.joinedAt },
     ];
   }, [selectedUser]);
-
-  const handleOpenAddDialog = () => {
-    setAddMemberForm(createDefaultMemberForm());
-    setOpenAddDialog(true);
-  };
-
-  const handleCloseAddDialog = (event: object, reason: ModalCloseReason) => {
-    void event;
-    void reason;
-
-    if (isSubmitting) {
-      return;
-    }
-
-    setOpenAddDialog(false);
-  };
-
-  const handleOpenEditDialog = () => {
-    if (!selectedUser) {
-      enqueueSnackbar('먼저 수정할 회원을 선택해주세요.', { variant: 'error' });
-      return;
-    }
-
-    setEditMemberForm(toEditForm(selectedUser));
-    setOpenEditDialog(true);
-  };
-
-  const handleCloseEditDialog = (event: object, reason: ModalCloseReason) => {
-    void event;
-    void reason;
-
-    if (isSubmitting) {
-      return;
-    }
-
-    setOpenEditDialog(false);
-  };
-
-  const handleChangeAddForm = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = event.target;
-    setAddMemberForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
-  };
-
-  const handleChangeEditForm = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = event.target;
-    setEditMemberForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
-  };
-
-  const handleAddDateChange = (field: 'birthDate', value: string) => {
-    setAddMemberForm((previous) => ({
-      ...previous,
-      [field]: value,
-    }));
-  };
-
-  const handleEditDateChange = (field: 'birthDate', value: string) => {
-    setEditMemberForm((previous) => ({
-      ...previous,
-      [field]: value,
-    }));
-  };
-
-  const handleCreateMember = async () => {
-    setIsSubmitting(true);
-
-    try {
-      const response = await apiFetch('/member', {
-        method: 'POST',
-        body: JSON.stringify(addMemberForm),
-      });
-      const payload = await parseApiResponse(response);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          handleExpiredSession();
-          return;
-        }
-
-        enqueueSnackbar(`회원 등록 실패: ${getApiMessage(payload, '알 수 없는 에러')}`, {
-          variant: 'error',
-        });
-        return;
-      }
-
-      enqueueSnackbar(getApiMessage(payload, '회원이 등록되었습니다.'), { variant: 'success' });
-      setOpenAddDialog(false);
-      await Promise.all([loadMembers(), loadMemberDuesStatus(), loadMemberMeetingAttendanceStatus()]);
-    } catch (error) {
-      console.error('Member create error:', error);
-      enqueueSnackbar('회원 등록 중 오류가 발생했습니다.', { variant: 'error' });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleUpdateMember = async () => {
-    if (!selectedUser) {
-      enqueueSnackbar('수정할 회원을 찾을 수 없습니다.', { variant: 'error' });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const response = await apiFetch(`/member/${selectedUser.id}`, {
-        method: 'PUT',
-        body: JSON.stringify(editMemberForm),
-      });
-      const payload = await parseApiResponse(response);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          handleExpiredSession();
-          return;
-        }
-
-        enqueueSnackbar(`회원 수정 실패: ${getApiMessage(payload, '알 수 없는 에러')}`, {
-          variant: 'error',
-        });
-        return;
-      }
-
-      enqueueSnackbar(getApiMessage(payload, '회원 정보가 수정되었습니다.'), {
-        variant: 'success',
-      });
-      setOpenEditDialog(false);
-      await Promise.all([loadMembers(), loadMemberDuesStatus(), loadMemberMeetingAttendanceStatus()]);
-    } catch (error) {
-      console.error('Member update error:', error);
-      enqueueSnackbar('회원 수정 중 오류가 발생했습니다.', { variant: 'error' });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDeleteMember = async () => {
-    if (!selectedUser) {
-      enqueueSnackbar('삭제할 회원을 찾을 수 없습니다.', { variant: 'error' });
-      return;
-    }
-
-    const isConfirmed = await confirm({
-      title: '회원 삭제',
-      description: `정말로 '${selectedUser.name}' 회원을 삭제하시겠습니까?`,
-      confirmLabel: '삭제',
-      confirmButtonStyle: 'error',
-    });
-    if (!isConfirmed) {
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const response = await apiFetch(`/member/${selectedUser.id}`, {
-        method: 'DELETE',
-      });
-      const payload = await parseApiResponse(response);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          handleExpiredSession();
-          return;
-        }
-
-        enqueueSnackbar(`회원 삭제 실패: ${getApiMessage(payload, '알 수 없는 에러')}`, {
-          variant: 'error',
-        });
-        return;
-      }
-
-      enqueueSnackbar(getApiMessage(payload, '회원이 삭제되었습니다.'), { variant: 'success' });
-      setOpenEditDialog(false);
-      await Promise.all([loadMembers(), loadMemberDuesStatus(), loadMemberMeetingAttendanceStatus()]);
-    } catch (error) {
-      console.error('Member delete error:', error);
-      enqueueSnackbar('회원 삭제 중 오류가 발생했습니다.', { variant: 'error' });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSetMeetingAttendance = useCallback(
-    async (year: number, period: number, attended: boolean) => {
-      if (!selectedUser || !canManageMembers) {
-        return;
-      }
-
-      const attendanceKey = getAttendanceStatusKey(year, period);
-      setUpdatingAttendanceKey(attendanceKey);
-
-      try {
-        const response = await apiFetch(
-          `/member/${selectedUser.id}/meeting/attendance/${year}/${period}`,
-          {
-          method: 'PATCH',
-          body: JSON.stringify({ attended }),
-          },
-        );
-        const payload = await parseApiResponse(response);
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            handleExpiredSession();
-            return;
-          }
-
-          enqueueSnackbar(
-            `회원 모임 참석 상태 저장 실패: ${getApiMessage(payload, '알 수 없는 에러')}`,
-            {
-              variant: 'error',
-            },
-          );
-          return;
-        }
-
-        enqueueSnackbar(
-          getApiMessage(payload, `${year}년 ${getMeetingPeriodLabel(period)} 참석 여부가 저장되었습니다.`),
-          {
-            variant: 'success',
-          },
-        );
-        await loadMemberMeetingAttendanceStatus();
-      } catch (error) {
-        console.error('Member meeting attendance update error:', error);
-        enqueueSnackbar('회원 모임 참석 상태 저장 중 오류가 발생했습니다.', { variant: 'error' });
-      } finally {
-        setUpdatingAttendanceKey(null);
-      }
-    },
-    [canManageMembers, handleExpiredSession, loadMemberMeetingAttendanceStatus, selectedUser],
-  );
-
-  const handleResetMeetingAttendance = useCallback(
-    async (year: number, period: number) => {
-      if (!selectedUser || !canManageMembers) {
-        return;
-      }
-
-      const attendanceKey = getAttendanceStatusKey(year, period);
-      setUpdatingAttendanceKey(attendanceKey);
-
-      try {
-        const response = await apiFetch(
-          `/member/${selectedUser.id}/meeting/attendance/${year}/${period}`,
-          {
-            method: 'DELETE',
-          },
-        );
-        const payload = await parseApiResponse(response);
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            handleExpiredSession();
-            return;
-          }
-
-          enqueueSnackbar(
-            `회원 모임 참석 수동 설정 해제 실패: ${getApiMessage(payload, '알 수 없는 에러')}`,
-            {
-              variant: 'error',
-            },
-          );
-          return;
-        }
-
-        enqueueSnackbar(
-          getApiMessage(payload, `${year}년 ${getMeetingPeriodLabel(period)} 수동 설정을 해제했습니다.`),
-          {
-            variant: 'success',
-          },
-        );
-        await loadMemberMeetingAttendanceStatus();
-      } catch (error) {
-        console.error('Member meeting attendance reset error:', error);
-        enqueueSnackbar('회원 모임 참석 수동 설정 해제 중 오류가 발생했습니다.', {
-          variant: 'error',
-        });
-      } finally {
-        setUpdatingAttendanceKey(null);
-      }
-    },
-    [canManageMembers, handleExpiredSession, loadMemberMeetingAttendanceStatus, selectedUser],
-  );
-
-  // ===== 정리한 코드 =====
 
   const addModalActions: TAction[] = [
     {
       label: '저장',
       onClick: () => {
-        void handleCreateMember();
+        void mutations.handleCreateMember();
       },
       buttonStyle: 'confirm',
-      disabled: isSubmitting,
+      disabled: mutations.isSubmitting,
     },
   ];
 
@@ -915,18 +109,18 @@ export default function Member() {
     {
       label: '삭제',
       onClick: () => {
-        void handleDeleteMember();
+        void mutations.handleDeleteMember();
       },
       buttonStyle: 'error',
-      disabled: isSubmitting,
+      disabled: mutations.isSubmitting,
     },
     {
       label: '수정',
       onClick: () => {
-        void handleUpdateMember();
+        void mutations.handleUpdateMember();
       },
       buttonStyle: 'confirm',
-      disabled: isSubmitting,
+      disabled: mutations.isSubmitting,
     },
   ];
 
@@ -946,7 +140,7 @@ export default function Member() {
 
           {canManageMembers && (
             <GlobalButton
-              onClick={handleOpenAddDialog}
+              onClick={mutations.handleOpenAddDialog}
               label="ADD MEMBER"
               iconBasicMappingType="ADD"
             />
@@ -954,225 +148,39 @@ export default function Member() {
         </div>
 
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-          <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:col-span-3 lg:sticky lg:top-6">
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
-              <h3
-                id="member-directory-heading"
-                className="text-sm font-bold uppercase tracking-wider text-slate-500"
-              >
-                Member Directory
-              </h3>
-            </div>
-
-            <div
-              className="flex flex-col"
-              role="listbox"
-              aria-labelledby="member-directory-heading"
-            >
-              {users.length === 0 ? (
-                <p className="px-4 py-5 text-sm font-medium text-slate-500">
-                  No members available.
-                </p>
-              ) : (
-                users.map((user) => {
-                  const isActive = user.id === selectedUserId;
-
-                  return (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => setSelectedUserId(user.id)}
-                      role="option"
-                      aria-selected={isActive}
-                      tabIndex={isActive ? 0 : -1}
-                      className={`flex w-full items-center gap-3 border-r-4 px-4 py-3 text-left transition-all ${
-                        isActive
-                          ? 'border-amber-300 bg-amber-50/60 text-slate-900'
-                          : 'border-transparent text-slate-600 hover:bg-slate-50'
-                      } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-inset`}
-                    >
-                      <MemberAvatar
-                        name={user.name}
-                        profileImage={user.profileImage}
-                        containerClassName={`inline-flex size-8 items-center justify-center overflow-hidden rounded-full text-xs font-bold ${
-                          isActive ? 'bg-amber-200 text-amber-800' : 'bg-slate-100 text-slate-500'
-                        }`}
-                        fallbackClassName="text-xs font-bold"
-                      />
-
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={`block truncate text-sm ${
-                            isActive ? 'font-bold' : 'font-semibold'
-                          }`}
-                        >
-                          {user.name}
-                        </span>
-                        <span className="block truncate text-xs text-slate-400">
-                          {renderDetailValue(user.email)}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </aside>
+          <MemberSidebar
+            users={users}
+            selectedUserId={selectedUserId}
+            onSelectUser={setSelectedUserId}
+          />
 
           <section className="flex flex-col gap-6 lg:col-span-9">
             {selectedUser ? (
               <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-200/60">
-                <div className="p-6 md:p-8">
-                  <div className="mb-8 flex flex-col gap-5 border-b border-slate-100 pb-8 md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center gap-5">
-                      <MemberAvatar
-                        key={`${selectedUser.id}:${selectedUser.profileImage ?? ''}`}
-                        name={selectedUser.name}
-                        profileImage={selectedUser.profileImage}
-                        containerClassName="inline-flex size-24 items-center justify-center overflow-hidden rounded-full border-4 border-amber-300 bg-slate-100 text-4xl font-black text-slate-500 shadow-inner"
-                        fallbackClassName="text-4xl font-black text-slate-500"
-                      />
+                <MemberProfileHeader
+                  selectedUser={selectedUser}
+                  detailInfo={userDetailInfo}
+                  canManageMembers={canManageMembers}
+                  onEditClick={mutations.handleOpenEditDialog}
+                />
 
-                      <div>
-                        <h2 className="text-3xl font-black tracking-tight text-slate-900">
-                          {selectedUser.name}
-                        </h2>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">
-                            {selectedUser.isAdmin ? 'Administrator' : 'Member'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                <MemberDuesPanel
+                  duesYears={duesYears}
+                  selectedUserDuesStatus={selectedUserDuesStatus}
+                />
 
-                    {canManageMembers && (
-                      <EditDeleteButton
-                        onEditClick={handleOpenEditDialog}
-                        isExisteDeleteButton={false}
-                      />
-                    )}
-                  </div>
-
-                  {DetailInfoDesc(userDetailInfo)}
-                </div>
-
-                <div className="border-t border-slate-100 bg-slate-50 px-6 py-6 md:px-8">
-                  <h3 className="mb-5 flex items-center gap-2 text-lg font-bold text-slate-900">
-                    <span aria-hidden="true" className="text-amber-500">
-                      <BiMoneyWithdraw />
-                    </span>
-                    회비 입금 여부
-                  </h3>
-
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    {duesYears.length > 0 ? (
-                      duesYears.map((year) => {
-                        const isPaid = selectedUserDuesStatus[year] === true;
-                        const statusMeta = getDuesDisplayMeta(year, isPaid);
-
-                        return (
-                          <div
-                            key={`dues-${year}`}
-                            className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3"
-                          >
-                            <span className="font-bold text-slate-600">{year}년</span>
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold ${statusMeta.className}`}
-                            >
-                              <span aria-hidden="true">{statusMeta.icon}</span>
-                              {statusMeta.label}
-                            </span>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-500">
-                        회비 데이터 없음
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-100 bg-white px-6 py-6 md:px-8">
-                  <h3 className="mb-5 flex items-center gap-2 text-lg font-bold text-slate-900">
-                    <span aria-hidden="true" className="text-sky-500">
-                      📅
-                    </span>
-                    연도/차수별 모임 참석 여부
-                  </h3>
-
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    {attendancePeriods.length > 0 ? (
-                      attendancePeriods.map(({ year, period }) => {
-                        const attendanceKey = getAttendanceStatusKey(year, period);
-                        const isAttended = selectedUserAttendanceStatus[attendanceKey] === true;
-                        const statusMeta = getMeetingAttendanceDisplayMeta(year, period, isAttended);
-                        const isUpdatingYear = updatingAttendanceKey === attendanceKey;
-
-                        return (
-                          <div
-                            key={`attendance-${attendanceKey}`}
-                            className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
-                          >
-                            <div className="flex flex-col gap-1">
-                              <span className="font-bold text-slate-600">{year}년</span>
-                              <span className="text-xs font-semibold text-slate-400">
-                                {getMeetingPeriodLabel(period)}
-                              </span>
-                            </div>
-                            <div className="flex flex-col items-end gap-2">
-                              <span
-                                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold ${statusMeta.className}`}
-                              >
-                                <span aria-hidden="true">{statusMeta.icon}</span>
-                                {statusMeta.label}
-                              </span>
-
-                              {canManageMembers && (
-                                <div className="flex flex-wrap justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      void handleSetMeetingAttendance(year, period, true);
-                                    }}
-                                    disabled={isUpdatingYear}
-                                    className="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 transition-colors hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    {isUpdatingYear ? '저장 중...' : '참석'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      void handleSetMeetingAttendance(year, period, false);
-                                    }}
-                                    disabled={isUpdatingYear}
-                                    className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    미참석
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      void handleResetMeetingAttendance(year, period);
-                                    }}
-                                    disabled={isUpdatingYear}
-                                    className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    자동
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">
-                        모임 참석 데이터 없음
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <MemberAttendancePanel
+                  attendancePeriods={attendancePeriods}
+                  selectedUserAttendanceStatus={selectedUserAttendanceStatus}
+                  updatingAttendanceKey={updatingAttendanceKey}
+                  canManageMembers={canManageMembers}
+                  onSetAttendance={(year, period, attended) => {
+                    void handleSetMeetingAttendance(year, period, attended);
+                  }}
+                  onResetAttendance={(year, period) => {
+                    void handleResetMeetingAttendance(year, period);
+                  }}
+                />
               </article>
             ) : (
               <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-sm font-semibold text-slate-500 shadow-sm">
@@ -1185,26 +193,26 @@ export default function Member() {
 
       <MemberDetailModal
         type="ADD"
-        open={openAddDialog}
-        handleClose={handleCloseAddDialog}
+        open={mutations.openAddDialog}
+        handleClose={mutations.handleCloseAddDialog}
         title="ADD MEMBER"
         actions={addModalActions}
-        form={addMemberForm}
-        isSubmitting={isSubmitting}
-        onFormChange={handleChangeAddForm}
-        onDateChange={handleAddDateChange}
+        form={mutations.addMemberForm}
+        isSubmitting={mutations.isSubmitting}
+        onFormChange={mutations.handleChangeAddForm}
+        onDateChange={mutations.handleAddDateChange}
       />
 
       <MemberDetailModal
         type="EDIT"
-        open={openEditDialog}
-        handleClose={handleCloseEditDialog}
+        open={mutations.openEditDialog}
+        handleClose={mutations.handleCloseEditDialog}
         title="EDIT MEMBER"
         actions={editModalActions}
-        form={editMemberForm}
-        isSubmitting={isSubmitting}
-        onFormChange={handleChangeEditForm}
-        onDateChange={handleEditDateChange}
+        form={mutations.editMemberForm}
+        isSubmitting={mutations.isSubmitting}
+        onFormChange={mutations.handleChangeEditForm}
+        onDateChange={mutations.handleEditDateChange}
       />
 
       {confirmDialog}

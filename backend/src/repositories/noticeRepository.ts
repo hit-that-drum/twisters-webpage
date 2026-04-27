@@ -1,4 +1,4 @@
-import pool from '../db.js';
+import pool from '../config/database.js';
 import { type NoticeMutationPayload, type NoticeRow } from '../types/notice.types.js';
 import { getScopedTableNames, type DataScope } from '../utils/dataScope.js';
 

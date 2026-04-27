@@ -1,478 +1,110 @@
+/**
+ * Auth facade: exposes the public surface the controller depends on. Core
+ * local-credentials flows (sign-in session issue, sign-up, profile fetch,
+ * profile image, password reset, session refresh, heartbeat, logout) live
+ * here; OAuth, email verification, admin user-management, and password
+ * reset are delegated to their dedicated services so each feature can
+ * evolve independently without churning the controller.
+ */
 import bcrypt from 'bcrypt';
-import crypto from 'crypto';
-import { OAuth2Client } from 'google-auth-library';
 import { HttpError } from '../errors/httpError.js';
 import { authRepository } from '../repositories/authRepository.js';
 import {
   canSendEmails,
-  canSendPasswordResetEmails,
-  sendPasswordResetEmail,
-  sendSignupVerificationEmail,
 } from './emailService.js';
+import {
+  authenticateWithGoogle,
+} from './googleAuthService.js';
+import {
+  authenticateWithKakao,
+} from './kakaoAuthService.js';
+import {
+  resendVerificationEmail,
+  sendEmailVerification,
+  verifyEmail,
+} from './emailVerificationService.js';
+import {
+  approveUser,
+  declineUser,
+  deleteUser,
+  deleteUserProfileImage,
+  getAdminUsers,
+  getPendingUsers,
+  updateUser,
+} from './userManagementService.js';
 import {
   createSessionAuthResponse,
   refreshSessionAuthResponse,
   revokeSessionById,
   touchSessionActivity,
-} from '../sessionService.js';
+} from './sessionService.js';
+import { passwordResetService } from './auth/passwordResetService.js';
 import { type AuthenticatedUser } from '../types/common.types.js';
 import {
   type AdminUserMutationDTO,
-  type KakaoAuthDTO,
   type GoogleAuthDTO,
+  type KakaoAuthDTO,
   type LocalAuthUser,
   type MeUser,
   type PendingSignUpResponse,
   type RefreshSessionDTO,
-  type ResendVerificationEmailDTO,
   type RequestResetDTO,
+  type ResendVerificationEmailDTO,
   type ResetPasswordDTO,
   type SignUpDTO,
+  type UpdateMeDTO,
   type UpdateProfileImageDTO,
   type VerifyEmailDTO,
   type VerifyResetTokenDTO,
 } from '../types/auth.types.js';
+import {
+  isTestUserName,
+  isValidEmail,
+  normalizeBoolean,
+  requireAuthenticatedUser,
+} from '../utils/authScope.js';
 import { evaluatePasswordPolicy, PASSWORD_POLICY_ERROR_MESSAGE } from '../utils/passwordPolicy.js';
+import { normalizeOptionalPhoneNumber, normalizePhoneNumber } from '../utils/phoneNumber.js';
 
 const SALT_ROUNDS = 10;
-const RESET_TOKEN_TTL_MINUTES = 30;
-const EMAIL_VERIFICATION_TOKEN_TTL_MINUTES = 60 * 24 * 3;
-const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || 'http://localhost:5173';
 const isProduction = process.env.NODE_ENV === 'production';
 
-const readRequiredEnv = (...candidates: Array<string | undefined>) => {
-  for (const value of candidates) {
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
-    }
+const normalizeOptionalBirthDate = (rawValue: unknown) => {
+  if (rawValue === null || rawValue === undefined) {
+    return null;
   }
 
-  return undefined;
-};
-
-const readOptionalKakaoClientSecret = () => {
-  const candidate = process.env.KAKAO_CLIENT_SECRET?.trim();
-  if (!candidate || candidate === 'your-kakao-client-secret') {
-    return undefined;
+  if (typeof rawValue !== 'string') {
+    throw new HttpError(400, '생년월일 형식이 올바르지 않습니다.');
   }
 
-  return candidate;
-};
-
-const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID;
-const KAKAO_REST_API_KEY = readRequiredEnv(process.env.VITE_KAKAO_REST_API_KEY);
-const KAKAO_CLIENT_SECRET = readOptionalKakaoClientSecret();
-const KAKAO_REDIRECT_URI = readRequiredEnv(process.env.VITE_KAKAO_REDIRECT_URI);
-const oauth2Client = new OAuth2Client(GOOGLE_CLIENT_ID);
-const shouldLogOAuthDebug = process.env.NODE_ENV !== 'production';
-
-const logKakaoOAuthDebug = (...args: unknown[]) => {
-  if (shouldLogOAuthDebug) {
-    console.log(...args);
-  }
-};
-
-const KAKAO_TOKEN_ENDPOINT = 'https://kauth.kakao.com/oauth/token';
-const KAKAO_USERINFO_ENDPOINT = 'https://kapi.kakao.com/v2/user/me';
-
-interface KakaoTokenPayload {
-  access_token?: string;
-  error?: string;
-  error_description?: string;
-  error_code?: string;
-}
-
-interface KakaoAccountPayload {
-  email?: string;
-  profile?: {
-    nickname?: string;
-    profile_image_url?: string;
-  };
-}
-
-interface KakaoUserPayload {
-  id?: number | string;
-  properties?: {
-    nickname?: string;
-    profile_image?: string;
-  };
-  kakao_account?: KakaoAccountPayload;
-}
-
-interface KakaoUserProfile {
-  kakaoId: string;
-  email: string | null;
-  name: string;
-  profileImage: string | null;
-  rawPayload: KakaoUserPayload;
-}
-
-const requireAuthenticatedUser = (authenticatedUser: AuthenticatedUser | undefined) => {
-  if (!authenticatedUser) {
-    throw new HttpError(401, '인증된 사용자 정보가 없습니다.');
+  const normalizedDate = rawValue.trim();
+  if (!normalizedDate) {
+    return null;
   }
 
-  return authenticatedUser;
-};
-
-const normalizeBoolean = (rawValue: unknown, fallbackValue = false) => {
-  if (typeof rawValue === 'boolean') {
-    return rawValue;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+    throw new HttpError(400, '생년월일은 YYYY-MM-DD 형식이어야 합니다.');
   }
 
-  if (typeof rawValue === 'number') {
-    return rawValue === 1;
+  const [yearText, monthText, dayText] = normalizedDate.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    throw new HttpError(400, '생년월일 형식이 올바르지 않습니다.');
   }
 
-  if (typeof rawValue === 'string') {
-    const normalized = rawValue.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') {
-      return true;
-    }
-
-    if (normalized === 'false' || normalized === '0') {
-      return false;
-    }
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    candidate.getUTCFullYear() !== year ||
+    candidate.getUTCMonth() !== month - 1 ||
+    candidate.getUTCDate() !== day
+  ) {
+    throw new HttpError(400, '유효한 생년월일을 입력해주세요.');
   }
 
-  return fallbackValue;
-};
-
-const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-
-const isTestUserName = (name: string) => name.trim().startsWith('TEST');
-
-const isTestScopedAdmin = (authenticatedUser: AuthenticatedUser) => {
-  return (
-    normalizeBoolean(authenticatedUser.isAdmin, false) &&
-    (normalizeBoolean(authenticatedUser.isTest, false) || isTestUserName(authenticatedUser.name))
-  );
-};
-
-const isTestScopedUser = (user: { name: string; isTest: boolean | number }) => {
-  return normalizeBoolean(user.isTest, false) || isTestUserName(user.name);
-};
-
-const requireScopedAdminTarget = (
-  authenticatedUser: AuthenticatedUser,
-  targetUser: { name: string; isTest: boolean | number },
-) => {
-  if (isTestScopedAdmin(authenticatedUser) && !isTestScopedUser(targetUser)) {
-    throw new HttpError(403, 'TEST 관리자 계정은 TEST 사용자만 관리할 수 있습니다.');
-  }
-};
-
-const requirePasswordResetLookup = (
-  lookup: {
-    id: number;
-    user_id: number;
-    expires_at: Date;
-    used_at: Date | null;
-    email: string;
-  } | null,
-  normalizedEmail: string,
-) => {
-  if (!lookup) {
-    throw new HttpError(400, '유효하지 않은 비밀번호 재설정 토큰입니다.');
-  }
-
-  if (lookup.used_at) {
-    throw new HttpError(400, '이미 사용된 비밀번호 재설정 토큰입니다.');
-  }
-
-  if (new Date(lookup.expires_at).getTime() < Date.now()) {
-    throw new HttpError(400, '만료된 비밀번호 재설정 토큰입니다.');
-  }
-
-  if (lookup.email.toLowerCase() !== normalizedEmail) {
-    throw new HttpError(400, '토큰과 이메일이 일치하지 않습니다.');
-  }
-
-  return lookup;
-};
-
-const requireEmailVerificationLookup = (
-  lookup: {
-    id: number;
-    user_id: number;
-    expires_at: Date;
-    used_at: Date | null;
-    email: string;
-    email_verified_at: Date | null;
-  } | null,
-  normalizedEmail: string,
-) => {
-  if (!lookup) {
-    throw new HttpError(400, '유효하지 않은 이메일 인증 링크입니다.', 'INVALID_EMAIL_VERIFICATION_TOKEN');
-  }
-
-  if (lookup.email.toLowerCase() !== normalizedEmail) {
-    throw new HttpError(
-      400,
-      '인증 링크와 이메일이 일치하지 않습니다.',
-      'EMAIL_VERIFICATION_EMAIL_MISMATCH',
-    );
-  }
-
-  if (lookup.email_verified_at) {
-    throw new HttpError(409, '이미 이메일 인증이 완료되었습니다.', 'EMAIL_ALREADY_VERIFIED');
-  }
-
-  if (lookup.used_at) {
-    throw new HttpError(400, '이미 사용된 이메일 인증 링크입니다.', 'EMAIL_VERIFICATION_ALREADY_USED');
-  }
-
-  if (new Date(lookup.expires_at).getTime() < Date.now()) {
-    throw new HttpError(
-      400,
-      '만료된 이메일 인증 링크입니다. 새 인증 메일을 요청해주세요.',
-      'EMAIL_VERIFICATION_EXPIRED',
-    );
-  }
-
-  return lookup;
-};
-
-const buildEmailVerificationLink = (rawToken: string, normalizedEmail: string) => {
-  return `${FRONTEND_BASE_URL.replace(
-    /\/+$/,
-    '',
-  )}/signin?verificationToken=${encodeURIComponent(rawToken)}&verificationEmail=${encodeURIComponent(
-    normalizedEmail,
-  )}`;
-};
-
-const formatEmailDeliveryErrorMessage = (fallbackMessage: string, error: unknown) => {
-  if (isProduction) {
-    return fallbackMessage;
-  }
-
-  if (!(error instanceof Error)) {
-    return fallbackMessage;
-  }
-
-  const errorWithDetails = error as Error & {
-    code?: string;
-    responseCode?: number;
-    command?: string;
-    response?: {
-      statusCode?: number;
-      body?: {
-        errors?: Array<{
-          message?: string;
-          field?: string;
-          help?: string;
-        }>;
-      };
-    } | string;
-  };
-
-  const responseDetails =
-    typeof errorWithDetails.response === 'object' && errorWithDetails.response !== null
-      ? [
-          typeof errorWithDetails.response.statusCode === 'number'
-            ? `HTTP ${errorWithDetails.response.statusCode}`
-            : undefined,
-          ...(errorWithDetails.response.body?.errors ?? []).flatMap((responseError) =>
-            [responseError.message, responseError.field, responseError.help].filter(
-              (value): value is string => typeof value === 'string' && value.trim().length > 0,
-            ),
-          ),
-        ]
-      : [];
-
-  const details = [
-    errorWithDetails.code,
-    typeof errorWithDetails.responseCode === 'number'
-      ? `SMTP ${errorWithDetails.responseCode}`
-      : undefined,
-    errorWithDetails.command,
-    error.message,
-    ...(typeof errorWithDetails.response === 'string' ? [errorWithDetails.response] : []),
-    ...responseDetails,
-  ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
-
-  if (details.length === 0) {
-    return fallbackMessage;
-  }
-
-  return `${fallbackMessage} (${details.join(' | ')})`;
-};
-
-const createEmailVerificationPayload = async (userId: number, normalizedEmail: string) => {
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-  await authRepository.markUnusedEmailVerificationTokensAsUsed(userId);
-  await authRepository.createEmailVerificationToken(
-    userId,
-    tokenHash,
-    EMAIL_VERIFICATION_TOKEN_TTL_MINUTES,
-  );
-
-  return {
-    verificationLink: buildEmailVerificationLink(rawToken, normalizedEmail),
-  };
-};
-
-const sendEmailVerification = async (
-  userId: number,
-  normalizedEmail: string,
-  deliveryFailureMessage =
-    '이메일 인증 메일 전송에 실패했습니다. 잠시 후 다시 시도해주세요.',
-) => {
-  const { verificationLink } = await createEmailVerificationPayload(userId, normalizedEmail);
-  const isEmailDeliveryConfigured = canSendEmails();
-
-  if (isEmailDeliveryConfigured) {
-    try {
-      await sendSignupVerificationEmail(normalizedEmail, verificationLink);
-    } catch (error) {
-      console.error('Signup verification email send error:', error);
-      throw new HttpError(
-        502,
-        formatEmailDeliveryErrorMessage(deliveryFailureMessage, error),
-        'EMAIL_DELIVERY_FAILED',
-      );
-    }
-  }
-
-  return {
-    verificationLink,
-    isEmailDeliveryConfigured,
-  };
-};
-
-const requireKakaoConfiguration = () => {
-  if (!KAKAO_REST_API_KEY) {
-    throw new HttpError(500, '카카오 OAuth REST API Key 설정이 누락되었습니다.');
-  }
-
-  return {
-    restApiKey: KAKAO_REST_API_KEY,
-    redirectUri: KAKAO_REDIRECT_URI,
-    clientSecret: KAKAO_CLIENT_SECRET,
-  };
-};
-
-const requestKakaoAccessToken = async (code: string, redirectUriFromClient?: string) => {
-  const config = requireKakaoConfiguration();
-  const redirectUri = redirectUriFromClient?.trim() || config.redirectUri;
-
-  if (!redirectUri) {
-    throw new HttpError(500, '카카오 OAuth Redirect URI 설정이 누락되었습니다.');
-  }
-
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    client_id: config.restApiKey,
-    redirect_uri: redirectUri,
-    code,
-  });
-
-  logKakaoOAuthDebug('[Kakao OAuth][Backend] Token request params:', {
-    grant_type: 'authorization_code',
-    client_id: config.restApiKey,
-    redirect_uri: redirectUri,
-    code,
-    has_client_secret: Boolean(config.clientSecret),
-  });
-
-  if (config.clientSecret) {
-    body.set('client_secret', config.clientSecret);
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(KAKAO_TOKEN_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
-      },
-      body: body.toString(),
-    });
-  } catch (error) {
-    console.error('Kakao token request error:', error);
-    throw new HttpError(502, '카카오 토큰 서버와 통신하지 못했습니다.');
-  }
-
-  const payload = (await response.json().catch(() => null)) as KakaoTokenPayload | null;
-
-  logKakaoOAuthDebug('[Kakao OAuth][Backend] Token response payload:', {
-    status: response.status,
-    ok: response.ok,
-    payload,
-  });
-
-  if (!response.ok || !payload?.access_token) {
-    const kakaoError = payload?.error_description || payload?.error;
-    const kakaoErrorCode = payload?.error_code || payload?.error;
-    const normalizedKakaoError = kakaoErrorCode
-      ? `${kakaoError || '카카오 토큰 교환에 실패했습니다.'} (${kakaoErrorCode})`
-      : kakaoError;
-    throw new HttpError(401, normalizedKakaoError || '카카오 토큰 교환에 실패했습니다.');
-  }
-
-  logKakaoOAuthDebug('[Kakao OAuth][Backend] Issued access_token:', payload.access_token);
-
-  return payload.access_token;
-};
-
-const requestKakaoUserProfile = async (accessToken: string): Promise<KakaoUserProfile> => {
-  logKakaoOAuthDebug('[Kakao OAuth][Backend] UserInfo request access_token:', accessToken);
-
-  let response: Response;
-
-  try {
-    response = await fetch(KAKAO_USERINFO_ENDPOINT, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-  } catch (error) {
-    console.error('Kakao user profile request error:', error);
-    throw new HttpError(502, '카카오 사용자 정보 서버와 통신하지 못했습니다.');
-  }
-
-  const payload = (await response.json().catch(() => null)) as KakaoUserPayload | null;
-
-  logKakaoOAuthDebug('[Kakao OAuth][Backend] UserInfo response payload:', {
-    status: response.status,
-    ok: response.ok,
-    payload,
-  });
-
-  if (!response.ok || !payload?.id) {
-    throw new HttpError(401, '카카오 사용자 정보를 조회하지 못했습니다.');
-  }
-
-  const kakaoId = String(payload.id).trim();
-  if (!kakaoId) {
-    throw new HttpError(400, '카카오 사용자 식별자를 확인하지 못했습니다.');
-  }
-
-  const emailValue = payload.kakao_account?.email;
-  const email =
-    typeof emailValue === 'string' && emailValue.trim() ? emailValue.trim().toLowerCase() : null;
-  const nickname =
-    payload.kakao_account?.profile?.nickname ||
-    payload.properties?.nickname ||
-    (email ? email.split('@')[0] : '');
-  const profileImageValue =
-    payload.kakao_account?.profile?.profile_image_url || payload.properties?.profile_image;
-  const profileImage =
-    typeof profileImageValue === 'string' && profileImageValue.trim()
-      ? profileImageValue.trim()
-      : null;
-
-  return {
-    kakaoId,
-    email,
-    name: nickname || `kakao-${kakaoId}`,
-    profileImage,
-    rawPayload: payload,
-  };
+  return normalizedDate;
 };
 
 class AuthService {
@@ -548,8 +180,34 @@ class AuthService {
         typeof me.profileImage === 'string' && me.profileImage.trim().length > 0
           ? me.profileImage.trim()
           : null,
+      phone:
+        typeof me.phone === 'string' && me.phone.trim().length > 0
+          ? normalizePhoneNumber(me.phone)
+          : null,
+      birthDate: typeof me.birthDate === 'string' && me.birthDate.trim().length > 0 ? me.birthDate : null,
+      joinedAt: typeof me.joinedAt === 'string' && me.joinedAt.trim().length > 0 ? me.joinedAt : null,
       isAdmin: Boolean(me.isAdmin),
       isTest: normalizeBoolean(me.isTest, false),
+    };
+  }
+
+  async updateMe(authenticatedUser: AuthenticatedUser | undefined, payload: UpdateMeDTO) {
+    const currentUser = requireAuthenticatedUser(authenticatedUser);
+    const phone = normalizeOptionalPhoneNumber(payload.phone);
+    const birthDate = normalizeOptionalBirthDate(payload.birthDate);
+
+    const updated = await authRepository.updateMeProfileByUserId(currentUser.id, {
+      phone,
+      birthDate,
+    });
+    if (!updated) {
+      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
+    }
+
+    return {
+      message: '프로필 정보가 저장되었습니다.',
+      phone,
+      birthDate,
     };
   }
 
@@ -603,480 +261,58 @@ class AuthService {
   }
 
   async resetPassword(payload: ResetPasswordDTO) {
-    const { email, newPassword, token } = payload;
-
-    if (!email || !newPassword || !token) {
-      throw new HttpError(400, '이메일, 새 비밀번호, 토큰을 모두 입력해주세요.');
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
-
-    if (!evaluatePasswordPolicy(newPassword).isValid) {
-      throw new HttpError(400, PASSWORD_POLICY_ERROR_MESSAGE);
-    }
-
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-
-    const lookup = await authRepository.findPasswordResetLookupByTokenHash(tokenHash);
-    const resetLookup = requirePasswordResetLookup(lookup, normalizedEmail);
-
-    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    const resetResult = await authRepository.resetPasswordByToken(
-      resetLookup.id,
-      resetLookup.user_id,
-      hashedPassword,
-    );
-
-    if (resetResult === 'already_used') {
-      throw new HttpError(400, '이미 사용된 비밀번호 재설정 토큰입니다.');
-    }
-
-    if (resetResult === 'user_not_found') {
-      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
-    }
-
-    return { message: '비밀번호가 성공적으로 변경되었습니다.' };
+    return passwordResetService.resetPassword(payload);
   }
 
   async requestReset(payload: RequestResetDTO) {
-    const { email } = payload;
-
-    if (!email) {
-      throw new HttpError(400, '이메일을 입력해주세요.');
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
-    const genericMessage = '입력한 이메일로 비밀번호 재설정 링크를 전송했습니다.';
-    const isEmailDeliveryConfigured = canSendPasswordResetEmails();
-
-    if (isProduction && !isEmailDeliveryConfigured) {
-      throw new HttpError(500, '비밀번호 재설정 이메일 설정이 누락되었습니다.');
-    }
-
-    const user = await authRepository.findUserEmailByEmail(normalizedEmail);
-
-    if (!user) {
-      return { message: genericMessage };
-    }
-
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-    await authRepository.markUnusedResetTokensAsUsed(user.id);
-    await authRepository.createPasswordResetToken(user.id, tokenHash, RESET_TOKEN_TTL_MINUTES);
-
-    const resetLink = `${FRONTEND_BASE_URL.replace(
-      /\/+$/,
-      '',
-    )}/signin?resetToken=${encodeURIComponent(rawToken)}&email=${encodeURIComponent(
-      normalizedEmail,
-    )}`;
-
-    if (isEmailDeliveryConfigured) {
-      try {
-        await sendPasswordResetEmail(normalizedEmail, resetLink);
-      } catch (error) {
-        console.error('Password reset email send error:', error);
-      }
-    }
-
-    if (isProduction) {
-      return { message: genericMessage };
-    }
-
-    return { message: genericMessage, devResetLink: resetLink };
+    return passwordResetService.requestReset(payload);
   }
 
   async verifyResetToken(payload: VerifyResetTokenDTO) {
-    const { email, token } = payload;
-
-    if (!email || !token) {
-      throw new HttpError(400, '이메일과 토큰을 입력해주세요.');
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const lookup = await authRepository.findPasswordResetLookupByTokenHash(tokenHash);
-
-    requirePasswordResetLookup(lookup, normalizedEmail);
-    return { message: '유효한 비밀번호 재설정 토큰입니다.' };
+    return passwordResetService.verifyResetToken(payload);
   }
 
   async verifyEmail(payload: VerifyEmailDTO) {
-    const { email, token } = payload;
-
-    if (!email || !token) {
-      throw new HttpError(400, '이메일과 인증 토큰을 모두 입력해주세요.');
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const lookup = await authRepository.findEmailVerificationLookupByTokenHash(tokenHash);
-    const verificationLookup = requireEmailVerificationLookup(lookup, normalizedEmail);
-
-    const verifyResult = await authRepository.verifyEmailByToken(
-      verificationLookup.id,
-      verificationLookup.user_id,
-    );
-
-    if (verifyResult === 'already_used') {
-      throw new HttpError(400, '이미 사용된 이메일 인증 링크입니다.', 'EMAIL_VERIFICATION_ALREADY_USED');
-    }
-
-    if (verifyResult === 'user_not_found') {
-      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
-    }
-
-    return {
-      message: '이메일 인증이 완료되었습니다. 관리자 승인 후 로그인해주세요.',
-    };
+    return verifyEmail(payload);
   }
 
   async resendVerificationEmail(payload: ResendVerificationEmailDTO) {
-    const { email } = payload;
-
-    if (!email) {
-      throw new HttpError(400, '이메일을 입력해주세요.');
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
-
-    if (!isValidEmail(normalizedEmail)) {
-      throw new HttpError(400, '이메일 형식이 올바르지 않습니다.');
-    }
-
-    if (isProduction && !canSendEmails()) {
-      throw new HttpError(500, '회원가입 이메일 인증 설정이 누락되었습니다.');
-    }
-
-    const genericMessage =
-      '입력한 이메일이 가입 대기 중이면 인증 링크를 다시 전송했습니다. 이메일 인증과 관리자 승인 후 로그인하실 수 있습니다.';
-
-    const user = await authRepository.findUserEmailByEmail(normalizedEmail);
-
-    if (!user) {
-      return { message: genericMessage };
-    }
-
-    if (user.emailVerifiedAt) {
-      return {
-        message: '이미 이메일 인증이 완료되었습니다. 관리자 승인 후 로그인해주세요.',
-      };
-    }
-
-    const { verificationLink, isEmailDeliveryConfigured } = await sendEmailVerification(
-      user.id,
-      normalizedEmail,
-      '인증 메일 재전송에 실패했습니다. 잠시 후 다시 시도해주세요.',
-    );
-
-    if (!isProduction && !isEmailDeliveryConfigured) {
-      return {
-        message: `${genericMessage} 개발 환경 인증 링크를 함께 반환했습니다.`,
-        devVerificationLink: verificationLink,
-      };
-    }
-
-    return { message: genericMessage };
+    return resendVerificationEmail(payload);
   }
 
   async googleAuth(payload: GoogleAuthDTO) {
-    const token = payload.token;
-
-    if (!token) {
-      throw new HttpError(400, '구글 토큰이 필요합니다.');
-    }
-
-    const ticket = await oauth2Client.verifyIdToken({
-      idToken: token,
-      audience: GOOGLE_CLIENT_ID as string,
-    });
-
-    const ticketPayload = ticket.getPayload();
-
-    if (!ticketPayload) {
-      throw new HttpError(400, '잘못된 토큰입니다.');
-    }
-
-    const { email, name, picture, sub: googleId } = ticketPayload;
-    const normalizedName = typeof name === 'string' ? name.trim() : '';
-
-    if (!email || !normalizedName || !googleId) {
-      throw new HttpError(400, '구글 사용자 정보를 가져오지 못했습니다.');
-    }
-
-    const normalizedEmail = email.toLowerCase();
-    const profileImage = typeof picture === 'string' && picture.trim() ? picture.trim() : null;
-    let user = await authRepository.findApprovalUserByEmail(normalizedEmail);
-
-    if (!user) {
-      await authRepository.createGoogleUser(
-        normalizedEmail,
-        normalizedName,
-        googleId,
-        profileImage,
-        isTestUserName(normalizedName),
-      );
-      user = await authRepository.findApprovalUserByEmail(normalizedEmail);
-    } else {
-      await authRepository.updateGoogleProfileByUserId(user.id, googleId, profileImage);
-    }
-
-    if (!user) {
-      throw new HttpError(500, '구글 로그인 사용자 생성에 실패했습니다.');
-    }
-
-    if (!user.emailVerifiedAt) {
-      await authRepository.markEmailVerifiedByUserId(user.id);
-      user.emailVerifiedAt = new Date();
-    }
-
-    if (!normalizeBoolean(user.isAllowed, false)) {
-      throw new HttpError(403, '관리자 승인 대기 중입니다.', 'ACCOUNT_PENDING_APPROVAL');
-    }
-
-    return createSessionAuthResponse(user, '구글 로그인 성공', true);
+    return authenticateWithGoogle(payload);
   }
 
   async kakaoAuth(payload: KakaoAuthDTO) {
-    logKakaoOAuthDebug('[Kakao OAuth][Backend] Incoming /auth/kakao payload:', payload);
-
-    const code = payload.code?.trim();
-    if (!code) {
-      throw new HttpError(400, '카카오 인가 코드가 필요합니다.');
-    }
-
-    const redirectUri = payload.redirectUri?.trim();
-    const accessToken = await requestKakaoAccessToken(code, redirectUri);
-    const kakaoProfile = await requestKakaoUserProfile(accessToken);
-
-    logKakaoOAuthDebug('[Kakao OAuth][Backend] Parsed Kakao profile:', kakaoProfile);
-
-    let user = await authRepository.findApprovalUserByKakaoId(kakaoProfile.kakaoId);
-
-    logKakaoOAuthDebug('[Kakao OAuth][Backend] User lookup by kakao_id:', user);
-
-    if (!user && kakaoProfile.email) {
-      user = await authRepository.findApprovalUserByEmail(kakaoProfile.email);
-      logKakaoOAuthDebug('[Kakao OAuth][Backend] User lookup by email:', user);
-    }
-
-    if (!user) {
-      const fallbackEmail = `kakao-${kakaoProfile.kakaoId}@kakao.local`;
-      const userEmail = kakaoProfile.email || fallbackEmail;
-      const normalizedKakaoName = kakaoProfile.name.trim();
-      const userName = normalizedKakaoName || `kakao-${kakaoProfile.kakaoId}`;
-
-      logKakaoOAuthDebug('[Kakao OAuth][Backend] Creating new Kakao user:', {
-        userEmail,
-        name: userName,
-        kakaoId: kakaoProfile.kakaoId,
-        profileImage: kakaoProfile.profileImage,
-      });
-
-      await authRepository.createKakaoUser(
-        userEmail,
-        userName,
-        kakaoProfile.kakaoId,
-        kakaoProfile.profileImage,
-        isTestUserName(userName),
-      );
-      user = await authRepository.findApprovalUserByKakaoId(kakaoProfile.kakaoId);
-      logKakaoOAuthDebug('[Kakao OAuth][Backend] Created user fetched by kakao_id:', user);
-    } else {
-      await authRepository.updateKakaoProfileByUserId(
-        user.id,
-        kakaoProfile.kakaoId,
-        kakaoProfile.profileImage,
-      );
-      logKakaoOAuthDebug('[Kakao OAuth][Backend] Updated existing Kakao user profile:', {
-        userId: user.id,
-        kakaoId: kakaoProfile.kakaoId,
-        profileImage: kakaoProfile.profileImage,
-      });
-    }
-
-    if (!user) {
-      throw new HttpError(500, '카카오 로그인 사용자 생성에 실패했습니다.');
-    }
-
-    if (!user.emailVerifiedAt) {
-      await authRepository.markEmailVerifiedByUserId(user.id);
-      user.emailVerifiedAt = new Date();
-    }
-
-    if (!normalizeBoolean(user.isAllowed, false)) {
-      logKakaoOAuthDebug('[Kakao OAuth][Backend] User pending approval:', user);
-      throw new HttpError(403, '관리자 승인 대기 중입니다.', 'ACCOUNT_PENDING_APPROVAL');
-    }
-
-    const sessionAuthResponse = await createSessionAuthResponse(user, '카카오 로그인 성공', true);
-    logKakaoOAuthDebug('[Kakao OAuth][Backend] Final auth response payload:', sessionAuthResponse);
-
-    if (shouldLogOAuthDebug) {
-      return {
-        ...sessionAuthResponse,
-        kakaoUserInfo: kakaoProfile.rawPayload,
-      };
-    }
-
-    return sessionAuthResponse;
+    return authenticateWithKakao(payload);
   }
 
   async getPendingUsers(authenticatedUser: AuthenticatedUser | undefined) {
-    const currentUser = requireAuthenticatedUser(authenticatedUser);
-    const rows = await authRepository.findPendingUsers(isTestScopedAdmin(currentUser));
-
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      createdAt: row.createdAt,
-      emailVerifiedAt: row.emailVerifiedAt,
-    }));
+    return getPendingUsers(authenticatedUser);
   }
 
   async getAdminUsers(authenticatedUser: AuthenticatedUser | undefined) {
-    const currentUser = requireAuthenticatedUser(authenticatedUser);
-    const rows = await authRepository.findAllAdminUsers(isTestScopedAdmin(currentUser));
-
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      profileImage:
-        typeof row.profileImage === 'string' && row.profileImage.trim().length > 0
-          ? row.profileImage.trim()
-          : null,
-      isAdmin: normalizeBoolean(row.isAdmin, false),
-      isAllowed: normalizeBoolean(row.isAllowed, false),
-      createdAt: row.createdAt,
-      emailVerifiedAt: row.emailVerifiedAt,
-    }));
+    return getAdminUsers(authenticatedUser);
   }
 
   async deleteUserProfileImage(
     authenticatedUser: AuthenticatedUser | undefined,
     rawUserId: unknown,
   ) {
-    const currentUser = requireAuthenticatedUser(authenticatedUser);
-    const userId = Number(rawUserId);
-
-    if (!Number.isInteger(userId) || userId <= 0) {
-      throw new HttpError(400, '유효한 사용자 ID가 필요합니다.');
-    }
-
-    const user = await authRepository.findManagedUserById(userId);
-    if (!user) {
-      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
-    }
-
-    requireScopedAdminTarget(currentUser, user);
-
-    const updated = await authRepository.updateProfileImageByUserId(userId, null);
-    if (!updated) {
-      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
-    }
-
-    return {
-      message: '사용자 프로필 이미지가 삭제되었습니다.',
-      userId,
-      profileImage: null,
-    };
+    return deleteUserProfileImage(authenticatedUser, rawUserId);
   }
 
   async approveUser(authenticatedUser: AuthenticatedUser | undefined, rawUserId: unknown) {
-    const currentUser = requireAuthenticatedUser(authenticatedUser);
-    const userId = Number(rawUserId);
-
-    if (!Number.isInteger(userId) || userId <= 0) {
-      throw new HttpError(400, '유효한 사용자 ID가 필요합니다.');
-    }
-
-    const user = await authRepository.findUserApprovalById(userId);
-    if (!user) {
-      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
-    }
-
-    requireScopedAdminTarget(currentUser, user);
-
-    await authRepository.approveUserById(userId);
-
-    return {
-      message: 'approved',
-      userId,
-    };
+    return approveUser(authenticatedUser, rawUserId);
   }
 
   async declineUser(authenticatedUser: AuthenticatedUser | undefined, rawUserId: unknown) {
-    const currentUser = requireAuthenticatedUser(authenticatedUser);
-    const userId = Number(rawUserId);
-
-    if (!Number.isInteger(userId) || userId <= 0) {
-      throw new HttpError(400, '유효한 사용자 ID가 필요합니다.');
-    }
-
-    const user = await authRepository.findUserApprovalById(userId);
-    if (!user) {
-      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
-    }
-
-    requireScopedAdminTarget(currentUser, user);
-
-    if (normalizeBoolean(user.isAllowed, false)) {
-      throw new HttpError(409, '이미 승인된 사용자는 거절할 수 없습니다.');
-    }
-
-    const isDeleted = await authRepository.deletePendingUserById(userId);
-    if (!isDeleted) {
-      throw new HttpError(
-        409,
-        '사용자 상태가 변경되어 가입 요청을 거절할 수 없습니다. 목록을 새로고침해주세요.',
-      );
-    }
-
-    return {
-      message: 'declined',
-      userId,
-    };
+    return declineUser(authenticatedUser, rawUserId);
   }
 
   async deleteUser(authenticatedUser: AuthenticatedUser | undefined, rawUserId: unknown) {
-    const currentUser = requireAuthenticatedUser(authenticatedUser);
-    const userId = Number(rawUserId);
-
-    if (!Number.isInteger(userId) || userId <= 0) {
-      throw new HttpError(400, '유효한 사용자 ID가 필요합니다.');
-    }
-
-    if (currentUser.id === userId) {
-      throw new HttpError(409, '현재 로그인한 관리자 계정은 삭제할 수 없습니다.');
-    }
-
-    const user = await authRepository.findManagedUserById(userId);
-    if (!user) {
-      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
-    }
-
-    requireScopedAdminTarget(currentUser, user);
-
-    const deleteResult = await authRepository.deleteManagedUserById(
-      userId,
-      normalizeBoolean(user.isAdmin, false) && normalizeBoolean(user.isAllowed, false),
-    );
-
-    if (deleteResult === 'last_active_admin') {
-      throw new HttpError(409, '마지막 활성 관리자 계정은 삭제할 수 없습니다.');
-    }
-
-    if (deleteResult === 'not_found') {
-      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
-    }
-
-    return {
-      message: '사용자가 삭제되었습니다.',
-      userId,
-    };
+    return deleteUser(authenticatedUser, rawUserId);
   }
 
   async updateUser(
@@ -1084,74 +320,7 @@ class AuthService {
     rawUserId: unknown,
     payload: AdminUserMutationDTO,
   ) {
-    const currentUser = requireAuthenticatedUser(authenticatedUser);
-    const userId = Number(rawUserId);
-
-    if (!Number.isInteger(userId) || userId <= 0) {
-      throw new HttpError(400, '유효한 사용자 ID가 필요합니다.');
-    }
-
-    const user = await authRepository.findManagedUserById(userId);
-    if (!user) {
-      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
-    }
-
-    requireScopedAdminTarget(currentUser, user);
-
-    const name = typeof payload.name === 'string' ? payload.name.trim() : '';
-    const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
-
-    if (!name || !email) {
-      throw new HttpError(400, '이름과 이메일을 모두 입력해주세요.');
-    }
-
-    if (!isValidEmail(email)) {
-      throw new HttpError(400, '이메일 형식이 올바르지 않습니다.');
-    }
-
-    if (typeof payload.isAdmin !== 'boolean' || typeof payload.isAllowed !== 'boolean') {
-      throw new HttpError(400, '권한과 활성 상태를 정확히 전달해주세요.');
-    }
-
-    const nextIsAdmin = payload.isAdmin;
-    const nextIsAllowed = payload.isAllowed;
-    const currentIsAdmin = normalizeBoolean(user.isAdmin, false);
-    const currentIsAllowed = normalizeBoolean(user.isAllowed, false);
-
-    if (
-      currentUser.id === userId &&
-      (currentIsAdmin !== nextIsAdmin || currentIsAllowed !== nextIsAllowed)
-    ) {
-      throw new HttpError(409, '현재 로그인한 관리자 계정의 권한 상태는 변경할 수 없습니다.');
-    }
-
-    const updateResult = await authRepository.updateManagedUserById(
-      userId,
-      {
-        name,
-        email,
-        isAdmin: nextIsAdmin,
-        isAllowed: nextIsAllowed,
-      },
-      currentIsAdmin && currentIsAllowed && (!nextIsAdmin || !nextIsAllowed),
-    );
-
-    if (updateResult === 'last_active_admin') {
-      throw new HttpError(409, '마지막 활성 관리자 계정의 권한 상태는 변경할 수 없습니다.');
-    }
-
-    if (updateResult === 'email_conflict') {
-      throw new HttpError(400, '이미 사용 중인 이메일입니다.');
-    }
-
-    if (updateResult === 'not_found') {
-      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
-    }
-
-    return {
-      message: '사용자 정보가 수정되었습니다.',
-      userId,
-    };
+    return updateUser(authenticatedUser, rawUserId, payload);
   }
 
   async refreshSession(payload: RefreshSessionDTO) {

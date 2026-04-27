@@ -1,5 +1,5 @@
 import { Pool, type QueryResultRow } from 'pg';
-import { loadEnvironment } from './config/env.js';
+import { loadEnvironment } from './env.js';
 
 loadEnvironment();
 

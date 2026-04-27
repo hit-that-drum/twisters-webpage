@@ -1,3 +1,23 @@
+export const BOARD_REACTION_TYPES = ['thumbsUp', 'thumbsDown', 'favorite', 'heart'] as const;
+
+export type BoardReactionType = (typeof BOARD_REACTION_TYPES)[number];
+
+export interface BoardReactionSummary {
+  thumbsUpCount: number;
+  thumbsDownCount: number;
+  favoriteCount: number;
+  heartCount: number;
+  userReactions: BoardReactionType[];
+}
+
+export const createEmptyBoardReactionSummary = (): BoardReactionSummary => ({
+  thumbsUpCount: 0,
+  thumbsDownCount: 0,
+  favoriteCount: 0,
+  heartCount: 0,
+  userReactions: [],
+});
+
 export interface BoardRow {
   id: number;
   authorId: number | null;
@@ -22,6 +42,7 @@ export interface Board {
   imageUrl: string[];
   content: string;
   pinned: boolean;
+  reactions: BoardReactionSummary;
 }
 
 export interface CreateBoardDTO {
@@ -38,6 +59,10 @@ export interface UpdateBoardDTO {
   pinned?: unknown;
 }
 
+export interface ToggleBoardReactionDTO {
+  reactionType?: unknown;
+}
+
 export interface BoardMutationPayload {
   authorId: number;
   title: string;
@@ -51,6 +76,21 @@ export interface BoardLookupRow {
   id: number;
   authorId: number | null;
   pinned: boolean | number;
+}
+
+export interface BoardReactionCountRow {
+  boardId: number;
+  type: string;
+  reactionCount: number;
+}
+
+export interface BoardUserReactionRow {
+  boardId: number;
+  type: string;
+}
+
+export interface BoardReactionLookupRow {
+  id: number;
 }
 
 export type BoardSortOption = 'latest' | 'oldest' | 'updated' | 'pinned';
@@ -94,6 +134,12 @@ export interface BoardCommentMutationPayload {
   authorId: number;
   authorName: string;
   content: string;
+}
+
+export interface BoardReactionMutationPayload {
+  boardId: number;
+  userId: number;
+  reactionType: BoardReactionType;
 }
 
 export interface BoardCommentLookupRow {

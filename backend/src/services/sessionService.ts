@@ -1,5 +1,10 @@
-import { query } from './db.js';
-import { buildUserResponse, createAccessToken, createRefreshToken, hashToken } from './authUtils.js';
+import { query } from '../config/database.js';
+import {
+  buildUserResponse,
+  createAccessToken,
+  createRefreshToken,
+  hashToken,
+} from '../utils/authTokens.js';
 
 interface AuthUser {
   id: number;

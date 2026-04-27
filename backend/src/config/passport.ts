@@ -2,11 +2,11 @@ import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
 import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
 import bcrypt from 'bcrypt';
-import { query } from '../db.js';
-import { getJwtSecret } from '../authUtils.js';
+import { query } from './database.js';
+import { getJwtSecret } from '../utils/authTokens.js';
 import { HttpError } from '../errors/httpError.js';
 import { authRepository } from '../repositories/authRepository.js';
-import { getAuthenticatedUserBySession, touchSessionActivity } from '../sessionService.js';
+import { getAuthenticatedUserBySession, touchSessionActivity } from '../services/sessionService.js';
 
 interface AccessJwtPayload {
   id?: unknown;

@@ -3,18 +3,24 @@ import { boardRepository } from '../repositories/boardRepository.js';
 import { meetingAttendanceService } from './meetingAttendanceService.js';
 import { type AuthenticatedUser } from '../types/common.types.js';
 import {
+  BOARD_REACTION_TYPES,
   type Board,
   type BoardComment,
   type BoardCommentMutationPayload,
   type BoardListFilters,
   type BoardListQuery,
   type BoardMutationPayload,
+  type BoardReactionSummary,
+  type BoardReactionType,
+  type ToggleBoardReactionDTO,
   type BoardSortOption,
   type CreateBoardCommentDTO,
   type CreateBoardDTO,
   type UpdateBoardDTO,
+  createEmptyBoardReactionSummary,
 } from '../types/board.types.js';
 import { resolveDataScopeByUser } from '../utils/dataScope.js';
+import { normalizeBoolean } from '../utils/parseUtils.js';
 
 const parseBoardId = (rawBoardId?: string) => {
   const boardId = Number(rawBoardId);
@@ -32,52 +38,6 @@ const parseCommentId = (rawCommentId?: string) => {
   }
 
   return commentId;
-};
-
-const parsePinned = (rawPinned: unknown, defaultValue = false) => {
-  if (typeof rawPinned === 'boolean') {
-    return rawPinned;
-  }
-
-  if (typeof rawPinned === 'number') {
-    return rawPinned === 1;
-  }
-
-  if (typeof rawPinned === 'string') {
-    const normalized = rawPinned.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') {
-      return true;
-    }
-
-    if (normalized === 'false' || normalized === '0') {
-      return false;
-    }
-  }
-
-  return defaultValue;
-};
-
-const normalizeBoolean = (rawValue: unknown, fallbackValue = false) => {
-  if (typeof rawValue === 'boolean') {
-    return rawValue;
-  }
-
-  if (typeof rawValue === 'number') {
-    return rawValue === 1;
-  }
-
-  if (typeof rawValue === 'string') {
-    const normalized = rawValue.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') {
-      return true;
-    }
-
-    if (normalized === 'false' || normalized === '0') {
-      return false;
-    }
-  }
-
-  return fallbackValue;
 };
 
 const isAdminUser = (authenticatedUser: AuthenticatedUser) => {
@@ -143,7 +103,7 @@ const normalizeBoardMutationPayload = (
     throw new HttpError(400, '게시글 이미지 전체 크기는 20MB 이하만 저장할 수 있습니다.');
   }
 
-  const requestedPinned = parsePinned(payload.pinned, defaultPinned);
+  const requestedPinned = normalizeBoolean(payload.pinned, defaultPinned);
   if (requestedPinned && !isAdminUser(authenticatedUser)) {
     throw new HttpError(403, '관리자만 상단 고정 게시글을 지정할 수 있습니다.');
   }
@@ -209,6 +169,19 @@ const normalizeBoardSearch = (rawSearch: string | undefined) => {
   return trimmed.slice(0, 100);
 };
 
+const normalizeBoardReactionType = (rawReactionType: unknown): BoardReactionType => {
+  if (typeof rawReactionType !== 'string') {
+    throw new HttpError(400, '유효한 반응 타입이 필요합니다.');
+  }
+
+  const normalizedReactionType = BOARD_REACTION_TYPES.find((reactionType) => reactionType === rawReactionType);
+  if (!normalizedReactionType) {
+    throw new HttpError(400, '지원하지 않는 반응 타입입니다.');
+  }
+
+  return normalizedReactionType;
+};
+
 class BoardService {
   async getBoards(
     authenticatedUser: AuthenticatedUser | undefined,
@@ -226,6 +199,12 @@ class BoardService {
     }
 
     const rows = await boardRepository.findAll(scope, normalizedQuery);
+    const reactionSummaryByBoardId = await boardRepository.findReactionSummariesByBoardIds(
+      scope,
+      rows.map((row) => row.id),
+      authenticatedUser?.id ?? null,
+    );
+
     return rows.map((row) => ({
       ...row,
       imageUrl: Array.isArray(row.imageUrl)
@@ -235,6 +214,7 @@ class BoardService {
             .filter((item) => item.length > 0)
         : [],
       pinned: Boolean(row.pinned),
+      reactions: reactionSummaryByBoardId[row.id] ?? createEmptyBoardReactionSummary(),
     }));
   }
 
@@ -391,6 +371,55 @@ class BoardService {
     }
 
     await meetingAttendanceService.syncMeetingAttendanceForBoard(sessionUser, boardId);
+  }
+
+  async toggleBoardReaction(
+    authenticatedUser: AuthenticatedUser | undefined,
+    rawBoardId: string | undefined,
+    payload: ToggleBoardReactionDTO,
+  ): Promise<{ active: boolean; reactions: BoardReactionSummary }> {
+    const sessionUser = requireAuthenticatedUser(authenticatedUser);
+    const scope = resolveDataScopeByUser(sessionUser);
+    const boardId = parseBoardId(rawBoardId);
+    if (!boardId) {
+      throw new HttpError(400, '유효한 게시글 ID가 필요합니다.');
+    }
+
+    const existingBoard = await boardRepository.findById(scope, boardId);
+    if (!existingBoard) {
+      throw new HttpError(404, '해당 게시글을 찾을 수 없습니다.');
+    }
+
+    const reactionType = normalizeBoardReactionType(payload.reactionType);
+    const existingReaction = await boardRepository.findReaction(
+      scope,
+      boardId,
+      sessionUser.id,
+      reactionType,
+    );
+
+    let active = false;
+    if (existingReaction) {
+      await boardRepository.deleteReaction(scope, boardId, sessionUser.id, reactionType);
+    } else {
+      await boardRepository.createReaction(scope, {
+        boardId,
+        userId: sessionUser.id,
+        reactionType,
+      });
+      active = true;
+    }
+
+    const reactionSummaryByBoardId = await boardRepository.findReactionSummariesByBoardIds(
+      scope,
+      [boardId],
+      sessionUser.id,
+    );
+
+    return {
+      active,
+      reactions: reactionSummaryByBoardId[boardId] ?? createEmptyBoardReactionSummary(),
+    };
   }
 }
 

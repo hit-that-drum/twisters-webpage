@@ -12,6 +12,7 @@ import {
   type AuthSessionSnapshot,
   type StoredAuthSnapshot,
 } from '@/common/lib/auth/authStorage';
+import { normalizePhoneNumber } from '@/common/lib/phoneNumber';
 import { type MeInfo } from '@/entities/user/types';
 import { type AuthContextValue } from './types';
 
@@ -37,6 +38,9 @@ const parseMeInfo = (payload: unknown): MeInfo | null => {
   const rawIsAdmin = (payload as { isAdmin?: unknown }).isAdmin;
   const rawIsTest = (payload as { isTest?: unknown }).isTest;
   const rawProfileImage = (payload as { profileImage?: unknown }).profileImage;
+  const rawPhone = (payload as { phone?: unknown }).phone;
+  const rawBirthDate = (payload as { birthDate?: unknown }).birthDate;
+  const rawJoinedAt = (payload as { joinedAt?: unknown }).joinedAt;
 
   const normalizedIsAdmin =
     typeof rawIsAdmin === 'boolean'
@@ -62,6 +66,14 @@ const parseMeInfo = (payload: unknown): MeInfo | null => {
     typeof rawProfileImage === 'string' && rawProfileImage.trim().length > 0
       ? rawProfileImage.trim()
       : null;
+  const normalizedPhone =
+    typeof rawPhone === 'string' && rawPhone.trim().length > 0
+      ? normalizePhoneNumber(rawPhone)
+      : null;
+  const normalizedBirthDate =
+    typeof rawBirthDate === 'string' && rawBirthDate.trim().length > 0 ? rawBirthDate.trim() : null;
+  const normalizedJoinedAt =
+    typeof rawJoinedAt === 'string' && rawJoinedAt.trim().length > 0 ? rawJoinedAt.trim() : null;
 
   if (
     typeof id !== 'number' ||
@@ -78,6 +90,9 @@ const parseMeInfo = (payload: unknown): MeInfo | null => {
     name,
     email,
     profileImage: normalizedProfileImage,
+    phone: normalizedPhone,
+    birthDate: normalizedBirthDate,
+    joinedAt: normalizedJoinedAt,
     isAdmin: normalizedIsAdmin,
     isTest: normalizedIsTest,
   };
