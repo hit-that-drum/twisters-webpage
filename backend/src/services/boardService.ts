@@ -188,6 +188,7 @@ class BoardService {
     query: BoardListQuery,
   ): Promise<Board[]> {
     const scope = resolveDataScopeByUser(authenticatedUser);
+    await boardRepository.initializeSchema();
 
     const normalizedQuery: BoardListFilters = {
       sort: normalizeBoardSort(query.sort),

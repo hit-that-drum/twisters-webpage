@@ -51,6 +51,49 @@ export const getApiMessage = (payload: unknown, fallback: string): string => {
   return fallback;
 };
 
+const getApiPayloadMessage = (payload: unknown) => getApiMessage(payload, '');
+
+export const isEmptyListResponse = (
+  response: Response,
+  payload: unknown,
+  emptyMessageHints: string[] = [],
+) => {
+  if (response.status === 204 || (Array.isArray(payload) && payload.length === 0)) {
+    return true;
+  }
+
+  if (response.status !== 404) {
+    return false;
+  }
+
+  const normalizedMessage = getApiPayloadMessage(payload).trim().toLowerCase();
+  if (!normalizedMessage) {
+    return true;
+  }
+
+  const commonEmptyPatterns = [
+    /no\s+data/,
+    /no\s+records?/,
+    /no\s+items?/,
+    /not\s+found/,
+    /empty/,
+    /없습니다/,
+    /없음/,
+  ];
+
+  const hasEmptyPhrase = commonEmptyPatterns.some((pattern) => pattern.test(normalizedMessage));
+  if (!hasEmptyPhrase) {
+    return false;
+  }
+
+  if (emptyMessageHints.length === 0) {
+    return true;
+  }
+
+  const normalizedHints = emptyMessageHints.map((hint) => hint.trim().toLowerCase()).filter(Boolean);
+  return normalizedHints.some((hint) => normalizedMessage.includes(hint));
+};
+
 /**
  * Human-friendly relative time ("just now", "5 minutes ago", "3 days ago").
  * Falls back to a localized date once the delta exceeds one week.

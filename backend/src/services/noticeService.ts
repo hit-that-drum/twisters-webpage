@@ -92,6 +92,7 @@ const normalizeNoticeMutationPayload = (
 class NoticeService {
   async getNotices(authenticatedUser: AuthenticatedUser | undefined): Promise<Notice[]> {
     const scope = resolveDataScopeByUser(authenticatedUser);
+    await noticeRepository.initializeSchema();
     const rows = await noticeRepository.findAll(scope);
     return rows.map((row) => ({
       ...row,
