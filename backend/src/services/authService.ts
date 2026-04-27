@@ -52,6 +52,7 @@ import {
   type ResendVerificationEmailDTO,
   type ResetPasswordDTO,
   type SignUpDTO,
+  type UpdateMeDTO,
   type UpdateProfileImageDTO,
   type VerifyEmailDTO,
   type VerifyResetTokenDTO,
@@ -63,9 +64,48 @@ import {
   requireAuthenticatedUser,
 } from '../utils/authScope.js';
 import { evaluatePasswordPolicy, PASSWORD_POLICY_ERROR_MESSAGE } from '../utils/passwordPolicy.js';
+import { normalizeOptionalPhoneNumber, normalizePhoneNumber } from '../utils/phoneNumber.js';
 
 const SALT_ROUNDS = 10;
 const isProduction = process.env.NODE_ENV === 'production';
+
+const normalizeOptionalBirthDate = (rawValue: unknown) => {
+  if (rawValue === null || rawValue === undefined) {
+    return null;
+  }
+
+  if (typeof rawValue !== 'string') {
+    throw new HttpError(400, '생년월일 형식이 올바르지 않습니다.');
+  }
+
+  const normalizedDate = rawValue.trim();
+  if (!normalizedDate) {
+    return null;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+    throw new HttpError(400, '생년월일은 YYYY-MM-DD 형식이어야 합니다.');
+  }
+
+  const [yearText, monthText, dayText] = normalizedDate.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    throw new HttpError(400, '생년월일 형식이 올바르지 않습니다.');
+  }
+
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    candidate.getUTCFullYear() !== year ||
+    candidate.getUTCMonth() !== month - 1 ||
+    candidate.getUTCDate() !== day
+  ) {
+    throw new HttpError(400, '유효한 생년월일을 입력해주세요.');
+  }
+
+  return normalizedDate;
+};
 
 class AuthService {
   async createSignInSession(user: LocalAuthUser, rememberMe: boolean) {
@@ -140,8 +180,34 @@ class AuthService {
         typeof me.profileImage === 'string' && me.profileImage.trim().length > 0
           ? me.profileImage.trim()
           : null,
+      phone:
+        typeof me.phone === 'string' && me.phone.trim().length > 0
+          ? normalizePhoneNumber(me.phone)
+          : null,
+      birthDate: typeof me.birthDate === 'string' && me.birthDate.trim().length > 0 ? me.birthDate : null,
+      joinedAt: typeof me.joinedAt === 'string' && me.joinedAt.trim().length > 0 ? me.joinedAt : null,
       isAdmin: Boolean(me.isAdmin),
       isTest: normalizeBoolean(me.isTest, false),
+    };
+  }
+
+  async updateMe(authenticatedUser: AuthenticatedUser | undefined, payload: UpdateMeDTO) {
+    const currentUser = requireAuthenticatedUser(authenticatedUser);
+    const phone = normalizeOptionalPhoneNumber(payload.phone);
+    const birthDate = normalizeOptionalBirthDate(payload.birthDate);
+
+    const updated = await authRepository.updateMeProfileByUserId(currentUser.id, {
+      phone,
+      birthDate,
+    });
+    if (!updated) {
+      throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
+    }
+
+    return {
+      message: '프로필 정보가 저장되었습니다.',
+      phone,
+      birthDate,
     };
   }
 

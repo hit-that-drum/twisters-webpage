@@ -12,6 +12,7 @@ import {
   type RequestResetDTO,
   type ResetPasswordDTO,
   type SignUpDTO,
+  type UpdateMeDTO,
   type UpdateProfileImageDTO,
   type VerifyEmailDTO,
   type VerifyResetTokenDTO,
@@ -84,6 +85,22 @@ export const updateProfileImage = async (req: Request, res: Response) => {
       error,
       '프로필 이미지 저장 중 오류가 발생했습니다.',
       'Profile image update error',
+    );
+  }
+};
+
+export const updateMe = async (req: Request, res: Response) => {
+  try {
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const payload = req.body as UpdateMeDTO;
+    const result = await authService.updateMe(authenticatedUser, payload);
+    return res.json(result);
+  } catch (error) {
+    return handleControllerError(
+      res,
+      error,
+      '프로필 정보 저장 중 오류가 발생했습니다.',
+      'Profile update error',
     );
   }
 };

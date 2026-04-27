@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import { GlobalButton, useConfirmDialog } from '@/common/components';
 import type { TAction } from '@/common/components/GlobalModal';
@@ -20,6 +20,7 @@ import type { BoardCommentItem, BoardPostItem } from '@/pages/board/lib/boardTyp
 
 export default function Board() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { meInfo } = useAuth();
   const { confirm, confirmDialog } = useConfirmDialog();
 
@@ -27,6 +28,17 @@ export default function Board() {
   const canCreatePost = Boolean(meInfo);
 
   const handleExpiredSession = useExpiredSession();
+
+  const targetPostId = useMemo(() => {
+    const rawPostId = searchParams.get('postId');
+    const parsedPostId = Number(rawPostId);
+
+    if (!Number.isInteger(parsedPostId) || parsedPostId <= 0) {
+      return null;
+    }
+
+    return parsedPostId;
+  }, [searchParams]);
 
   const requireAuthenticatedAction = useCallback(() => {
     if (!meInfo) {
@@ -77,6 +89,7 @@ export default function Board() {
     sortOption,
     setSearchInput,
     setSortOption,
+    ensurePostVisible,
     loadBoardPosts,
     handleSearchSubmit,
     handleResetFilters,
@@ -93,6 +106,7 @@ export default function Board() {
     confirm,
     onExpiredSession: handleExpiredSession,
   });
+  const expandPost = comments.expandPost;
 
   const reactions = useBoardReactions({
     boardPosts,
@@ -108,6 +122,34 @@ export default function Board() {
     loadBoardPosts,
     onExpiredSession: handleExpiredSession,
   });
+
+  useEffect(() => {
+    if (!targetPostId || isLoading || boardPosts.length === 0) {
+      return;
+    }
+
+    if (!boardPosts.some((post) => post.id === targetPostId)) {
+      return;
+    }
+
+    ensurePostVisible(targetPostId);
+    expandPost(targetPostId);
+  }, [boardPosts, ensurePostVisible, expandPost, isLoading, targetPostId]);
+
+  useEffect(() => {
+    if (!targetPostId || !displayedPosts.some((post) => post.id === targetPostId)) {
+      return;
+    }
+
+    const scrollTimer = window.setTimeout(() => {
+      document.getElementById(`board-post-${targetPostId}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 80);
+
+    return () => window.clearTimeout(scrollTimer);
+  }, [displayedPosts, targetPostId]);
 
   const addPostActions: TAction[] = [
     {

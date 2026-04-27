@@ -4,6 +4,12 @@ import type useConfirmDialog from '@/common/components/useConfirmDialog';
 import type { ModalCloseReason } from '@/common/components/GlobalModal';
 import { apiFetch } from '@/common/lib/api/apiClient';
 import { getApiMessage, parseApiResponse } from '@/common/lib/api/apiHelpers';
+import {
+  formatPhoneInput,
+  isValidOptionalPhoneNumber,
+  normalizePhoneNumber,
+  PHONE_FORMAT_ERROR_MESSAGE,
+} from '@/common/lib/phoneNumber';
 import type { MemberFormState } from '@/pages/member/MemberDetailModal';
 import { createDefaultMemberForm, toEditForm } from '@/pages/member/lib/memberFormatters';
 import type { MemberUser } from '@/entities/user/types';
@@ -105,7 +111,7 @@ export default function useMemberMutations({
       const { name, value } = event.target;
       setAddMemberForm((previous) => ({
         ...previous,
-        [name]: value,
+        [name]: name === 'phone' ? formatPhoneInput(value) : value,
       }));
     },
     [],
@@ -116,7 +122,7 @@ export default function useMemberMutations({
       const { name, value } = event.target;
       setEditMemberForm((previous) => ({
         ...previous,
-        [name]: value,
+        [name]: name === 'phone' ? formatPhoneInput(value) : value,
       }));
     },
     [],
@@ -137,12 +143,20 @@ export default function useMemberMutations({
   }, []);
 
   const handleCreateMember = useCallback(async () => {
+    if (!isValidOptionalPhoneNumber(addMemberForm.phone)) {
+      enqueueSnackbar(PHONE_FORMAT_ERROR_MESSAGE, { variant: 'error' });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const response = await apiFetch('/member', {
         method: 'POST',
-        body: JSON.stringify(addMemberForm),
+        body: JSON.stringify({
+          ...addMemberForm,
+          phone: normalizePhoneNumber(addMemberForm.phone),
+        }),
       });
       const payload = await parseApiResponse(response);
 
@@ -175,12 +189,20 @@ export default function useMemberMutations({
       return;
     }
 
+    if (!isValidOptionalPhoneNumber(editMemberForm.phone)) {
+      enqueueSnackbar(PHONE_FORMAT_ERROR_MESSAGE, { variant: 'error' });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const response = await apiFetch(`/member/${selectedUser.id}`, {
         method: 'PUT',
-        body: JSON.stringify(editMemberForm),
+        body: JSON.stringify({
+          ...editMemberForm,
+          phone: normalizePhoneNumber(editMemberForm.phone),
+        }),
       });
       const payload = await parseApiResponse(response);
 

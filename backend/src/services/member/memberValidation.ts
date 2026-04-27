@@ -4,6 +4,7 @@ import {
   type MemberMutationDTO,
   type MemberMutationPayload,
 } from '../../types/member.types.js';
+import { normalizeOptionalPhoneNumber } from '../../utils/phoneNumber.js';
 import { normalizeBoolean } from '../../utils/parseUtils.js';
 
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -175,7 +176,7 @@ export const normalizeMemberMutationPayload = (
     name: normalizeRequiredText(payload.name, '이름', 100),
     email: normalizeOptionalEmail(payload.email),
     isAdmin: normalizeBoolean(payload.isAdmin, false),
-    phone: normalizeOptionalText(payload.phone, 30, '전화번호'),
+    phone: normalizeOptionalPhoneNumber(payload.phone),
     department: normalizeOptionalText(payload.department, 100, '부서'),
     joinedAt: normalizeOptionalDate(payload.joinedAt, '입사일'),
     birthDate: normalizeOptionalDate(payload.birthDate, '생년월일'),

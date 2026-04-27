@@ -3,6 +3,7 @@ import type { ChangeEvent, ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import { FormModal } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
+import { PHONE_FORMATTED_LENGTH } from '@/common/lib/phoneNumber';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
@@ -72,6 +73,13 @@ function MemberDetailForm({
         value={form.phone}
         onChange={onFormChange}
         disabled={isSubmitting}
+        placeholder="010-1234-5678"
+        slotProps={{
+          htmlInput: {
+            inputMode: 'numeric',
+            maxLength: PHONE_FORMATTED_LENGTH,
+          },
+        }}
       />
       <LocalizationProvider dateAdapter={AdapterDayjs}>
         <DatePicker

@@ -1,3 +1,4 @@
+import { normalizePhoneNumber } from '@/common/lib/phoneNumber';
 import type { MemberUser } from '@/entities/user/types';
 import type { MemberFormState } from '@/pages/member/MemberDetailModal';
 import type { DuesDisplayMeta } from './memberTypes';
@@ -30,7 +31,7 @@ export const createDefaultMemberForm = (): MemberFormState => ({
 export const toEditForm = (member: MemberUser): MemberFormState => ({
   name: member.name,
   email: member.email ?? '',
-  phone: member.phone ?? '',
+  phone: member.phone ? normalizePhoneNumber(member.phone) : '',
   birthDate: member.birthDate ?? '',
 });
 

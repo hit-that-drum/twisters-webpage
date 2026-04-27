@@ -24,6 +24,7 @@ interface UseBoardCommentsResult {
   submittingCommentPostId: number | null;
   deletingCommentKey: string | null;
   expandedPostIds: number[];
+  expandPost: (postId: number) => void;
   togglePostExpand: (postId: number) => void;
   handleCommentDraftChange: (postId: number, value: string) => void;
   handleCreateComment: (postId: number) => Promise<void>;
@@ -115,6 +116,23 @@ export default function useBoardComments({
         const isExpanded = previous.includes(postId);
         if (isExpanded) {
           return previous.filter((id) => id !== postId);
+        }
+
+        if (commentsByPost[postId] === undefined) {
+          void loadBoardComments(postId);
+        }
+
+        return [...previous, postId];
+      });
+    },
+    [commentsByPost, loadBoardComments],
+  );
+
+  const expandPost = useCallback(
+    (postId: number) => {
+      setExpandedPostIds((previous) => {
+        if (previous.includes(postId)) {
+          return previous;
         }
 
         if (commentsByPost[postId] === undefined) {
@@ -247,6 +265,7 @@ export default function useBoardComments({
     submittingCommentPostId,
     deletingCommentKey,
     expandedPostIds,
+    expandPost,
     togglePostExpand,
     handleCommentDraftChange,
     handleCreateComment,

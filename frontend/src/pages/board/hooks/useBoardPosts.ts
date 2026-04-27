@@ -27,6 +27,7 @@ interface UseBoardPostsResult {
   sortOption: BoardSortOption;
   setSearchInput: (value: string) => void;
   setSortOption: (value: BoardSortOption) => void;
+  ensurePostVisible: (postId: number) => void;
   loadBoardPosts: () => Promise<void>;
   handleSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   handleResetFilters: () => void;
@@ -107,6 +108,18 @@ export default function useBoardPosts({
     setVisiblePostCount((previous) => previous + DEFAULT_VISIBLE_POSTS);
   }, []);
 
+  const ensurePostVisible = useCallback(
+    (postId: number) => {
+      const postIndex = boardPosts.findIndex((post) => post.id === postId);
+      if (postIndex < 0) {
+        return;
+      }
+
+      setVisiblePostCount((previous) => Math.max(previous, postIndex + 1));
+    },
+    [boardPosts],
+  );
+
   return {
     boardPosts,
     displayedPosts,
@@ -118,6 +131,7 @@ export default function useBoardPosts({
     sortOption,
     setSearchInput,
     setSortOption,
+    ensurePostVisible,
     loadBoardPosts,
     handleSearchSubmit,
     handleResetFilters,

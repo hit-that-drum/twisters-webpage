@@ -122,7 +122,7 @@ export default function BoardPostCard({
   ];
 
   return (
-    <article className="group">
+    <article id={`board-post-${post.id}`} className="group scroll-mt-24">
       <div
         className={`flex flex-col items-stretch justify-start overflow-hidden rounded-xl bg-white transition-all xl:flex-row ${
           post.pinned

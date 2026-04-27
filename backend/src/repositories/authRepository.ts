@@ -23,6 +23,8 @@ class AuthRepository {
       ensureUsersSchemaPromise = (async () => {
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isTest" BOOLEAN NOT NULL DEFAULT FALSE');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "profileImage" TEXT');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(30)');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "birthDate" DATE');
         await pool.query('ALTER TABLE users ALTER COLUMN "profileImage" TYPE TEXT');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "emailVerifiedAt" TIMESTAMPTZ');
         await pool.query(
@@ -81,7 +83,20 @@ class AuthRepository {
   async findMeById(userId: number) {
     await this.ensureUsersSchema();
     const result = await pool.query<MeUserRow>(
-      'SELECT id, name, email, "profileImage", "isAdmin", "isTest" FROM users WHERE id = $1',
+      `
+        SELECT
+          id,
+          name,
+          email,
+          "profileImage",
+          phone,
+          CASE WHEN "birthDate" IS NULL THEN NULL ELSE TO_CHAR("birthDate", 'YYYY-MM-DD') END AS "birthDate",
+          TO_CHAR("createdAt", 'YYYY-MM-DD') AS "joinedAt",
+          "isAdmin",
+          "isTest"
+        FROM users
+        WHERE id = $1
+      `,
       [userId],
     );
 
@@ -173,6 +188,19 @@ class AuthRepository {
       userId,
       profileImage,
     ]);
+
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async updateMeProfileByUserId(
+    userId: number,
+    payload: { phone: string | null; birthDate: string | null },
+  ) {
+    await this.ensureUsersSchema();
+    const result = await pool.query(
+      'UPDATE users SET phone = $2, "birthDate" = $3 WHERE id = $1',
+      [userId, payload.phone, payload.birthDate],
+    );
 
     return (result.rowCount ?? 0) > 0;
   }

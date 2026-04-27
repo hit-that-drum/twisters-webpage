@@ -29,7 +29,18 @@ class UserRepository {
   async findMeById(userId: number) {
     await ensureAuthSchema();
     const result = await pool.query<MeUserRow>(
-      'SELECT id, name, email, "profileImage", "isAdmin", "isTest" FROM users WHERE id = $1',
+      `SELECT
+         id,
+         name,
+         email,
+         "profileImage",
+         phone,
+         CASE WHEN "birthDate" IS NULL THEN NULL ELSE TO_CHAR("birthDate", 'YYYY-MM-DD') END AS "birthDate",
+         TO_CHAR("createdAt", 'YYYY-MM-DD') AS "joinedAt",
+         "isAdmin",
+         "isTest"
+       FROM users
+       WHERE id = $1`,
       [userId],
     );
 
@@ -121,6 +132,19 @@ class UserRepository {
       userId,
       profileImage,
     ]);
+
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async updateMeProfileByUserId(
+    userId: number,
+    payload: { phone: string | null; birthDate: string | null },
+  ) {
+    await ensureAuthSchema();
+    const result = await pool.query(
+      'UPDATE users SET phone = $2, "birthDate" = $3 WHERE id = $1',
+      [userId, payload.phone, payload.birthDate],
+    );
 
     return (result.rowCount ?? 0) > 0;
   }

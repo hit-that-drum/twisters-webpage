@@ -1,4 +1,5 @@
 import { normalizeBoolean, normalizeNullableString } from '@/common/lib/parseUtils';
+import { normalizePhoneNumber } from '@/common/lib/phoneNumber';
 import type { MemberUser } from '@/entities/user/types';
 import {
   ATTENDANCE_KEY_PATTERN,
@@ -39,13 +40,15 @@ export const parseMembers = (payload: unknown): MemberUser[] => {
         return null;
       }
 
+      const phone = normalizeNullableString(row.phone);
+
       return {
         id: row.id,
         name: row.name,
         email: normalizeNullableString(row.email),
         profileImage: normalizeNullableString(row.profileImage),
         isAdmin: normalizeBoolean(row.isAdmin),
-        phone: normalizeNullableString(row.phone),
+        phone: phone ? normalizePhoneNumber(phone) : null,
         joinedAt: normalizeNullableString(row.joinedAt),
         birthDate: normalizeNullableString(row.birthDate),
       };

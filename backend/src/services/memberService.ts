@@ -4,6 +4,7 @@ import { type AuthenticatedUser } from '../types/common.types.js';
 import { type Member, type MemberMutationDTO } from '../types/member.types.js';
 import { resolveDataScopeByUser } from '../utils/dataScope.js';
 import { normalizeBoolean } from '../utils/parseUtils.js';
+import { normalizePhoneNumber } from '../utils/phoneNumber.js';
 import {
   normalizeMemberMutationPayload,
   parseMemberId,
@@ -28,7 +29,7 @@ class MemberService {
           ? row.profileImage.trim()
           : null,
       isAdmin: normalizeBoolean(row.isAdmin, false),
-      phone: row.phone,
+      phone: row.phone ? normalizePhoneNumber(row.phone) : null,
       department: row.department,
       joinedAt: row.joinedAt,
       birthDate: row.birthDate,
