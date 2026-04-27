@@ -7,7 +7,7 @@ import {
 } from 'react';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { getApiMessage, parseApiResponse } from '@/common/lib/api/apiHelpers';
+import { getApiMessage, isEmptyListResponse, parseApiResponse } from '@/common/lib/api/apiHelpers';
 import { DEFAULT_VISIBLE_POSTS } from '@/pages/board/lib/boardConstants';
 import { buildBoardListPath, parseBoardPosts } from '@/pages/board/lib/boardParsers';
 import type { BoardPostItem, BoardSortOption } from '@/pages/board/lib/boardTypes';
@@ -61,6 +61,12 @@ export default function useBoardPosts({
       if (!response.ok) {
         if (response.status === 401) {
           onExpiredSession();
+          return;
+        }
+
+        if (isEmptyListResponse(response, payload, ['게시글', 'board', 'post', 'data'])) {
+          setBoardPosts([]);
+          setVisiblePostCount(DEFAULT_VISIBLE_POSTS);
           return;
         }
 

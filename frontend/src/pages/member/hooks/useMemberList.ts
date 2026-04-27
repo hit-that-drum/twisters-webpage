@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { getApiMessage, parseApiResponse } from '@/common/lib/api/apiHelpers';
+import { getApiMessage, isEmptyListResponse, parseApiResponse } from '@/common/lib/api/apiHelpers';
 import { parseMembers } from '@/pages/member/lib/memberParsers';
 import type { MemberUser } from '@/entities/user/types';
 
@@ -44,6 +44,12 @@ export default function useMemberList({
       if (!response.ok) {
         if (response.status === 401) {
           onExpiredSession();
+          return;
+        }
+
+        if (isEmptyListResponse(response, payload, ['회원', 'member', 'members', 'data'])) {
+          setUsers([]);
+          setSelectedUserId(null);
           return;
         }
 

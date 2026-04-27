@@ -126,6 +126,7 @@ const normalizeSettlementPayload = (payload: SettlementMutationDTO): SettlementM
 class SettlementService {
   async getSettlements(authenticatedUser: AuthenticatedUser | undefined): Promise<Settlement[]> {
     const scope = resolveDataScopeByUser(authenticatedUser);
+    await settlementRepository.initializeSchema();
     const rows = await settlementRepository.findAll(scope);
     return rows.map((row) => ({
       ...row,

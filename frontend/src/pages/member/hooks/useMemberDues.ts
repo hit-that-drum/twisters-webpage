@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { getApiMessage, parseApiResponse } from '@/common/lib/api/apiHelpers';
+import { getApiMessage, isEmptyListResponse, parseApiResponse } from '@/common/lib/api/apiHelpers';
 import { parseMemberDuesStatus } from '@/pages/member/lib/memberParsers';
 
 interface UseMemberDuesOptions {
@@ -40,6 +40,12 @@ export default function useMemberDues({
       if (!response.ok) {
         if (response.status === 401) {
           onExpiredSession();
+          return;
+        }
+
+        if (isEmptyListResponse(response, payload, ['회원', 'member', '회비', 'dues', 'deposit', 'status'])) {
+          setDuesYears([]);
+          setDuesStatusByMemberId({});
           return;
         }
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { getApiMessage, parseApiResponse } from '@/common/lib/api/apiHelpers';
+import { getApiMessage, isEmptyListResponse, parseApiResponse } from '@/common/lib/api/apiHelpers';
 import { parseSettlementRows } from '@/pages/settlement/lib/settlementParsers';
 import type { SettlementRecord } from '@/pages/settlement/lib/settlementTypes';
 
@@ -35,6 +35,11 @@ export default function useSettlementList({
       if (!response.ok) {
         if (response.status === 401) {
           onExpiredSession();
+          return;
+        }
+
+        if (isEmptyListResponse(response, payload, ['정산', 'settlement', 'settlements', 'data'])) {
+          setSettlementRows([]);
           return;
         }
 

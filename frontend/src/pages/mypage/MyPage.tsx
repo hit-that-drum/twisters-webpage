@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { FaHeart, FaRegStar, FaThumbsDown, FaThumbsUp } from 'react-icons/fa';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { getApiMessage, parseApiResponse, formatRelativeTime } from '@/common/lib/api/apiHelpers';
+import {
+  getApiMessage,
+  isEmptyListResponse,
+  parseApiResponse,
+  formatRelativeTime,
+} from '@/common/lib/api/apiHelpers';
 import useExpiredSession from '@/common/hooks/useExpiredSession';
 import { FormModal, GlobalButton, GlobalImageUpload } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
@@ -327,6 +332,11 @@ export default function Mypage() {
         if (!response.ok) {
           if (response.status === 401) {
             handleExpiredSession();
+            return;
+          }
+
+          if (isEmptyListResponse(response, payload, ['게시글', 'board', 'post', 'data'])) {
+            setReactionPosts([]);
             return;
           }
 

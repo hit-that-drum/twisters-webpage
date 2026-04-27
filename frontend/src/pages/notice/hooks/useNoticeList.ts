@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { enqueueSnackbar } from 'notistack';
 import { apiFetch } from '@/common/lib/api/apiClient';
-import { getApiMessage, parseApiResponse } from '@/common/lib/api/apiHelpers';
+import { getApiMessage, isEmptyListResponse, parseApiResponse } from '@/common/lib/api/apiHelpers';
 import { parseNoticeList } from '@/pages/notice/lib/noticeParsers';
 import { DEFAULT_VISIBLE_NOTICES, type NoticeItem } from '@/pages/notice/lib/noticeTypes';
 
@@ -32,6 +32,12 @@ export default function useNoticeList(): UseNoticeListResult {
       const payload = await parseApiResponse(response);
 
       if (!response.ok) {
+        if (isEmptyListResponse(response, payload, ['공지', 'notice', 'notices', 'data'])) {
+          setNoticeList([]);
+          setVisibleNoticeCount(DEFAULT_VISIBLE_NOTICES);
+          return;
+        }
+
         enqueueSnackbar(`공지사항 조회 실패: ${getApiMessage(payload, '알 수 없는 에러')}`, {
           variant: 'error',
         });
