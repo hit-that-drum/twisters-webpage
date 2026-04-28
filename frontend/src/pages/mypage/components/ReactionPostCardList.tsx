@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { formatRelativeTime } from '@/common/lib/api/apiHelpers';
 import type { BoardPostItem } from '@/pages/board/lib/boardTypes';
 import { createBoardPostUrl, getReactionCount } from '@/pages/mypage/lib/myPageHelpers';
@@ -8,7 +9,7 @@ interface ReactionPostCardListProps {
   posts: BoardPostItem[];
 }
 
-export default function ReactionPostCardList({ section, posts }: ReactionPostCardListProps) {
+function ReactionPostCardList({ section, posts }: ReactionPostCardListProps) {
   const Icon = section.icon;
 
   return (
@@ -46,3 +47,5 @@ export default function ReactionPostCardList({ section, posts }: ReactionPostCar
     </div>
   );
 }
+
+export default memo(ReactionPostCardList);

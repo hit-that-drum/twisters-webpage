@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { FormModal } from '@/common/components';
 import type { ModalCloseReason } from '@/common/components/GlobalModal';
 import type { BoardPostItem } from '@/pages/board/lib/boardTypes';
@@ -11,7 +12,7 @@ interface ReactionPostsModalProps {
   onClose: (event: object, reason: ModalCloseReason) => void;
 }
 
-export default function ReactionPostsModal({ open, section, posts, onClose }: ReactionPostsModalProps) {
+function ReactionPostsModal({ open, section, posts, onClose }: ReactionPostsModalProps) {
   if (!section) {
     return null;
   }
@@ -30,3 +31,5 @@ export default function ReactionPostsModal({ open, section, posts, onClose }: Re
     </FormModal>
   );
 }
+
+export default memo(ReactionPostsModal);

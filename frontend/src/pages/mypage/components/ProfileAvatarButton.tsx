@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { getMemberInitial } from '@/pages/member/lib/memberFormatters';
 
 interface ProfileAvatarButtonProps {
@@ -7,7 +7,7 @@ interface ProfileAvatarButtonProps {
   onClick: () => void;
 }
 
-export default function ProfileAvatarButton({
+function ProfileAvatarButton({
   name,
   profileImage,
   onClick,
@@ -35,3 +35,5 @@ export default function ProfileAvatarButton({
     </button>
   );
 }
+
+export default memo(ProfileAvatarButton);

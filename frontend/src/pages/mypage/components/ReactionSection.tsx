@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { BoardPostItem, BoardReactionType } from '@/pages/board/lib/boardTypes';
 import ReactionPostCardList from '@/pages/mypage/components/ReactionPostCardList';
 import {
@@ -12,7 +13,7 @@ interface ReactionSectionProps {
   onOpenAll: (sectionKey: BoardReactionType) => void;
 }
 
-export default function ReactionSection({ section, posts, onOpenAll }: ReactionSectionProps) {
+function ReactionSection({ section, posts, onOpenAll }: ReactionSectionProps) {
   const Icon = section.icon;
   const shouldShowModalEntry = posts.length >= REACTION_MODAL_THRESHOLD;
   const displayedPosts = shouldShowModalEntry ? posts.slice(0, REACTION_INLINE_LIMIT) : posts;
@@ -54,3 +55,5 @@ export default function ReactionSection({ section, posts, onOpenAll }: ReactionS
     </section>
   );
 }
+
+export default memo(ReactionSection);

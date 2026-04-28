@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { FormModal, GlobalImageUpload } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 
@@ -11,7 +12,7 @@ interface ProfileImageEditorModalProps {
   onSave: () => void;
 }
 
-export default function ProfileImageEditorModal({
+function ProfileImageEditorModal({
   open,
   profileImages,
   isSubmitting,
@@ -52,3 +53,5 @@ export default function ProfileImageEditorModal({
     </FormModal>
   );
 }
+
+export default memo(ProfileImageEditorModal);
