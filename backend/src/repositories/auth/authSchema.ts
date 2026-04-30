@@ -14,8 +14,6 @@ export const ensureAuthSchema = async () => {
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isTest" BOOLEAN NOT NULL DEFAULT FALSE');
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "profileImage" TEXT');
       await pool.query('ALTER TABLE users ALTER COLUMN "profileImage" TYPE TEXT');
-      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)');
-      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_id VARCHAR(255)');
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(30)');
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "birthDate" DATE');
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "emailVerifiedAt" TIMESTAMPTZ');

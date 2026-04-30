@@ -186,17 +186,7 @@ class UserRepository {
     await ensureAuthSchema();
     const result = await pool.query<AdminUserRow>(
       `
-        SELECT
-          id,
-          name,
-          email,
-          "profileImage",
-          "isAdmin",
-          "isAllowed",
-          "createdAt",
-          "emailVerifiedAt",
-          (google_id IS NOT NULL) AS "hasGoogleAuth",
-          (kakao_id IS NOT NULL) AS "hasKakaoAuth"
+        SELECT id, name, email, "profileImage", "isAdmin", "isAllowed", "createdAt", "emailVerifiedAt"
         FROM users
         WHERE $1::boolean = FALSE OR ("isTest" = TRUE OR name ILIKE 'TEST%')
         ORDER BY "createdAt" DESC, id DESC
