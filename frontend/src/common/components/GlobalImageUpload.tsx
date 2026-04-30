@@ -93,6 +93,7 @@ export default function GlobalImageUpload({
   const [isDragActive, setIsDragActive] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [previewUrlByValue, setPreviewUrlByValue] = useState<Record<string, string>>({});
+  const activeUploadScope = import.meta.env.PROD ? uploadScope : undefined;
 
   useEffect(() => {
     valueRef.current = value;
@@ -152,10 +153,10 @@ export default function GlobalImageUpload({
     }
 
     try {
-      const convertedImages = uploadScope
+      const convertedImages = activeUploadScope
         ? await Promise.all(
             imageFiles.map(async (file) => {
-              const uploadedImage = await uploadImageFileToB2(file, uploadScope);
+              const uploadedImage = await uploadImageFileToB2(file, activeUploadScope);
               const previewUrl = uploadedImage.imageUrl;
               if (previewUrl) {
                 setPreviewUrlByValue((previous) => ({
