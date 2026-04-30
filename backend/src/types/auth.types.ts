@@ -29,6 +29,10 @@ export interface MeUser {
   name: string;
   email: string;
   profileImage: string | null;
+  profileImageRef: string | null;
+  phone: string | null;
+  birthDate: string | null;
+  joinedAt: string | null;
   isAdmin: boolean;
   isTest: boolean;
 }
@@ -44,6 +48,9 @@ export interface MeUserRow {
   name: string;
   email: string;
   profileImage: string | null;
+  phone: string | null;
+  birthDate: string | null;
+  joinedAt: string | null;
   isAdmin: boolean | number;
   isTest: boolean | number;
 }
@@ -61,6 +68,7 @@ export interface PendingUserRow {
   name: string;
   email: string;
   createdAt: Date;
+  emailVerifiedAt: Date | null;
 }
 
 export interface UserApprovalRow {
@@ -78,6 +86,8 @@ export interface ManagedUserRow {
   isAllowed: boolean | number;
 }
 
+export type AdminAuthProvider = 'email' | 'google' | 'kakao';
+
 export interface AdminUserRow {
   id: number;
   name: string;
@@ -86,6 +96,9 @@ export interface AdminUserRow {
   isAdmin: boolean | number;
   isAllowed: boolean | number;
   createdAt: Date;
+  emailVerifiedAt: Date | null;
+  hasGoogleAuth: boolean | number;
+  hasKakaoAuth: boolean | number;
 }
 
 export interface UserEmailRow {
@@ -150,4 +163,9 @@ export interface RefreshSessionDTO {
 
 export interface UpdateProfileImageDTO {
   profileImage?: unknown;
+}
+
+export interface UpdateMeDTO {
+  phone?: unknown;
+  birthDate?: unknown;
 }

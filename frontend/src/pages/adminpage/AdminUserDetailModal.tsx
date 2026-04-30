@@ -1,9 +1,10 @@
 import { MenuItem, TextField } from '@mui/material';
 import type { ChangeEvent, ReactNode } from 'react';
-import { GlobalModal } from '@/common/components';
+import { FormModal } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
-
-const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+import type { AuthProvider } from '@/entities/user/types';
+import AdminAuthProviderBadge from '@/pages/adminpage/components/AdminAuthProviderBadge';
+import { isValidEmail } from '@/pages/adminpage/lib/adminFormatters';
 
 const formatRoleLabel = (role: AdminUserFormState['role']) => {
   return role === 'admin' ? 'Moderator' : 'Member';
@@ -34,6 +35,7 @@ interface AdminUserDetailModalProps {
   emailOptional?: boolean;
   userName?: string;
   joinedLabel?: string;
+  authProvider?: AuthProvider;
   onFormChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
 }
 
@@ -47,6 +49,7 @@ function AdminUserDetailForm({
   emailOptional = false,
   userName,
   joinedLabel,
+  authProvider = 'email',
   onFormChange,
 }: Pick<
   AdminUserDetailModalProps,
@@ -59,6 +62,7 @@ function AdminUserDetailForm({
   | 'emailOptional'
   | 'userName'
   | 'joinedLabel'
+  | 'authProvider'
   | 'onFormChange'
 >) {
   const trimmedName = form.name.trim();
@@ -82,6 +86,10 @@ function AdminUserDetailForm({
       <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
         <p className="font-semibold text-slate-900">{userName || 'Selected user'}</p>
         {joinedLabel ? <p className="mt-1">Joined {joinedLabel}</p> : null}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sign-up</span>
+          <AdminAuthProviderBadge provider={authProvider} />
+        </div>
         <p className="mt-2 text-xs leading-5 text-slate-500">
           {disableStatusControl
             ? 'Name and email update the selected test-member record. Test-member role and status do not control app sign-in authority here.'
@@ -222,10 +230,11 @@ export default function AdminUserDetailModal({
   emailOptional,
   userName,
   joinedLabel,
+  authProvider,
   onFormChange,
 }: AdminUserDetailModalProps) {
   return (
-    <GlobalModal open={open} handleClose={handleClose} title={title} actions={actions}>
+    <FormModal open={open} handleClose={handleClose} title={title} actions={actions}>
       <AdminUserDetailForm
         form={form}
         initialForm={initialForm}
@@ -236,8 +245,9 @@ export default function AdminUserDetailModal({
         emailOptional={emailOptional}
         userName={userName}
         joinedLabel={joinedLabel}
+        authProvider={authProvider}
         onFormChange={onFormChange}
       />
-    </GlobalModal>
+    </FormModal>
   );
 }

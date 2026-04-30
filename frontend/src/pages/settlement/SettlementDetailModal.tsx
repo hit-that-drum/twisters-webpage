@@ -1,6 +1,6 @@
 import { TextField, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import type { ChangeEvent, MouseEvent, ReactNode } from 'react';
-import { GlobalModal } from '@/common/components';
+import { FormModal } from '@/common/components';
 import type { ModalCloseReason, TAction } from '@/common/components/GlobalModal';
 
 export type SettlementModalType = 'ADD' | 'EDIT';
@@ -109,14 +109,19 @@ export default function SettlementDetailModal({
   onAmountTypeChange,
 }: SettlementDetailModalProps) {
   return (
-    <GlobalModal open={open} handleClose={handleClose} title={title} actions={actions}>
+    <FormModal
+      open={open}
+      handleClose={handleClose}
+      title={title}
+      actions={actions}
+      formKey={type}
+    >
       <SettlementDetailForm
-        key={type}
         form={form}
         isSubmitting={isSubmitting}
         onFormChange={onFormChange}
         onAmountTypeChange={onAmountTypeChange}
       />
-    </GlobalModal>
+    </FormModal>
   );
 }

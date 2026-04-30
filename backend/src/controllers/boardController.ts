@@ -1,9 +1,14 @@
 import { type Request, type Response } from 'express';
-import { boardService } from '../services/boardService.js';
+import {
+  boardCommentService,
+  boardReactionService,
+  boardService,
+} from '../services/boardService.js';
 import { type AuthenticatedRequest } from '../types/common.types.js';
 import {
   type CreateBoardCommentDTO,
   type CreateBoardDTO,
+  type ToggleBoardReactionDTO,
   type UpdateBoardDTO,
 } from '../types/board.types.js';
 import { handleControllerError } from '../utils/controllerErrorHandler.js';
@@ -62,7 +67,7 @@ export const deleteBoard = async (req: Request, res: Response) => {
 export const getBoardComments = async (req: Request, res: Response) => {
   try {
     const authenticatedUser = (req as AuthenticatedRequest).user;
-    const comments = await boardService.getBoardComments(authenticatedUser, req.params.id);
+    const comments = await boardCommentService.getBoardComments(authenticatedUser, req.params.id);
     return res.json(comments);
   } catch (error) {
     return handleControllerError(res, error, '댓글 조회 중 오류가 발생했습니다.', 'Board comments fetch error');
@@ -73,7 +78,7 @@ export const createBoardComment = async (req: Request, res: Response) => {
   try {
     const authenticatedUser = (req as AuthenticatedRequest).user;
     const payload = req.body as CreateBoardCommentDTO;
-    await boardService.createBoardComment(authenticatedUser, req.params.id, payload);
+    await boardCommentService.createBoardComment(authenticatedUser, req.params.id, payload);
     return res.status(201).json({ message: '댓글이 등록되었습니다.' });
   } catch (error) {
     return handleControllerError(res, error, '댓글 등록 중 오류가 발생했습니다.', 'Board comment create error');
@@ -83,9 +88,31 @@ export const createBoardComment = async (req: Request, res: Response) => {
 export const deleteBoardComment = async (req: Request, res: Response) => {
   try {
     const authenticatedUser = (req as AuthenticatedRequest).user;
-    await boardService.deleteBoardComment(authenticatedUser, req.params.id, req.params.commentId);
+    await boardCommentService.deleteBoardComment(
+      authenticatedUser,
+      req.params.id,
+      req.params.commentId,
+    );
     return res.json({ message: '댓글이 삭제되었습니다.' });
   } catch (error) {
     return handleControllerError(res, error, '댓글 삭제 중 오류가 발생했습니다.', 'Board comment delete error');
+  }
+};
+
+export const toggleBoardReaction = async (req: Request, res: Response) => {
+  try {
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const payload = req.body as ToggleBoardReactionDTO;
+    const result = await boardReactionService.toggleBoardReaction(
+      authenticatedUser,
+      req.params.id,
+      payload,
+    );
+    return res.json({
+      message: result.active ? '게시글 반응이 등록되었습니다.' : '게시글 반응이 취소되었습니다.',
+      reactions: result.reactions,
+    });
+  } catch (error) {
+    return handleControllerError(res, error, '게시글 반응 처리 중 오류가 발생했습니다.', 'Board reaction toggle error');
   }
 };

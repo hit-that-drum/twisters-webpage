@@ -1,4 +1,5 @@
 import { TextField } from '@mui/material';
+import { enqueueSnackbar } from 'notistack';
 import {
   type ChangeEvent,
   type ClipboardEvent,
@@ -9,6 +10,12 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  createImageDownloadUrl,
+  isB2ImageReference,
+  type ImageUploadScope,
+  uploadImageFileToB2,
+} from '@/common/lib/images/b2ImageStorage';
 
 type PreviewShape = 'square' | 'circle';
 
@@ -20,6 +27,7 @@ interface GlobalImageUploadProps {
   label?: string;
   helperText?: string;
   previewShape?: PreviewShape;
+  uploadScope?: ImageUploadScope;
 }
 
 const readFileAsDataUrl = (file: File) =>
@@ -48,7 +56,8 @@ const isSupportedImageSource = (value: string) => {
   return (
     normalizedValue.startsWith('http://') ||
     normalizedValue.startsWith('https://') ||
-    normalizedValue.startsWith('data:image/')
+    normalizedValue.startsWith('data:image/') ||
+    normalizedValue.startsWith('b2://')
   );
 };
 
@@ -76,16 +85,62 @@ export default function GlobalImageUpload({
   label = 'IMAGES',
   helperText,
   previewShape = 'square',
+  uploadScope,
 }: GlobalImageUploadProps) {
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const valueRef = useRef(value);
   const [isDragActive, setIsDragActive] = useState(false);
   const [urlInput, setUrlInput] = useState('');
+  const [previewUrlByValue, setPreviewUrlByValue] = useState<Record<string, string>>({});
+  const activeUploadScope = import.meta.env.PROD ? uploadScope : undefined;
 
   useEffect(() => {
     valueRef.current = value;
   }, [value]);
+
+  useEffect(() => {
+    const b2ImageRefs = value.filter((imageRef) => isB2ImageReference(imageRef));
+    const unresolvedRefs = b2ImageRefs.filter((imageRef) => !previewUrlByValue[imageRef]);
+    if (unresolvedRefs.length === 0) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const resolvePreviewUrls = async () => {
+      const resolvedEntries = await Promise.all(
+        unresolvedRefs.map(async (imageRef) => {
+          try {
+            return [imageRef, await createImageDownloadUrl(imageRef)] as const;
+          } catch (error) {
+            console.error('Image preview URL creation failed:', error);
+            return [imageRef, null] as const;
+          }
+        }),
+      );
+
+      if (isCancelled) {
+        return;
+      }
+
+      setPreviewUrlByValue((previous) => {
+        const nextPreviewUrls = { ...previous };
+        resolvedEntries.forEach(([imageRef, imageUrl]) => {
+          if (imageUrl) {
+            nextPreviewUrls[imageRef] = imageUrl;
+          }
+        });
+        return nextPreviewUrls;
+      });
+    };
+
+    void resolvePreviewUrls();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [previewUrlByValue, value]);
 
   const applyIncomingImages = async (incomingFiles: File[]) => {
     if (disabled || incomingFiles.length === 0) {
@@ -97,8 +152,27 @@ export default function GlobalImageUpload({
       return;
     }
 
-    const convertedImages = await Promise.all(imageFiles.map((file) => readFileAsDataUrl(file)));
-    onChange(mergeImages(valueRef.current, convertedImages, maxImages));
+    try {
+      const convertedImages = activeUploadScope
+        ? await Promise.all(
+            imageFiles.map(async (file) => {
+              const uploadedImage = await uploadImageFileToB2(file, activeUploadScope);
+              const previewUrl = uploadedImage.imageUrl;
+              if (previewUrl) {
+                setPreviewUrlByValue((previous) => ({
+                  ...previous,
+                  [uploadedImage.imageRef]: previewUrl,
+                }));
+              }
+              return uploadedImage.imageRef;
+            }),
+          )
+        : await Promise.all(imageFiles.map((file) => readFileAsDataUrl(file)));
+      onChange(mergeImages(valueRef.current, convertedImages, maxImages));
+    } catch (error) {
+      console.error('Image upload failed:', error);
+      enqueueSnackbar('이미지 업로드 중 오류가 발생했습니다.', { variant: 'error' });
+    }
   };
 
   const handleFileInputChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -177,6 +251,9 @@ export default function GlobalImageUpload({
   };
 
   const previewShapeClassName = previewShape === 'circle' ? 'rounded-full' : 'rounded-xl';
+  const previewCardShapeClassName = previewShape === 'circle' ? 'rounded-full' : 'rounded-xl';
+  const removeButtonPositionClassName =
+    previewShape === 'circle' ? 'right-[12%] top-[12%]' : 'right-2 top-2';
 
   return (
     <div className="space-y-3">
@@ -275,41 +352,53 @@ export default function GlobalImageUpload({
 
       {value.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {value.map((imageUrl, index) => (
+          {value.map((imageUrl, index) => {
+            const previewSrc = previewUrlByValue[imageUrl] ?? (isB2ImageReference(imageUrl) ? null : imageUrl);
+
+            return (
             <div
               key={`${imageUrl}-${index}`}
-              className={`overflow-hidden border border-slate-200 bg-white shadow-sm ${previewShapeClassName}`}
+              className={`relative overflow-hidden bg-white shadow-sm ${
+                index === 0 ? 'border-[6px] border-yellow-400' : 'border border-slate-200'
+              } ${previewCardShapeClassName}`}
             >
               <div className="relative aspect-square bg-slate-100">
-                <img
-                  src={imageUrl}
-                  alt={`Upload preview ${index + 1}`}
-                  className={`h-full w-full object-cover ${previewShapeClassName}`}
-                />
-                <div className="absolute left-2 top-2 rounded-full bg-slate-900/75 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-                  {index === 0 ? 'Main' : `Image ${index + 1}`}
-                </div>
-              </div>
-              <div className="flex gap-2 p-2">
-                {index > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => handleMakeMainImage(index)}
-                    className="flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                  >
-                    Make Main
-                  </button>
-                ) : null}
+                {previewSrc ? (
+                  <img
+                    src={previewSrc}
+                    alt={`Upload preview ${index + 1}`}
+                    className={`h-full w-full object-cover ${previewShapeClassName}`}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-slate-400">
+                    Loading...
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => handleRemoveImage(index)}
-                  className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                  disabled={disabled}
+                  aria-label={`Remove upload preview ${index + 1}`}
+                  className={`absolute flex size-7 items-center justify-center rounded-full bg-slate-950/80 text-sm font-bold leading-none text-white shadow-sm transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50 ${removeButtonPositionClassName}`}
                 >
-                  Remove
+                  ×
                 </button>
               </div>
+              {index > 0 ? (
+                <div className="flex gap-2 p-2">
+                  <button
+                    type="button"
+                    onClick={() => handleMakeMainImage(index)}
+                    disabled={disabled}
+                    className="flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Make Main
+                  </button>
+                </div>
+              ) : null}
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
     </div>

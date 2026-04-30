@@ -8,6 +8,8 @@ CREATE TABLE public.users (
   google_id VARCHAR(255),
   kakao_id VARCHAR(255),
   "profileImage" TEXT,
+  phone VARCHAR(30),
+  "birthDate" DATE,
   "emailVerifiedAt" TIMESTAMPTZ,
   "isAdmin" BOOLEAN NOT NULL DEFAULT FALSE,
   "isAllowed" BOOLEAN NOT NULL DEFAULT FALSE,
@@ -127,6 +129,66 @@ CREATE TABLE public.test_board_comments (
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE public.meeting_sources (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "boardId" INTEGER NOT NULL UNIQUE REFERENCES public.board(id) ON DELETE CASCADE,
+  "meetingYear" INTEGER NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE public.test_meeting_sources (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "boardId" INTEGER NOT NULL UNIQUE REFERENCES public.test_board(id) ON DELETE CASCADE,
+  "meetingYear" INTEGER NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE public.meeting_attendance (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "meetingSourceId" INTEGER NOT NULL REFERENCES public.meeting_sources(id) ON DELETE CASCADE,
+  "memberId" INTEGER NOT NULL REFERENCES public.members(id) ON DELETE CASCADE,
+  "sourceCommentId" INTEGER REFERENCES public.board_comments(id) ON DELETE SET NULL,
+  "sourceType" VARCHAR(30) NOT NULL DEFAULT 'derived',
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE("meetingSourceId", "memberId")
+);
+
+CREATE TABLE public.test_meeting_attendance (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "meetingSourceId" INTEGER NOT NULL REFERENCES public.test_meeting_sources(id) ON DELETE CASCADE,
+  "memberId" INTEGER NOT NULL REFERENCES public.test_members(id) ON DELETE CASCADE,
+  "sourceCommentId" INTEGER REFERENCES public.test_board_comments(id) ON DELETE SET NULL,
+  "sourceType" VARCHAR(30) NOT NULL DEFAULT 'derived',
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE("meetingSourceId", "memberId")
+);
+
+CREATE TABLE public.meeting_attendance_overrides (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "memberId" INTEGER NOT NULL REFERENCES public.members(id) ON DELETE CASCADE,
+  "meetingYear" INTEGER NOT NULL,
+  attended BOOLEAN NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE("memberId", "meetingYear")
+);
+
+CREATE TABLE public.test_meeting_attendance_overrides (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "memberId" INTEGER NOT NULL REFERENCES public.test_members(id) ON DELETE CASCADE,
+  "meetingYear" INTEGER NOT NULL,
+  attended BOOLEAN NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE("memberId", "meetingYear")
+);
+
 CREATE TABLE public.password_reset_tokens (
   id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
@@ -191,6 +253,14 @@ CREATE INDEX idx_board_comments_author_id ON public.board_comments ("authorId");
 CREATE INDEX idx_test_board_comments_board_id
   ON public.test_board_comments ("boardId", "createdAt" ASC);
 CREATE INDEX idx_test_board_comments_author_id ON public.test_board_comments ("authorId");
+CREATE INDEX idx_meeting_sources_year ON public.meeting_sources ("meetingYear" DESC);
+CREATE INDEX idx_test_meeting_sources_year ON public.test_meeting_sources ("meetingYear" DESC);
+CREATE INDEX idx_meeting_attendance_member_id ON public.meeting_attendance ("memberId");
+CREATE INDEX idx_test_meeting_attendance_member_id ON public.test_meeting_attendance ("memberId");
+CREATE INDEX idx_meeting_attendance_overrides_member_year
+  ON public.meeting_attendance_overrides ("memberId", "meetingYear");
+CREATE INDEX idx_test_meeting_attendance_overrides_member_year
+  ON public.test_meeting_attendance_overrides ("memberId", "meetingYear");
 
 CREATE FUNCTION public.update_notice_updated_at()
 RETURNS TRIGGER AS $$
@@ -209,6 +279,14 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION public.update_board_comment_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW."updatedAt" = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION public.update_meeting_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW."updatedAt" = NOW();
@@ -245,5 +323,35 @@ CREATE TRIGGER trg_test_board_comment_update_date
 BEFORE UPDATE ON public.test_board_comments
 FOR EACH ROW
 EXECUTE FUNCTION public.update_board_comment_updated_at();
+
+CREATE TRIGGER trg_meeting_sources_update_date
+BEFORE UPDATE ON public.meeting_sources
+FOR EACH ROW
+EXECUTE FUNCTION public.update_meeting_updated_at();
+
+CREATE TRIGGER trg_test_meeting_sources_update_date
+BEFORE UPDATE ON public.test_meeting_sources
+FOR EACH ROW
+EXECUTE FUNCTION public.update_meeting_updated_at();
+
+CREATE TRIGGER trg_meeting_attendance_update_date
+BEFORE UPDATE ON public.meeting_attendance
+FOR EACH ROW
+EXECUTE FUNCTION public.update_meeting_updated_at();
+
+CREATE TRIGGER trg_test_meeting_attendance_update_date
+BEFORE UPDATE ON public.test_meeting_attendance
+FOR EACH ROW
+EXECUTE FUNCTION public.update_meeting_updated_at();
+
+CREATE TRIGGER trg_meeting_attendance_overrides_update_date
+BEFORE UPDATE ON public.meeting_attendance_overrides
+FOR EACH ROW
+EXECUTE FUNCTION public.update_meeting_updated_at();
+
+CREATE TRIGGER trg_test_meeting_attendance_overrides_update_date
+BEFORE UPDATE ON public.test_meeting_attendance_overrides
+FOR EACH ROW
+EXECUTE FUNCTION public.update_meeting_updated_at();
 
 COMMIT;

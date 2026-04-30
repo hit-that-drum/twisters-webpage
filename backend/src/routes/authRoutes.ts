@@ -9,6 +9,7 @@ router.post('/signin', authController.signIn);
 
 router.post('/signup', authController.signUp);
 router.get('/me', passport.authenticate('jwt', { session: false }), authController.getMe);
+router.patch('/me', passport.authenticate('jwt', { session: false }), authController.updateMe);
 router.patch(
   '/me/profile-image',
   passport.authenticate('jwt', { session: false }),
