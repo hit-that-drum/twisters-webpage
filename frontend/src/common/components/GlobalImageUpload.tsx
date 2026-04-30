@@ -312,7 +312,26 @@ export default function GlobalImageUpload({
     previewShape === 'circle' ? 'right-[12%] top-[12%]' : 'right-2 top-2';
 
   return (
-    <div className="space-y-3">
+    <div className="relative space-y-3" aria-busy={isUploadingImages}>
+      {isUploadingImages ? (
+        <div
+          className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-white/75 backdrop-blur-sm"
+          role="status"
+          aria-live="polite"
+          onClick={(event) => event.preventDefault()}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => event.preventDefault()}
+        >
+          <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-lg">
+            <span
+              className="inline-block size-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900"
+              aria-hidden="true"
+            />
+            이미지 업로드 중...
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex items-center justify-between gap-3">
         <label htmlFor={inputId} className="text-sm font-bold tracking-wide text-slate-700">
           {label}
@@ -352,10 +371,13 @@ export default function GlobalImageUpload({
         onPaste={(event) => {
           void handlePaste(event);
         }}
-        className={`rounded-2xl border-2 border-dashed p-5 transition ${
+        aria-disabled={isUploadDisabled}
+        className={`relative rounded-2xl border-2 border-dashed p-5 transition ${
           isDragActive
             ? 'border-blue-500 bg-blue-50/70'
-            : 'border-slate-300 bg-slate-50/70 hover:border-slate-400'
+            : isUploadDisabled
+              ? 'border-slate-300 bg-slate-50/70'
+              : 'border-slate-300 bg-slate-50/70 hover:border-slate-400'
         } ${isUploadDisabled ? 'cursor-not-allowed opacity-60' : ''}`}
       >
         <div className="flex flex-col items-center gap-3 text-center">
@@ -374,8 +396,14 @@ export default function GlobalImageUpload({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploadDisabled}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed"
+            className="inline-flex min-w-36 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed"
           >
+            {isUploadingImages ? (
+              <span
+                className="inline-block size-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                aria-hidden="true"
+              />
+            ) : null}
             {isUploadingImages ? '이미지 업로드 중...' : '이미지 선택하기'}
           </button>
         </div>
