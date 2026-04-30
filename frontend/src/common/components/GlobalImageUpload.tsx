@@ -86,6 +86,23 @@ const getUploadCandidates = (existingImages: string[], incomingFiles: File[], ma
   return incomingFiles.slice(0, availableSlots);
 };
 
+const reorderImages = (images: string[], fromIndex: number, toIndex: number) => {
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= images.length ||
+    toIndex >= images.length
+  ) {
+    return images;
+  }
+
+  const nextImages = [...images];
+  const [selectedImage] = nextImages.splice(fromIndex, 1);
+  nextImages.splice(toIndex, 0, selectedImage);
+  return nextImages;
+};
+
 export default function GlobalImageUpload({
   value,
   onChange,
@@ -104,8 +121,11 @@ export default function GlobalImageUpload({
   const [urlInput, setUrlInput] = useState('');
   const [previewUrlByValue, setPreviewUrlByValue] = useState<Record<string, string>>({});
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
+  const [dragOverImageIndex, setDragOverImageIndex] = useState<number | null>(null);
   const activeUploadScope = import.meta.env.PROD ? uploadScope : undefined;
   const isUploadDisabled = disabled || isUploadingImages;
+  const canReorderImages = !isUploadDisabled && value.length > 1;
 
   useEffect(() => {
     valueRef.current = value;
@@ -306,6 +326,61 @@ export default function GlobalImageUpload({
     onChange(nextImages);
   };
 
+  const resetImageDragState = () => {
+    setDraggedImageIndex(null);
+    setDragOverImageIndex(null);
+  };
+
+  const handleImageDragStart = (event: DragEvent<HTMLDivElement>, index: number) => {
+    if (!canReorderImages) {
+      event.preventDefault();
+      return;
+    }
+
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('application/x-twisters-image-index', String(index));
+    event.dataTransfer.setData('text/plain', String(index));
+    setDraggedImageIndex(index);
+    setDragOverImageIndex(index);
+  };
+
+  const handleImageDragOver = (event: DragEvent<HTMLDivElement>, index: number) => {
+    if (!canReorderImages || draggedImageIndex === null) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setDragOverImageIndex(index);
+  };
+
+  const handleImageDrop = (event: DragEvent<HTMLDivElement>, index: number) => {
+    if (!canReorderImages) {
+      return;
+    }
+
+    event.preventDefault();
+    const fallbackIndex = Number.parseInt(
+      event.dataTransfer.getData('application/x-twisters-image-index') ||
+        event.dataTransfer.getData('text/plain'),
+      10,
+    );
+    const fromIndex = draggedImageIndex ?? fallbackIndex;
+    resetImageDragState();
+
+    if (!Number.isInteger(fromIndex)) {
+      return;
+    }
+
+    const nextImages = reorderImages(valueRef.current, fromIndex, index);
+    if (nextImages === valueRef.current) {
+      return;
+    }
+
+    valueRef.current = nextImages;
+    onChange(nextImages);
+  };
+
   const previewShapeClassName = previewShape === 'circle' ? 'rounded-full' : 'rounded-xl';
   const previewCardShapeClassName = previewShape === 'circle' ? 'rounded-full' : 'rounded-xl';
   const removeButtonPositionClassName =
@@ -433,25 +508,46 @@ export default function GlobalImageUpload({
       </div>
 
       {helperText ? <p className="text-xs text-slate-500">{helperText}</p> : null}
+      {canReorderImages ? (
+        <p className="text-xs font-medium text-slate-500">
+          사진을 드래그해서 순서를 변경할 수 있습니다.
+        </p>
+      ) : null}
 
       {value.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {value.map((imageUrl, index) => {
             const previewSrc =
               previewUrlByValue[imageUrl] ?? (isB2ImageReference(imageUrl) ? null : imageUrl);
+            const isDraggedImage = draggedImageIndex === index;
+            const isDragTargetImage =
+              dragOverImageIndex === index &&
+              draggedImageIndex !== null &&
+              draggedImageIndex !== index;
 
             return (
               <div
                 key={`${imageUrl}-${index}`}
-                className={`relative overflow-hidden bg-white shadow-sm ${
+                draggable={canReorderImages}
+                onDragStart={(event) => handleImageDragStart(event, index)}
+                onDragOver={(event) => handleImageDragOver(event, index)}
+                onDrop={(event) => handleImageDrop(event, index)}
+                onDragEnd={resetImageDragState}
+                aria-label={`Upload preview ${index + 1}`}
+                className={`relative overflow-hidden bg-white shadow-sm transition ${
                   index === 0 ? 'border-[6px] border-yellow-400' : 'border border-slate-200'
-                } ${previewCardShapeClassName}`}
+                } ${previewCardShapeClassName} ${
+                  canReorderImages ? 'cursor-grab active:cursor-grabbing' : ''
+                } ${isDraggedImage ? 'scale-[0.98] opacity-50' : ''} ${
+                  isDragTargetImage ? 'ring-4 ring-blue-300 ring-offset-2' : ''
+                }`}
               >
                 <div className="relative aspect-square bg-slate-100">
                   {previewSrc ? (
                     <img
                       src={previewSrc}
                       alt={`Upload preview ${index + 1}`}
+                      draggable={false}
                       className={`h-full w-full object-cover ${previewShapeClassName}`}
                     />
                   ) : (
@@ -463,6 +559,7 @@ export default function GlobalImageUpload({
                     type="button"
                     onClick={() => handleRemoveImage(index)}
                     disabled={isUploadDisabled}
+                    draggable={false}
                     aria-label={`Remove upload preview ${index + 1}`}
                     className={`absolute flex size-7 items-center justify-center rounded-full bg-slate-950/80 text-sm font-bold leading-none text-white shadow-sm transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50 ${removeButtonPositionClassName}`}
                   >
@@ -475,6 +572,7 @@ export default function GlobalImageUpload({
                       type="button"
                       onClick={() => handleMakeMainImage(index)}
                       disabled={isUploadDisabled}
+                      draggable={false}
                       className="flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Make Main
