@@ -315,17 +315,6 @@ export default function GlobalImageUpload({
     onChange(value.filter((_, imageIndex) => imageIndex !== index));
   };
 
-  const handleMakeMainImage = (index: number) => {
-    if (index <= 0 || index >= value.length) {
-      return;
-    }
-
-    const nextImages = [...value];
-    const [selectedImage] = nextImages.splice(index, 1);
-    nextImages.unshift(selectedImage);
-    onChange(nextImages);
-  };
-
   const resetImageDragState = () => {
     setDraggedImageIndex(null);
     setDragOverImageIndex(null);
@@ -566,19 +555,6 @@ export default function GlobalImageUpload({
                     ×
                   </button>
                 </div>
-                {index > 0 ? (
-                  <div className="flex gap-2 p-2">
-                    <button
-                      type="button"
-                      onClick={() => handleMakeMainImage(index)}
-                      disabled={isUploadDisabled}
-                      draggable={false}
-                      className="flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Make Main
-                    </button>
-                  </div>
-                ) : null}
               </div>
             );
           })}
