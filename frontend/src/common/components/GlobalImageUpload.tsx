@@ -77,6 +77,32 @@ const mergeImages = (existingImages: string[], incomingImages: string[], maxImag
   return nextImages.slice(0, maxImages);
 };
 
+const getUploadCandidates = (existingImages: string[], incomingFiles: File[], maxImages: number) => {
+  if (maxImages <= 1) {
+    return incomingFiles.slice(0, 1);
+  }
+
+  const availableSlots = Math.max(maxImages - existingImages.length, 0);
+  return incomingFiles.slice(0, availableSlots);
+};
+
+const reorderImages = (images: string[], fromIndex: number, toIndex: number) => {
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= images.length ||
+    toIndex >= images.length
+  ) {
+    return images;
+  }
+
+  const nextImages = [...images];
+  const [selectedImage] = nextImages.splice(fromIndex, 1);
+  nextImages.splice(toIndex, 0, selectedImage);
+  return nextImages;
+};
+
 export default function GlobalImageUpload({
   value,
   onChange,
@@ -89,11 +115,17 @@ export default function GlobalImageUpload({
 }: GlobalImageUploadProps) {
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isUploadingImagesRef = useRef(false);
   const valueRef = useRef(value);
   const [isDragActive, setIsDragActive] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [previewUrlByValue, setPreviewUrlByValue] = useState<Record<string, string>>({});
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
+  const [dragOverImageIndex, setDragOverImageIndex] = useState<number | null>(null);
   const activeUploadScope = import.meta.env.PROD ? uploadScope : undefined;
+  const isUploadDisabled = disabled || isUploadingImages;
+  const canReorderImages = !isUploadDisabled && value.length > 1;
 
   useEffect(() => {
     valueRef.current = value;
@@ -109,16 +141,20 @@ export default function GlobalImageUpload({
     let isCancelled = false;
 
     const resolvePreviewUrls = async () => {
-      const resolvedEntries = await Promise.all(
-        unresolvedRefs.map(async (imageRef) => {
-          try {
-            return [imageRef, await createImageDownloadUrl(imageRef)] as const;
-          } catch (error) {
-            console.error('Image preview URL creation failed:', error);
-            return [imageRef, null] as const;
-          }
-        }),
-      );
+      const resolvedEntries: Array<readonly [string, string | null]> = [];
+
+      for (const imageRef of unresolvedRefs) {
+        if (isCancelled) {
+          return;
+        }
+
+        try {
+          resolvedEntries.push([imageRef, await createImageDownloadUrl(imageRef)] as const);
+        } catch (error) {
+          console.error('Image preview URL creation failed:', error);
+          resolvedEntries.push([imageRef, null] as const);
+        }
+      }
 
       if (isCancelled) {
         return;
@@ -143,7 +179,7 @@ export default function GlobalImageUpload({
   }, [previewUrlByValue, value]);
 
   const applyIncomingImages = async (incomingFiles: File[]) => {
-    if (disabled || incomingFiles.length === 0) {
+    if (disabled || isUploadingImagesRef.current || incomingFiles.length === 0) {
       return;
     }
 
@@ -152,26 +188,66 @@ export default function GlobalImageUpload({
       return;
     }
 
+    const uploadCandidates = getUploadCandidates(valueRef.current, imageFiles, maxImages);
+    if (uploadCandidates.length === 0) {
+      enqueueSnackbar(`이미지는 최대 ${maxImages}개까지 등록할 수 있습니다.`, { variant: 'info' });
+      return;
+    }
+
+    if (uploadCandidates.length < imageFiles.length) {
+      enqueueSnackbar(`최대 ${maxImages}개까지만 등록할 수 있어 일부 이미지만 처리합니다.`, {
+        variant: 'info',
+      });
+    }
+
+    let failedUploadCount = 0;
+    isUploadingImagesRef.current = true;
+    setIsUploadingImages(true);
+
     try {
-      const convertedImages = activeUploadScope
-        ? await Promise.all(
-            imageFiles.map(async (file) => {
-              const uploadedImage = await uploadImageFileToB2(file, activeUploadScope);
-              const previewUrl = uploadedImage.imageUrl;
-              if (previewUrl) {
-                setPreviewUrlByValue((previous) => ({
-                  ...previous,
-                  [uploadedImage.imageRef]: previewUrl,
-                }));
-              }
-              return uploadedImage.imageRef;
-            }),
-          )
-        : await Promise.all(imageFiles.map((file) => readFileAsDataUrl(file)));
-      onChange(mergeImages(valueRef.current, convertedImages, maxImages));
-    } catch (error) {
-      console.error('Image upload failed:', error);
+      let nextImages = valueRef.current;
+
+      for (const file of uploadCandidates) {
+        try {
+          let convertedImage: string;
+
+          if (activeUploadScope) {
+            const uploadedImage = await uploadImageFileToB2(file, activeUploadScope);
+            const previewUrl = uploadedImage.imageUrl;
+            if (previewUrl) {
+              setPreviewUrlByValue((previous) => ({
+                ...previous,
+                [uploadedImage.imageRef]: previewUrl,
+              }));
+            }
+
+            convertedImage = uploadedImage.imageRef;
+          } else {
+            convertedImage = await readFileAsDataUrl(file);
+          }
+
+          nextImages = mergeImages(nextImages, [convertedImage], maxImages);
+          valueRef.current = nextImages;
+          onChange(nextImages);
+        } catch (error) {
+          failedUploadCount += 1;
+          console.error(`Image upload failed: ${file.name}`, error);
+        }
+      }
+    } finally {
+      isUploadingImagesRef.current = false;
+      setIsUploadingImages(false);
+    }
+
+    if (failedUploadCount === uploadCandidates.length) {
       enqueueSnackbar('이미지 업로드 중 오류가 발생했습니다.', { variant: 'error' });
+      return;
+    }
+
+    if (failedUploadCount > 0) {
+      enqueueSnackbar(`${failedUploadCount}개 이미지를 업로드하지 못했습니다.`, {
+        variant: 'warning',
+      });
     }
   };
 
@@ -189,7 +265,7 @@ export default function GlobalImageUpload({
   };
 
   const handleAddUrls = () => {
-    if (disabled) {
+    if (isUploadDisabled) {
       return;
     }
 
@@ -212,7 +288,7 @@ export default function GlobalImageUpload({
   };
 
   const handlePaste = async (event: ClipboardEvent<HTMLDivElement>) => {
-    if (disabled) {
+    if (isUploadDisabled) {
       return;
     }
 
@@ -239,14 +315,58 @@ export default function GlobalImageUpload({
     onChange(value.filter((_, imageIndex) => imageIndex !== index));
   };
 
-  const handleMakeMainImage = (index: number) => {
-    if (index <= 0 || index >= value.length) {
+  const resetImageDragState = () => {
+    setDraggedImageIndex(null);
+    setDragOverImageIndex(null);
+  };
+
+  const handleImageDragStart = (event: DragEvent<HTMLDivElement>, index: number) => {
+    if (!canReorderImages) {
+      event.preventDefault();
       return;
     }
 
-    const nextImages = [...value];
-    const [selectedImage] = nextImages.splice(index, 1);
-    nextImages.unshift(selectedImage);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('application/x-twisters-image-index', String(index));
+    event.dataTransfer.setData('text/plain', String(index));
+    setDraggedImageIndex(index);
+    setDragOverImageIndex(index);
+  };
+
+  const handleImageDragOver = (event: DragEvent<HTMLDivElement>, index: number) => {
+    if (!canReorderImages || draggedImageIndex === null) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setDragOverImageIndex(index);
+  };
+
+  const handleImageDrop = (event: DragEvent<HTMLDivElement>, index: number) => {
+    if (!canReorderImages) {
+      return;
+    }
+
+    event.preventDefault();
+    const fallbackIndex = Number.parseInt(
+      event.dataTransfer.getData('application/x-twisters-image-index') ||
+        event.dataTransfer.getData('text/plain'),
+      10,
+    );
+    const fromIndex = draggedImageIndex ?? fallbackIndex;
+    resetImageDragState();
+
+    if (!Number.isInteger(fromIndex)) {
+      return;
+    }
+
+    const nextImages = reorderImages(valueRef.current, fromIndex, index);
+    if (nextImages === valueRef.current) {
+      return;
+    }
+
+    valueRef.current = nextImages;
     onChange(nextImages);
   };
 
@@ -256,7 +376,7 @@ export default function GlobalImageUpload({
     previewShape === 'circle' ? 'right-[12%] top-[12%]' : 'right-2 top-2';
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" aria-busy={isUploadingImages}>
       <div className="flex items-center justify-between gap-3">
         <label htmlFor={inputId} className="text-sm font-bold tracking-wide text-slate-700">
           {label}
@@ -276,13 +396,13 @@ export default function GlobalImageUpload({
         onChange={(event) => {
           void handleFileInputChange(event);
         }}
-        disabled={disabled}
+        disabled={isUploadDisabled}
       />
 
       <div
         onDragOver={(event) => {
           event.preventDefault();
-          if (!disabled) {
+          if (!isUploadDisabled) {
             setIsDragActive(true);
           }
         }}
@@ -296,12 +416,36 @@ export default function GlobalImageUpload({
         onPaste={(event) => {
           void handlePaste(event);
         }}
-        className={`rounded-2xl border-2 border-dashed p-5 transition ${
+        aria-disabled={isUploadDisabled}
+        className={`relative overflow-hidden rounded-2xl border-2 border-dashed p-5 transition ${
           isDragActive
             ? 'border-blue-500 bg-blue-50/70'
-            : 'border-slate-300 bg-slate-50/70 hover:border-slate-400'
-        } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+            : isUploadDisabled
+              ? 'border-slate-300 bg-slate-50/70'
+              : 'border-slate-300 bg-slate-50/70 hover:border-slate-400'
+        } ${isUploadDisabled ? 'cursor-not-allowed' : ''} ${
+          disabled && !isUploadingImages ? 'opacity-60' : ''
+        }`}
       >
+        {isUploadingImages ? (
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center bg-white/85 backdrop-blur-sm"
+            role="status"
+            aria-live="polite"
+            onClick={(event) => event.preventDefault()}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => event.preventDefault()}
+          >
+            <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-lg">
+              <span
+                className="inline-block size-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900"
+                aria-hidden="true"
+              />
+              이미지 업로드 중...
+            </div>
+          </div>
+        ) : null}
+
         <div className="flex flex-col items-center gap-3 text-center">
           <div className="text-3xl" aria-hidden="true">
             🖼
@@ -317,10 +461,16 @@ export default function GlobalImageUpload({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={disabled}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed"
+            disabled={isUploadDisabled}
+            className="inline-flex min-w-36 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed"
           >
-            이미지 선택하기
+            {isUploadingImages ? (
+              <span
+                className="inline-block size-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                aria-hidden="true"
+              />
+            ) : null}
+            {isUploadingImages ? '이미지 업로드 중...' : '이미지 선택하기'}
           </button>
         </div>
       </div>
@@ -334,14 +484,14 @@ export default function GlobalImageUpload({
             value={urlInput}
             onChange={(event) => setUrlInput(event.target.value)}
             onKeyDown={handleUrlInputKeyDown}
-            disabled={disabled}
+            disabled={isUploadDisabled}
             placeholder="https://example.com/image.jpg"
           />
         </div>
         <button
           type="button"
           onClick={handleAddUrls}
-          disabled={disabled}
+          disabled={isUploadDisabled}
           className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed"
         >
           URL 첨부
@@ -349,54 +499,69 @@ export default function GlobalImageUpload({
       </div>
 
       {helperText ? <p className="text-xs text-slate-500">{helperText}</p> : null}
+      {canReorderImages ? (
+        <p className="text-xs font-medium text-slate-500">
+          사진을 드래그해서 순서를 변경할 수 있습니다.
+        </p>
+      ) : null}
 
       {value.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div
+          className={`grid grid-cols-2 gap-3 transition sm:grid-cols-3 lg:grid-cols-4 ${
+            isUploadingImages ? 'pointer-events-none opacity-60' : ''
+          }`}
+        >
           {value.map((imageUrl, index) => {
-            const previewSrc = previewUrlByValue[imageUrl] ?? (isB2ImageReference(imageUrl) ? null : imageUrl);
+            const previewSrc =
+              previewUrlByValue[imageUrl] ?? (isB2ImageReference(imageUrl) ? null : imageUrl);
+            const isDraggedImage = draggedImageIndex === index;
+            const isDragTargetImage =
+              dragOverImageIndex === index &&
+              draggedImageIndex !== null &&
+              draggedImageIndex !== index;
 
             return (
-            <div
-              key={`${imageUrl}-${index}`}
-              className={`relative overflow-hidden bg-white shadow-sm ${
-                index === 0 ? 'border-[6px] border-yellow-400' : 'border border-slate-200'
-              } ${previewCardShapeClassName}`}
-            >
-              <div className="relative aspect-square bg-slate-100">
-                {previewSrc ? (
-                  <img
-                    src={previewSrc}
-                    alt={`Upload preview ${index + 1}`}
-                    className={`h-full w-full object-cover ${previewShapeClassName}`}
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-slate-400">
-                    Loading...
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleRemoveImage(index)}
-                  disabled={disabled}
-                  aria-label={`Remove upload preview ${index + 1}`}
-                  className={`absolute flex size-7 items-center justify-center rounded-full bg-slate-950/80 text-sm font-bold leading-none text-white shadow-sm transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50 ${removeButtonPositionClassName}`}
-                >
-                  ×
-                </button>
-              </div>
-              {index > 0 ? (
-                <div className="flex gap-2 p-2">
+              <div
+                key={`${imageUrl}-${index}`}
+                draggable={canReorderImages}
+                onDragStart={(event) => handleImageDragStart(event, index)}
+                onDragOver={(event) => handleImageDragOver(event, index)}
+                onDrop={(event) => handleImageDrop(event, index)}
+                onDragEnd={resetImageDragState}
+                aria-label={`Upload preview ${index + 1}`}
+                className={`relative overflow-hidden bg-white shadow-sm transition ${
+                  index === 0 ? 'border-[6px] border-yellow-400' : 'border border-slate-200'
+                } ${previewCardShapeClassName} ${
+                  canReorderImages ? 'cursor-grab active:cursor-grabbing' : ''
+                } ${isDraggedImage ? 'scale-[0.98] opacity-50' : ''} ${
+                  isDragTargetImage ? 'ring-4 ring-blue-300 ring-offset-2' : ''
+                }`}
+              >
+                <div className="relative aspect-square bg-slate-100">
+                  {previewSrc ? (
+                    <img
+                      src={previewSrc}
+                      alt={`Upload preview ${index + 1}`}
+                      draggable={false}
+                      className={`h-full w-full object-cover ${previewShapeClassName}`}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-slate-400">
+                      Loading...
+                    </div>
+                  )}
                   <button
                     type="button"
-                    onClick={() => handleMakeMainImage(index)}
-                    disabled={disabled}
-                    className="flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => handleRemoveImage(index)}
+                    disabled={isUploadDisabled}
+                    draggable={false}
+                    aria-label={`Remove upload preview ${index + 1}`}
+                    className={`absolute flex size-7 items-center justify-center rounded-full bg-slate-950/80 text-sm font-bold leading-none text-white shadow-sm transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50 ${removeButtonPositionClassName}`}
                   >
-                    Make Main
+                    ×
                   </button>
                 </div>
-              ) : null}
-            </div>
+              </div>
             );
           })}
         </div>
