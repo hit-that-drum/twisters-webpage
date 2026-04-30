@@ -19,6 +19,7 @@ export interface BoardPostItem {
   updateUser: string;
   updateDate: string;
   imageUrl: string[];
+  imageRefs: string[];
   content: string;
   pinned: boolean;
   reactions: BoardReactionSummary;

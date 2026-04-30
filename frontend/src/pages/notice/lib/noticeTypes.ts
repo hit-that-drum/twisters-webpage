@@ -6,6 +6,7 @@ export interface NoticeItem {
   updateUser: string;
   updateDate: string;
   imageUrl: string | null;
+  imageRef: string | null;
   content: string;
   pinned: boolean;
 }

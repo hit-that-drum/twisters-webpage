@@ -52,8 +52,9 @@ const useMyPageProfile = ({
   const [openProfileImageModal, setOpenProfileImageModal] = useState(false);
 
   useEffect(() => {
-    setProfileImages(meInfo?.profileImage ? [meInfo.profileImage] : []);
-  }, [meInfo?.profileImage]);
+    const currentProfileImageRef = meInfo?.profileImageRef ?? meInfo?.profileImage ?? null;
+    setProfileImages(currentProfileImageRef ? [currentProfileImageRef] : []);
+  }, [meInfo?.profileImage, meInfo?.profileImageRef]);
 
   useEffect(() => {
     setProfileForm({
@@ -63,9 +64,9 @@ const useMyPageProfile = ({
   }, [meInfo?.birthDate, meInfo?.phone]);
 
   const hasImageChanges = useMemo(() => {
-    const currentProfileImage = meInfo?.profileImage ?? '';
+    const currentProfileImage = meInfo?.profileImageRef ?? meInfo?.profileImage ?? '';
     return currentProfileImage !== (profileImages[0] ?? '');
-  }, [meInfo?.profileImage, profileImages]);
+  }, [meInfo?.profileImage, meInfo?.profileImageRef, profileImages]);
 
   const hasProfileDetailChanges = useMemo(() => {
     return (
@@ -75,16 +76,21 @@ const useMyPageProfile = ({
   }, [meInfo?.birthDate, meInfo?.phone, profileForm.birthDate, profileForm.phone]);
 
   const handleOpenProfileImageModal = () => {
-    setProfileImages(meInfo?.profileImage ? [meInfo.profileImage] : []);
+    const currentProfileImageRef = meInfo?.profileImageRef ?? meInfo?.profileImage ?? null;
+    setProfileImages(currentProfileImageRef ? [currentProfileImageRef] : []);
     setOpenProfileImageModal(true);
   };
 
-  const handleCloseProfileImageModal = (_event: object, _reason: ModalCloseReason) => {
+  const handleCloseProfileImageModal = (event: object, reason: ModalCloseReason) => {
+    void event;
+    void reason;
+
     if (isSavingProfileImage) {
       return;
     }
 
-    setProfileImages(meInfo?.profileImage ? [meInfo.profileImage] : []);
+    const currentProfileImageRef = meInfo?.profileImageRef ?? meInfo?.profileImage ?? null;
+    setProfileImages(currentProfileImageRef ? [currentProfileImageRef] : []);
     setOpenProfileImageModal(false);
   };
 

@@ -19,6 +19,7 @@ export const parseNoticeList = (payload: unknown): NoticeItem[] => {
         updateUser?: unknown;
         updateDate?: unknown;
         imageUrl?: unknown;
+        imageRef?: unknown;
         content?: unknown;
         pinned?: unknown;
       };
@@ -50,6 +51,10 @@ export const parseNoticeList = (payload: unknown): NoticeItem[] => {
         typeof row.imageUrl === 'string' && row.imageUrl.trim().length > 0
           ? row.imageUrl.trim()
           : null;
+      const normalizedImageRef =
+        typeof row.imageRef === 'string' && row.imageRef.trim().length > 0
+          ? row.imageRef.trim()
+          : normalizedImageUrl;
 
       return {
         id: row.id,
@@ -59,6 +64,7 @@ export const parseNoticeList = (payload: unknown): NoticeItem[] => {
         updateUser: normalizedUpdateUser,
         updateDate: normalizedUpdateDate,
         imageUrl: normalizedImageUrl,
+        imageRef: normalizedImageRef,
         content: row.content,
         pinned: normalizedPinned,
       } satisfies NoticeItem;

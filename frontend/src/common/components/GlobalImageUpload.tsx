@@ -1,4 +1,5 @@
 import { TextField } from '@mui/material';
+import { enqueueSnackbar } from 'notistack';
 import {
   type ChangeEvent,
   type ClipboardEvent,
@@ -9,6 +10,12 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  createImageDownloadUrl,
+  isB2ImageReference,
+  type ImageUploadScope,
+  uploadImageFileToB2,
+} from '@/common/lib/images/b2ImageStorage';
 
 type PreviewShape = 'square' | 'circle';
 
@@ -20,6 +27,7 @@ interface GlobalImageUploadProps {
   label?: string;
   helperText?: string;
   previewShape?: PreviewShape;
+  uploadScope?: ImageUploadScope;
 }
 
 const readFileAsDataUrl = (file: File) =>
@@ -48,7 +56,8 @@ const isSupportedImageSource = (value: string) => {
   return (
     normalizedValue.startsWith('http://') ||
     normalizedValue.startsWith('https://') ||
-    normalizedValue.startsWith('data:image/')
+    normalizedValue.startsWith('data:image/') ||
+    normalizedValue.startsWith('b2://')
   );
 };
 
@@ -76,16 +85,61 @@ export default function GlobalImageUpload({
   label = 'IMAGES',
   helperText,
   previewShape = 'square',
+  uploadScope,
 }: GlobalImageUploadProps) {
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const valueRef = useRef(value);
   const [isDragActive, setIsDragActive] = useState(false);
   const [urlInput, setUrlInput] = useState('');
+  const [previewUrlByValue, setPreviewUrlByValue] = useState<Record<string, string>>({});
 
   useEffect(() => {
     valueRef.current = value;
   }, [value]);
+
+  useEffect(() => {
+    const b2ImageRefs = value.filter((imageRef) => isB2ImageReference(imageRef));
+    const unresolvedRefs = b2ImageRefs.filter((imageRef) => !previewUrlByValue[imageRef]);
+    if (unresolvedRefs.length === 0) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const resolvePreviewUrls = async () => {
+      const resolvedEntries = await Promise.all(
+        unresolvedRefs.map(async (imageRef) => {
+          try {
+            return [imageRef, await createImageDownloadUrl(imageRef)] as const;
+          } catch (error) {
+            console.error('Image preview URL creation failed:', error);
+            return [imageRef, null] as const;
+          }
+        }),
+      );
+
+      if (isCancelled) {
+        return;
+      }
+
+      setPreviewUrlByValue((previous) => {
+        const nextPreviewUrls = { ...previous };
+        resolvedEntries.forEach(([imageRef, imageUrl]) => {
+          if (imageUrl) {
+            nextPreviewUrls[imageRef] = imageUrl;
+          }
+        });
+        return nextPreviewUrls;
+      });
+    };
+
+    void resolvePreviewUrls();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [previewUrlByValue, value]);
 
   const applyIncomingImages = async (incomingFiles: File[]) => {
     if (disabled || incomingFiles.length === 0) {
@@ -97,8 +151,27 @@ export default function GlobalImageUpload({
       return;
     }
 
-    const convertedImages = await Promise.all(imageFiles.map((file) => readFileAsDataUrl(file)));
-    onChange(mergeImages(valueRef.current, convertedImages, maxImages));
+    try {
+      const convertedImages = uploadScope
+        ? await Promise.all(
+            imageFiles.map(async (file) => {
+              const uploadedImage = await uploadImageFileToB2(file, uploadScope);
+              const previewUrl = uploadedImage.imageUrl;
+              if (previewUrl) {
+                setPreviewUrlByValue((previous) => ({
+                  ...previous,
+                  [uploadedImage.imageRef]: previewUrl,
+                }));
+              }
+              return uploadedImage.imageRef;
+            }),
+          )
+        : await Promise.all(imageFiles.map((file) => readFileAsDataUrl(file)));
+      onChange(mergeImages(valueRef.current, convertedImages, maxImages));
+    } catch (error) {
+      console.error('Image upload failed:', error);
+      enqueueSnackbar('이미지 업로드 중 오류가 발생했습니다.', { variant: 'error' });
+    }
   };
 
   const handleFileInputChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -278,7 +351,10 @@ export default function GlobalImageUpload({
 
       {value.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {value.map((imageUrl, index) => (
+          {value.map((imageUrl, index) => {
+            const previewSrc = previewUrlByValue[imageUrl] ?? (isB2ImageReference(imageUrl) ? null : imageUrl);
+
+            return (
             <div
               key={`${imageUrl}-${index}`}
               className={`relative overflow-hidden bg-white shadow-sm ${
@@ -286,11 +362,17 @@ export default function GlobalImageUpload({
               } ${previewCardShapeClassName}`}
             >
               <div className="relative aspect-square bg-slate-100">
-                <img
-                  src={imageUrl}
-                  alt={`Upload preview ${index + 1}`}
-                  className={`h-full w-full object-cover ${previewShapeClassName}`}
-                />
+                {previewSrc ? (
+                  <img
+                    src={previewSrc}
+                    alt={`Upload preview ${index + 1}`}
+                    className={`h-full w-full object-cover ${previewShapeClassName}`}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-slate-400">
+                    Loading...
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => handleRemoveImage(index)}
@@ -314,7 +396,8 @@ export default function GlobalImageUpload({
                 </div>
               ) : null}
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
     </div>

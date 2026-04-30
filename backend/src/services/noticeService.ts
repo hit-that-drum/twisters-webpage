@@ -8,7 +8,9 @@ import {
 } from '../types/notice.types.js';
 import { type AuthenticatedUser } from '../types/common.types.js';
 import { resolveDataScopeByUser } from '../utils/dataScope.js';
+import { normalizeStoredImageReference } from '../utils/imageReference.js';
 import { normalizeBoolean } from '../utils/parseUtils.js';
+import { b2StorageService } from './storage/b2StorageService.js';
 
 const MAX_INLINE_IMAGE_CHARS = 5_000_000;
 
@@ -66,10 +68,7 @@ const normalizeNoticeMutationPayload = (
   authenticatedUser: AuthenticatedUser,
 ): NoticeMutationPayload => {
   const title = typeof payload.title === 'string' ? payload.title.trim() : '';
-  const imageUrl =
-    typeof payload.imageUrl === 'string' && payload.imageUrl.trim().length > 0
-      ? payload.imageUrl.trim()
-      : null;
+  const imageUrl = normalizeStoredImageReference(payload.imageUrl);
   const content = typeof payload.content === 'string' ? payload.content.trim() : '';
 
   if (!title || !content) {
@@ -94,11 +93,19 @@ class NoticeService {
     const scope = resolveDataScopeByUser(authenticatedUser);
     await noticeRepository.initializeSchema();
     const rows = await noticeRepository.findAll(scope);
-    return rows.map((row) => ({
-      ...row,
-      imageUrl: typeof row.imageUrl === 'string' && row.imageUrl.trim().length > 0 ? row.imageUrl.trim() : null,
-      pinned: Boolean(row.pinned),
-    }));
+    return Promise.all(
+      rows.map(async (row) => {
+        const imageRef = normalizeStoredImageReference(row.imageUrl);
+        const imageResponse = await b2StorageService.resolveImageResponse(imageRef);
+
+        return {
+          ...row,
+          imageRef: imageResponse.imageRef,
+          imageUrl: imageResponse.imageUrl,
+          pinned: Boolean(row.pinned),
+        };
+      }),
+    );
   }
 
   async createNotice(authenticatedUser: AuthenticatedUser | undefined, payload: CreateNoticeDTO) {

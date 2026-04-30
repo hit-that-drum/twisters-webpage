@@ -78,6 +78,7 @@ export const parseBoardPosts = (payload: unknown): BoardPostItem[] => {
         updateUser?: unknown;
         updateDate?: unknown;
         imageUrl?: unknown;
+        imageRefs?: unknown;
         content?: unknown;
         pinned?: unknown;
         reactions?: unknown;
@@ -110,6 +111,7 @@ export const parseBoardPosts = (payload: unknown): BoardPostItem[] => {
         row.pinned === true || row.pinned === 1 || row.pinned === '1' || row.pinned === 'true';
 
       const normalizedImageUrl = normalizeImageUrlList(row.imageUrl);
+      const normalizedImageRefs = normalizeImageUrlList(row.imageRefs);
 
       return {
         id: row.id,
@@ -120,6 +122,7 @@ export const parseBoardPosts = (payload: unknown): BoardPostItem[] => {
         updateUser: normalizedUpdateUser,
         updateDate: normalizedUpdateDate,
         imageUrl: normalizedImageUrl,
+        imageRefs: normalizedImageRefs.length > 0 ? normalizedImageRefs : normalizedImageUrl,
         content: row.content,
         pinned: normalizedPinned,
         reactions: normalizeBoardReactionSummary(row.reactions),

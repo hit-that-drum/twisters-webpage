@@ -112,7 +112,7 @@ export default function useNoticeMutations({
       setEditingNoticeId(notice.id);
       setEditNotice({
         title: notice.title,
-        imageUrl: notice.imageUrl ?? '',
+        imageUrl: notice.imageRef ?? notice.imageUrl ?? '',
         content: notice.content,
         pinned: notice.pinned,
       });

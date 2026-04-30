@@ -54,6 +54,7 @@ function NoticeDetailForm({
         disabled={isSubmitting}
         maxImages={1}
         label="IMAGE"
+        uploadScope="notice"
       />
       <TextField
         margin="dense"

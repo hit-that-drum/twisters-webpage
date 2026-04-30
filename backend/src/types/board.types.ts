@@ -40,6 +40,7 @@ export interface Board {
   updateUser: string;
   updateDate: Date;
   imageUrl: string[];
+  imageRefs: string[];
   content: string;
   pinned: boolean;
   reactions: BoardReactionSummary;

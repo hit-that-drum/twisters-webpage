@@ -19,6 +19,7 @@ import {
   parseBoardId,
   requireAuthenticatedUser,
 } from './board/boardValidation.js';
+import { b2StorageService } from './storage/b2StorageService.js';
 
 export { boardCommentService } from './board/boardCommentService.js';
 export { boardReactionService } from './board/boardReactionService.js';
@@ -47,17 +48,25 @@ class BoardService {
       authenticatedUser?.id ?? null,
     );
 
-    return rows.map((row) => ({
-      ...row,
-      imageUrl: Array.isArray(row.imageUrl)
-        ? row.imageUrl
-            .filter((item): item is string => typeof item === 'string')
-            .map((item) => item.trim())
-            .filter((item) => item.length > 0)
-        : [],
-      pinned: Boolean(row.pinned),
-      reactions: reactionSummaryByBoardId[row.id] ?? createEmptyBoardReactionSummary(),
-    }));
+    return Promise.all(
+      rows.map(async (row) => {
+        const imageRefs = Array.isArray(row.imageUrl)
+          ? row.imageUrl
+              .filter((item): item is string => typeof item === 'string')
+              .map((item) => item.trim())
+              .filter((item) => item.length > 0)
+          : [];
+        const imageResponse = await b2StorageService.resolveImageListResponse(imageRefs);
+
+        return {
+          ...row,
+          imageRefs: imageResponse.imageRefs,
+          imageUrl: imageResponse.imageUrl,
+          pinned: Boolean(row.pinned),
+          reactions: reactionSummaryByBoardId[row.id] ?? createEmptyBoardReactionSummary(),
+        };
+      }),
+    );
   }
 
   async createBoard(authenticatedUser: AuthenticatedUser | undefined, payload: CreateBoardDTO) {
