@@ -376,26 +376,7 @@ export default function GlobalImageUpload({
     previewShape === 'circle' ? 'right-[12%] top-[12%]' : 'right-2 top-2';
 
   return (
-    <div className="relative space-y-3" aria-busy={isUploadingImages}>
-      {isUploadingImages ? (
-        <div
-          className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-white/75 backdrop-blur-sm"
-          role="status"
-          aria-live="polite"
-          onClick={(event) => event.preventDefault()}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => event.preventDefault()}
-        >
-          <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-lg">
-            <span
-              className="inline-block size-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900"
-              aria-hidden="true"
-            />
-            이미지 업로드 중...
-          </div>
-        </div>
-      ) : null}
-
+    <div className="space-y-3" aria-busy={isUploadingImages}>
       <div className="flex items-center justify-between gap-3">
         <label htmlFor={inputId} className="text-sm font-bold tracking-wide text-slate-700">
           {label}
@@ -436,14 +417,35 @@ export default function GlobalImageUpload({
           void handlePaste(event);
         }}
         aria-disabled={isUploadDisabled}
-        className={`relative rounded-2xl border-2 border-dashed p-5 transition ${
+        className={`relative overflow-hidden rounded-2xl border-2 border-dashed p-5 transition ${
           isDragActive
             ? 'border-blue-500 bg-blue-50/70'
             : isUploadDisabled
               ? 'border-slate-300 bg-slate-50/70'
               : 'border-slate-300 bg-slate-50/70 hover:border-slate-400'
-        } ${isUploadDisabled ? 'cursor-not-allowed opacity-60' : ''}`}
+        } ${isUploadDisabled ? 'cursor-not-allowed' : ''} ${
+          disabled && !isUploadingImages ? 'opacity-60' : ''
+        }`}
       >
+        {isUploadingImages ? (
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center bg-white/85 backdrop-blur-sm"
+            role="status"
+            aria-live="polite"
+            onClick={(event) => event.preventDefault()}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => event.preventDefault()}
+          >
+            <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-lg">
+              <span
+                className="inline-block size-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900"
+                aria-hidden="true"
+              />
+              이미지 업로드 중...
+            </div>
+          </div>
+        ) : null}
+
         <div className="flex flex-col items-center gap-3 text-center">
           <div className="text-3xl" aria-hidden="true">
             🖼
@@ -504,7 +506,11 @@ export default function GlobalImageUpload({
       ) : null}
 
       {value.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div
+          className={`grid grid-cols-2 gap-3 transition sm:grid-cols-3 lg:grid-cols-4 ${
+            isUploadingImages ? 'pointer-events-none opacity-60' : ''
+          }`}
+        >
           {value.map((imageUrl, index) => {
             const previewSrc =
               previewUrlByValue[imageUrl] ?? (isB2ImageReference(imageUrl) ? null : imageUrl);
