@@ -77,6 +77,15 @@ const mergeImages = (existingImages: string[], incomingImages: string[], maxImag
   return nextImages.slice(0, maxImages);
 };
 
+const getUploadCandidates = (existingImages: string[], incomingFiles: File[], maxImages: number) => {
+  if (maxImages <= 1) {
+    return incomingFiles.slice(0, 1);
+  }
+
+  const availableSlots = Math.max(maxImages - existingImages.length, 0);
+  return incomingFiles.slice(0, availableSlots);
+};
+
 export default function GlobalImageUpload({
   value,
   onChange,
@@ -89,11 +98,14 @@ export default function GlobalImageUpload({
 }: GlobalImageUploadProps) {
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isUploadingImagesRef = useRef(false);
   const valueRef = useRef(value);
   const [isDragActive, setIsDragActive] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [previewUrlByValue, setPreviewUrlByValue] = useState<Record<string, string>>({});
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
   const activeUploadScope = import.meta.env.PROD ? uploadScope : undefined;
+  const isUploadDisabled = disabled || isUploadingImages;
 
   useEffect(() => {
     valueRef.current = value;
@@ -109,16 +121,20 @@ export default function GlobalImageUpload({
     let isCancelled = false;
 
     const resolvePreviewUrls = async () => {
-      const resolvedEntries = await Promise.all(
-        unresolvedRefs.map(async (imageRef) => {
-          try {
-            return [imageRef, await createImageDownloadUrl(imageRef)] as const;
-          } catch (error) {
-            console.error('Image preview URL creation failed:', error);
-            return [imageRef, null] as const;
-          }
-        }),
-      );
+      const resolvedEntries: Array<readonly [string, string | null]> = [];
+
+      for (const imageRef of unresolvedRefs) {
+        if (isCancelled) {
+          return;
+        }
+
+        try {
+          resolvedEntries.push([imageRef, await createImageDownloadUrl(imageRef)] as const);
+        } catch (error) {
+          console.error('Image preview URL creation failed:', error);
+          resolvedEntries.push([imageRef, null] as const);
+        }
+      }
 
       if (isCancelled) {
         return;
@@ -143,7 +159,7 @@ export default function GlobalImageUpload({
   }, [previewUrlByValue, value]);
 
   const applyIncomingImages = async (incomingFiles: File[]) => {
-    if (disabled || incomingFiles.length === 0) {
+    if (disabled || isUploadingImagesRef.current || incomingFiles.length === 0) {
       return;
     }
 
@@ -152,26 +168,66 @@ export default function GlobalImageUpload({
       return;
     }
 
+    const uploadCandidates = getUploadCandidates(valueRef.current, imageFiles, maxImages);
+    if (uploadCandidates.length === 0) {
+      enqueueSnackbar(`이미지는 최대 ${maxImages}개까지 등록할 수 있습니다.`, { variant: 'info' });
+      return;
+    }
+
+    if (uploadCandidates.length < imageFiles.length) {
+      enqueueSnackbar(`최대 ${maxImages}개까지만 등록할 수 있어 일부 이미지만 처리합니다.`, {
+        variant: 'info',
+      });
+    }
+
+    let failedUploadCount = 0;
+    isUploadingImagesRef.current = true;
+    setIsUploadingImages(true);
+
     try {
-      const convertedImages = activeUploadScope
-        ? await Promise.all(
-            imageFiles.map(async (file) => {
-              const uploadedImage = await uploadImageFileToB2(file, activeUploadScope);
-              const previewUrl = uploadedImage.imageUrl;
-              if (previewUrl) {
-                setPreviewUrlByValue((previous) => ({
-                  ...previous,
-                  [uploadedImage.imageRef]: previewUrl,
-                }));
-              }
-              return uploadedImage.imageRef;
-            }),
-          )
-        : await Promise.all(imageFiles.map((file) => readFileAsDataUrl(file)));
-      onChange(mergeImages(valueRef.current, convertedImages, maxImages));
-    } catch (error) {
-      console.error('Image upload failed:', error);
+      let nextImages = valueRef.current;
+
+      for (const file of uploadCandidates) {
+        try {
+          let convertedImage: string;
+
+          if (activeUploadScope) {
+            const uploadedImage = await uploadImageFileToB2(file, activeUploadScope);
+            const previewUrl = uploadedImage.imageUrl;
+            if (previewUrl) {
+              setPreviewUrlByValue((previous) => ({
+                ...previous,
+                [uploadedImage.imageRef]: previewUrl,
+              }));
+            }
+
+            convertedImage = uploadedImage.imageRef;
+          } else {
+            convertedImage = await readFileAsDataUrl(file);
+          }
+
+          nextImages = mergeImages(nextImages, [convertedImage], maxImages);
+          valueRef.current = nextImages;
+          onChange(nextImages);
+        } catch (error) {
+          failedUploadCount += 1;
+          console.error(`Image upload failed: ${file.name}`, error);
+        }
+      }
+    } finally {
+      isUploadingImagesRef.current = false;
+      setIsUploadingImages(false);
+    }
+
+    if (failedUploadCount === uploadCandidates.length) {
       enqueueSnackbar('이미지 업로드 중 오류가 발생했습니다.', { variant: 'error' });
+      return;
+    }
+
+    if (failedUploadCount > 0) {
+      enqueueSnackbar(`${failedUploadCount}개 이미지를 업로드하지 못했습니다.`, {
+        variant: 'warning',
+      });
     }
   };
 
@@ -189,7 +245,7 @@ export default function GlobalImageUpload({
   };
 
   const handleAddUrls = () => {
-    if (disabled) {
+    if (isUploadDisabled) {
       return;
     }
 
@@ -212,7 +268,7 @@ export default function GlobalImageUpload({
   };
 
   const handlePaste = async (event: ClipboardEvent<HTMLDivElement>) => {
-    if (disabled) {
+    if (isUploadDisabled) {
       return;
     }
 
@@ -276,13 +332,13 @@ export default function GlobalImageUpload({
         onChange={(event) => {
           void handleFileInputChange(event);
         }}
-        disabled={disabled}
+        disabled={isUploadDisabled}
       />
 
       <div
         onDragOver={(event) => {
           event.preventDefault();
-          if (!disabled) {
+          if (!isUploadDisabled) {
             setIsDragActive(true);
           }
         }}
@@ -300,7 +356,7 @@ export default function GlobalImageUpload({
           isDragActive
             ? 'border-blue-500 bg-blue-50/70'
             : 'border-slate-300 bg-slate-50/70 hover:border-slate-400'
-        } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+        } ${isUploadDisabled ? 'cursor-not-allowed opacity-60' : ''}`}
       >
         <div className="flex flex-col items-center gap-3 text-center">
           <div className="text-3xl" aria-hidden="true">
@@ -317,10 +373,10 @@ export default function GlobalImageUpload({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={disabled}
+            disabled={isUploadDisabled}
             className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed"
           >
-            이미지 선택하기
+            {isUploadingImages ? '이미지 업로드 중...' : '이미지 선택하기'}
           </button>
         </div>
       </div>
@@ -334,14 +390,14 @@ export default function GlobalImageUpload({
             value={urlInput}
             onChange={(event) => setUrlInput(event.target.value)}
             onKeyDown={handleUrlInputKeyDown}
-            disabled={disabled}
+            disabled={isUploadDisabled}
             placeholder="https://example.com/image.jpg"
           />
         </div>
         <button
           type="button"
           onClick={handleAddUrls}
-          disabled={disabled}
+          disabled={isUploadDisabled}
           className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed"
         >
           URL 첨부
@@ -353,50 +409,51 @@ export default function GlobalImageUpload({
       {value.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {value.map((imageUrl, index) => {
-            const previewSrc = previewUrlByValue[imageUrl] ?? (isB2ImageReference(imageUrl) ? null : imageUrl);
+            const previewSrc =
+              previewUrlByValue[imageUrl] ?? (isB2ImageReference(imageUrl) ? null : imageUrl);
 
             return (
-            <div
-              key={`${imageUrl}-${index}`}
-              className={`relative overflow-hidden bg-white shadow-sm ${
-                index === 0 ? 'border-[6px] border-yellow-400' : 'border border-slate-200'
-              } ${previewCardShapeClassName}`}
-            >
-              <div className="relative aspect-square bg-slate-100">
-                {previewSrc ? (
-                  <img
-                    src={previewSrc}
-                    alt={`Upload preview ${index + 1}`}
-                    className={`h-full w-full object-cover ${previewShapeClassName}`}
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-slate-400">
-                    Loading...
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleRemoveImage(index)}
-                  disabled={disabled}
-                  aria-label={`Remove upload preview ${index + 1}`}
-                  className={`absolute flex size-7 items-center justify-center rounded-full bg-slate-950/80 text-sm font-bold leading-none text-white shadow-sm transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50 ${removeButtonPositionClassName}`}
-                >
-                  ×
-                </button>
-              </div>
-              {index > 0 ? (
-                <div className="flex gap-2 p-2">
+              <div
+                key={`${imageUrl}-${index}`}
+                className={`relative overflow-hidden bg-white shadow-sm ${
+                  index === 0 ? 'border-[6px] border-yellow-400' : 'border border-slate-200'
+                } ${previewCardShapeClassName}`}
+              >
+                <div className="relative aspect-square bg-slate-100">
+                  {previewSrc ? (
+                    <img
+                      src={previewSrc}
+                      alt={`Upload preview ${index + 1}`}
+                      className={`h-full w-full object-cover ${previewShapeClassName}`}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-slate-400">
+                      Loading...
+                    </div>
+                  )}
                   <button
                     type="button"
-                    onClick={() => handleMakeMainImage(index)}
-                    disabled={disabled}
-                    className="flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => handleRemoveImage(index)}
+                    disabled={isUploadDisabled}
+                    aria-label={`Remove upload preview ${index + 1}`}
+                    className={`absolute flex size-7 items-center justify-center rounded-full bg-slate-950/80 text-sm font-bold leading-none text-white shadow-sm transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50 ${removeButtonPositionClassName}`}
                   >
-                    Make Main
+                    ×
                   </button>
                 </div>
-              ) : null}
-            </div>
+                {index > 0 ? (
+                  <div className="flex gap-2 p-2">
+                    <button
+                      type="button"
+                      onClick={() => handleMakeMainImage(index)}
+                      disabled={isUploadDisabled}
+                      className="flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Make Main
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             );
           })}
         </div>
