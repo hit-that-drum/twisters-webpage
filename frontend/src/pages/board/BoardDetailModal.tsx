@@ -56,6 +56,7 @@ function BoardDetailForm({
         disabled={isSubmitting}
         maxImages={12}
         label="IMAGES"
+        uploadScope="board"
       />
       <TextField
         margin="dense"

@@ -52,6 +52,11 @@ Deploy the `backend` directory as a separate Vercel project.
 - `KAKAO_REST_API_KEY` (if Kakao login is enabled)
 - `KAKAO_CLIENT_SECRET` (recommended for Kakao code exchange)
 - `KAKAO_REDIRECT_URI` (backend Kakao redirect URI)
+- `B2_ENDPOINT` (Backblaze B2 S3-compatible endpoint, for example `https://s3.<region>.backblazeb2.com`)
+- `B2_REGION`
+- `B2_BUCKET_NAME`
+- `B2_KEY_ID`
+- `B2_APPLICATION_KEY`
 - `DB_SSL=true` (default behavior is SSL enabled)
 
 #### Backend env validation checklist
@@ -65,6 +70,7 @@ Deploy the `backend` directory as a separate Vercel project.
 - `VITE_GOOGLE_CLIENT_ID` matches Google OAuth web app config
 - `KAKAO_REST_API_KEY` matches Kakao Developers REST API key
 - `KAKAO_REDIRECT_URI` exactly matches Kakao Developers redirect URI entry
+- Backblaze B2 bucket is private, and CORS allows frontend-origin `PUT`, `GET`, and `HEAD`
 - `DB_SSL` set to `true` on Vercel
 
 The backend uses:
@@ -132,6 +138,11 @@ VITE_GOOGLE_CLIENT_ID=<your-google-client-id>.apps.googleusercontent.com
 KAKAO_REST_API_KEY=<your-kakao-rest-api-key>
 KAKAO_CLIENT_SECRET=<your-kakao-client-secret>
 KAKAO_REDIRECT_URI=https://your-frontend.vercel.app/auth/kakao/callback
+B2_ENDPOINT=https://s3.<region>.backblazeb2.com
+B2_REGION=<region>
+B2_BUCKET_NAME=<your-private-bucket-name>
+B2_KEY_ID=<your-bucket-application-key-id>
+B2_APPLICATION_KEY=<your-bucket-application-key>
 SESSION_IDLE_TIMEOUT_MINUTES=60
 SESSION_ABSOLUTE_TIMEOUT_DAYS=7
 SESSION_ABSOLUTE_TIMEOUT_REMEMBER_DAYS=30

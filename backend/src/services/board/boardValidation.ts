@@ -10,6 +10,7 @@ import {
   type CreateBoardDTO,
   type UpdateBoardDTO,
 } from '../../types/board.types.js';
+import { normalizeStoredImageReference } from '../../utils/imageReference.js';
 import { normalizeBoolean } from '../../utils/parseUtils.js';
 
 export const parseBoardId = (rawBoardId?: string) => {
@@ -61,11 +62,12 @@ export const normalizeBoardMutationPayload = (
   const title = typeof payload.title === 'string' ? payload.title.trim() : '';
   const imageUrl = Array.isArray(payload.imageUrl)
     ? payload.imageUrl
+        .map((item) => normalizeStoredImageReference(item))
         .filter((item): item is string => typeof item === 'string')
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0)
-    : typeof payload.imageUrl === 'string' && payload.imageUrl.trim().length > 0
-      ? [payload.imageUrl.trim()]
+    : typeof payload.imageUrl === 'string'
+      ? [normalizeStoredImageReference(payload.imageUrl)].filter(
+          (item): item is string => typeof item === 'string',
+        )
       : [];
   const content = typeof payload.content === 'string' ? payload.content.trim() : '';
 

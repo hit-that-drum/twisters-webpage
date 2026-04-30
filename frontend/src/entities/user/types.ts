@@ -18,6 +18,7 @@ export interface MeInfo {
   name: string;
   email: string;
   profileImage: string | null;
+  profileImageRef: string | null;
   phone: string | null;
   birthDate: string | null;
   joinedAt: string | null;

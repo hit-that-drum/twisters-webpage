@@ -48,6 +48,7 @@ function ProfileImageEditorModal({
           label="PROFILE IMAGE"
           helperText="프로필 이미지를 하나 선택하거나, 드래그 앤 드롭 또는 이미지 URL로 등록할 수 있습니다."
           previewShape="circle"
+          uploadScope="profile"
         />
       </div>
     </FormModal>

@@ -104,7 +104,7 @@ export default function useBoardPostMutations({
       setEditingPostId(post.id);
       setEditPost({
         title: post.title,
-        imageUrl: post.imageUrl,
+        imageUrl: post.imageRefs.length > 0 ? post.imageRefs : post.imageUrl,
         content: post.content,
         pinned: post.pinned,
       });

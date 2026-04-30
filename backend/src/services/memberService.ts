@@ -3,6 +3,7 @@ import { memberRepository } from '../repositories/memberRepository.js';
 import { type AuthenticatedUser } from '../types/common.types.js';
 import { type Member, type MemberMutationDTO } from '../types/member.types.js';
 import { resolveDataScopeByUser } from '../utils/dataScope.js';
+import { normalizeStoredImageReference } from '../utils/imageReference.js';
 import { normalizeBoolean } from '../utils/parseUtils.js';
 import { normalizePhoneNumber } from '../utils/phoneNumber.js';
 import {
@@ -10,6 +11,7 @@ import {
   parseMemberId,
   requireAdminUser,
 } from './member/memberValidation.js';
+import { b2StorageService } from './storage/b2StorageService.js';
 
 export { memberDuesService } from './member/memberDuesService.js';
 export { memberAttendanceService } from './member/memberAttendanceService.js';
@@ -20,20 +22,21 @@ class MemberService {
     await memberRepository.ensureMembersSchema();
     const rows = await memberRepository.findAllMembers(scope);
 
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      profileImage:
-        typeof row.profileImage === 'string' && row.profileImage.trim().length > 0
-          ? row.profileImage.trim()
-          : null,
-      isAdmin: normalizeBoolean(row.isAdmin, false),
-      phone: row.phone ? normalizePhoneNumber(row.phone) : null,
-      department: row.department,
-      joinedAt: row.joinedAt,
-      birthDate: row.birthDate,
-    }));
+    return Promise.all(
+      rows.map(async (row) => ({
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        profileImage: await b2StorageService.createImageDownloadUrlFromRef(
+          normalizeStoredImageReference(row.profileImage),
+        ),
+        isAdmin: normalizeBoolean(row.isAdmin, false),
+        phone: row.phone ? normalizePhoneNumber(row.phone) : null,
+        department: row.department,
+        joinedAt: row.joinedAt,
+        birthDate: row.birthDate,
+      })),
+    );
   }
 
   async createMember(authenticatedUser: AuthenticatedUser | undefined, payload: MemberMutationDTO) {

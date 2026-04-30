@@ -41,6 +41,7 @@ const parseMeInfo = (payload: unknown): MeInfo | null => {
   const rawPhone = (payload as { phone?: unknown }).phone;
   const rawBirthDate = (payload as { birthDate?: unknown }).birthDate;
   const rawJoinedAt = (payload as { joinedAt?: unknown }).joinedAt;
+  const rawProfileImageRef = (payload as { profileImageRef?: unknown }).profileImageRef;
 
   const normalizedIsAdmin =
     typeof rawIsAdmin === 'boolean'
@@ -66,6 +67,10 @@ const parseMeInfo = (payload: unknown): MeInfo | null => {
     typeof rawProfileImage === 'string' && rawProfileImage.trim().length > 0
       ? rawProfileImage.trim()
       : null;
+  const normalizedProfileImageRef =
+    typeof rawProfileImageRef === 'string' && rawProfileImageRef.trim().length > 0
+      ? rawProfileImageRef.trim()
+      : normalizedProfileImage;
   const normalizedPhone =
     typeof rawPhone === 'string' && rawPhone.trim().length > 0
       ? normalizePhoneNumber(rawPhone)
@@ -90,6 +95,7 @@ const parseMeInfo = (payload: unknown): MeInfo | null => {
     name,
     email,
     profileImage: normalizedProfileImage,
+    profileImageRef: normalizedProfileImageRef,
     phone: normalizedPhone,
     birthDate: normalizedBirthDate,
     joinedAt: normalizedJoinedAt,

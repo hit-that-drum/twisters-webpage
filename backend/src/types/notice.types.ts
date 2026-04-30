@@ -18,6 +18,7 @@ export interface Notice {
   updateUser: string;
   updateDate: Date;
   imageUrl: string | null;
+  imageRef: string | null;
   content: string;
   pinned: boolean;
 }

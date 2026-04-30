@@ -14,10 +14,12 @@ import {
 } from '../../types/auth.types.js';
 import { type AuthenticatedUser } from '../../types/common.types.js';
 import { normalizeBoolean, requireAuthenticatedUser } from '../../utils/authScope.js';
+import { normalizeStoredImageReference } from '../../utils/imageReference.js';
 import {
   normalizeOptionalPhoneNumber,
   normalizePhoneNumber,
 } from '../../utils/phoneNumber.js';
+import { b2StorageService } from '../storage/b2StorageService.js';
 
 const normalizeOptionalBirthDate = (rawValue: unknown) => {
   if (rawValue === null || rawValue === undefined) {
@@ -66,14 +68,15 @@ class ProfileService {
       throw new HttpError(404, '해당 사용자를 찾을 수 없습니다.');
     }
 
+    const profileImageRef = normalizeStoredImageReference(me.profileImage);
+    const profileImageUrl = await b2StorageService.createImageDownloadUrlFromRef(profileImageRef);
+
     return {
       id: me.id,
       name: me.name,
       email: me.email,
-      profileImage:
-        typeof me.profileImage === 'string' && me.profileImage.trim().length > 0
-          ? me.profileImage.trim()
-          : null,
+      profileImage: profileImageUrl,
+      profileImageRef,
       phone:
         typeof me.phone === 'string' && me.phone.trim().length > 0
           ? normalizePhoneNumber(me.phone)
@@ -112,10 +115,7 @@ class ProfileService {
     payload: UpdateProfileImageDTO,
   ) {
     const currentUser = requireAuthenticatedUser(authenticatedUser);
-    const profileImage =
-      typeof payload.profileImage === 'string' && payload.profileImage.trim().length > 0
-        ? payload.profileImage.trim()
-        : null;
+    const profileImage = normalizeStoredImageReference(payload.profileImage);
 
     if (profileImage && profileImage.length > 5_000_000) {
       throw new HttpError(400, '프로필 이미지는 5MB 이하 문자열 데이터만 저장할 수 있습니다.');
@@ -128,7 +128,8 @@ class ProfileService {
 
     return {
       message: '프로필 이미지가 저장되었습니다.',
-      profileImage,
+      profileImage: await b2StorageService.createImageDownloadUrlFromRef(profileImage),
+      profileImageRef: profileImage,
     };
   }
 }

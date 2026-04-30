@@ -11,6 +11,8 @@ import {
   normalizeBoolean,
   requireAuthenticatedUser,
 } from '../../utils/authScope.js';
+import { normalizeStoredImageReference } from '../../utils/imageReference.js';
+import { b2StorageService } from '../storage/b2StorageService.js';
 
 const getAuthProvider = (row: {
   hasGoogleAuth: boolean | number;
@@ -44,18 +46,19 @@ export const getAdminUsers = async (authenticatedUser: AuthenticatedUser | undef
   const currentUser = requireAuthenticatedUser(authenticatedUser);
   const rows = await authRepository.findAllAdminUsers(isTestScopedAdmin(currentUser));
 
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    profileImage:
-      typeof row.profileImage === 'string' && row.profileImage.trim().length > 0
-        ? row.profileImage.trim()
-        : null,
-    isAdmin: normalizeBoolean(row.isAdmin, false),
-    isAllowed: normalizeBoolean(row.isAllowed, false),
-    createdAt: row.createdAt,
-    emailVerifiedAt: row.emailVerifiedAt,
-    authProvider: getAuthProvider(row),
-  }));
+  return Promise.all(
+    rows.map(async (row) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      profileImage: await b2StorageService.createImageDownloadUrlFromRef(
+        normalizeStoredImageReference(row.profileImage),
+      ),
+      isAdmin: normalizeBoolean(row.isAdmin, false),
+      isAllowed: normalizeBoolean(row.isAllowed, false),
+      createdAt: row.createdAt,
+      emailVerifiedAt: row.emailVerifiedAt,
+      authProvider: getAuthProvider(row),
+    })),
+  );
 };
