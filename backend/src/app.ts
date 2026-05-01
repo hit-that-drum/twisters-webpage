@@ -8,10 +8,12 @@ import memberRoutes from './routes/memberRoutes.js';
 import boardRoutes from './routes/boardRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import passport from './config/passport.js';
+import { requestProfilerMiddleware } from './utils/requestProfiler.js';
 
 const app = express();
 
 app.use(cors());
+app.use(requestProfilerMiddleware);
 app.use(express.json({ limit: '25mb' }));
 app.use(passport.initialize());
 

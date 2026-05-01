@@ -46,6 +46,14 @@ export interface Board {
   reactions: BoardReactionSummary;
 }
 
+export interface BoardListResponse {
+  items: Board[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  hasMore: boolean;
+}
+
 export interface CreateBoardDTO {
   title?: string;
   imageUrl?: unknown;
@@ -99,11 +107,15 @@ export type BoardSortOption = 'latest' | 'oldest' | 'updated' | 'pinned';
 export interface BoardListQuery {
   search?: string;
   sort?: string;
+  page?: string;
+  pageSize?: string;
 }
 
 export interface BoardListFilters {
   search?: string;
   sort: BoardSortOption;
+  page: number;
+  pageSize: number;
 }
 
 export interface BoardCommentRow {

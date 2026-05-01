@@ -8,27 +8,68 @@ import { type AuthenticatedRequest } from '../types/common.types.js';
 import {
   type CreateBoardCommentDTO,
   type CreateBoardDTO,
+  type BoardListQuery,
   type ToggleBoardReactionDTO,
   type UpdateBoardDTO,
 } from '../types/board.types.js';
 import { handleControllerError } from '../utils/controllerErrorHandler.js';
 
+const getBoardListQueryFromRequest = (req: Request): BoardListQuery => {
+  const query: BoardListQuery = {};
+  if (typeof req.query.search === 'string') {
+    query.search = req.query.search;
+  }
+
+  if (typeof req.query.sort === 'string') {
+    query.sort = req.query.sort;
+  }
+
+  if (typeof req.query.page === 'string') {
+    query.page = req.query.page;
+  }
+
+  if (typeof req.query.pageSize === 'string') {
+    query.pageSize = req.query.pageSize;
+  }
+
+  return query;
+};
+
 export const getBoards = async (req: Request, res: Response) => {
   try {
     const authenticatedUser = (req as AuthenticatedRequest).user;
-    const query: { search?: string; sort?: string } = {};
-    if (typeof req.query.search === 'string') {
-      query.search = req.query.search;
-    }
-
-    if (typeof req.query.sort === 'string') {
-      query.sort = req.query.sort;
-    }
-
-    const boards = await boardService.getBoards(authenticatedUser, query);
+    const boards = await boardService.getBoards(authenticatedUser, getBoardListQueryFromRequest(req));
     return res.json(boards);
   } catch (error) {
     return handleControllerError(res, error, '게시글 조회 중 오류가 발생했습니다.', 'Board list fetch error');
+  }
+};
+
+export const getBoard = async (req: Request, res: Response) => {
+  try {
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const board = await boardService.getBoardById(authenticatedUser, req.params.id);
+    return res.json(board);
+  } catch (error) {
+    return handleControllerError(res, error, '게시글 조회 중 오류가 발생했습니다.', 'Board fetch error');
+  }
+};
+
+export const getMyReactionBoards = async (req: Request, res: Response) => {
+  try {
+    const authenticatedUser = (req as AuthenticatedRequest).user;
+    const boards = await boardService.getMyReactionBoards(
+      authenticatedUser,
+      getBoardListQueryFromRequest(req),
+    );
+    return res.json(boards);
+  } catch (error) {
+    return handleControllerError(
+      res,
+      error,
+      '게시글 반응 조회 중 오류가 발생했습니다.',
+      'Board reaction list fetch error',
+    );
   }
 };
 

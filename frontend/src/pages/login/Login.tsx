@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import loginPageRightImage from '/login_page_right_image.png';
 import LoadingComponent from '@/common/LoadingComponent.tsx';
@@ -58,12 +58,18 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
   const googleOAuth = useGoogleOAuth({ setOAuthLoadingMessage });
   const kakaoOAuth = useKakaoOAuth({ setOAuthLoadingMessage });
 
-  // Wire refs to real implementations (setters are stable, so identity is preserved).
-  setFormEmailRef.current = authSubmit.setFormEmail;
-  setVerificationRequiredEmailRef.current = emailVerification.setVerificationRequiredEmail;
-  clearVerificationIfDifferentEmailRef.current =
-    emailVerification.clearVerificationIfDifferentEmail;
-  openForResetRef.current = passwordReset.openForReset;
+  useLayoutEffect(() => {
+    setFormEmailRef.current = authSubmit.setFormEmail;
+    setVerificationRequiredEmailRef.current = emailVerification.setVerificationRequiredEmail;
+    clearVerificationIfDifferentEmailRef.current =
+      emailVerification.clearVerificationIfDifferentEmail;
+    openForResetRef.current = passwordReset.openForReset;
+  }, [
+    authSubmit.setFormEmail,
+    emailVerification.clearVerificationIfDifferentEmail,
+    emailVerification.setVerificationRequiredEmail,
+    passwordReset.openForReset,
+  ]);
 
   const isOAuthLoading = oauthLoadingMessage !== null;
   const isSubmitLoading = authSubmit.isSubmitting || isAuthLoading || isOAuthLoading;

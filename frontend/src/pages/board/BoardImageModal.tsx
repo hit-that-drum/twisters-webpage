@@ -1,6 +1,7 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { GlobalModal } from '@/common/components';
 import type { ModalCloseReason } from '@/common/components/GlobalModal';
+import useResolvedBoardImages from '@/pages/board/hooks/useResolvedBoardImages';
 
 interface BoardImageModalProps {
   open: boolean;
@@ -24,7 +25,16 @@ export default function BoardImageModal({
   onSelectImage,
 }: BoardImageModalProps) {
   const safeIndex = images.length > 0 ? currentIndex % images.length : 0;
-  const activeImage = images[safeIndex] ?? null;
+  const activeImageRef = images[safeIndex] ?? null;
+  const imageRefsToResolve = useMemo(() => {
+    if (!open) {
+      return [];
+    }
+
+    return images;
+  }, [images, open]);
+  const resolvedImageUrlByRef = useResolvedBoardImages(imageRefsToResolve, open);
+  const activeImage = activeImageRef ? resolvedImageUrlByRef[activeImageRef] : null;
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -75,6 +85,7 @@ export default function BoardImageModal({
             <img
               src={activeImage}
               alt={`${title} image ${safeIndex + 1}`}
+              loading="lazy"
               className="h-auto max-h-[70vh] w-full object-contain"
             />
           ) : (
@@ -120,11 +131,18 @@ export default function BoardImageModal({
                 aria-label={`Show image ${imageIndex + 1} for ${title}`}
                 aria-pressed={safeIndex === imageIndex}
               >
-                <img
-                  src={imageUrl}
-                  alt={`${title} thumbnail ${imageIndex + 1}`}
-                  className="aspect-square w-full object-cover"
-                />
+                {resolvedImageUrlByRef[imageUrl] ? (
+                  <img
+                    src={resolvedImageUrlByRef[imageUrl]}
+                    alt={`${title} thumbnail ${imageIndex + 1}`}
+                    loading="lazy"
+                    className="aspect-square w-full object-cover"
+                  />
+                ) : (
+                  <span className="flex aspect-square w-full items-center justify-center bg-slate-100 text-[10px] font-semibold text-slate-400">
+                    Loading
+                  </span>
+                )}
               </button>
             ))}
           </div>

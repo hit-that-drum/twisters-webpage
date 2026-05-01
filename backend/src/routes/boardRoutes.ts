@@ -5,6 +5,12 @@ import * as boardController from '../controllers/boardController.js';
 const router = express.Router();
 
 router.get('/', passport.authenticate('jwt', { session: false }), boardController.getBoards);
+router.get(
+  '/reactions/me',
+  passport.authenticate('jwt', { session: false }),
+  boardController.getMyReactionBoards,
+);
+router.get('/:id', passport.authenticate('jwt', { session: false }), boardController.getBoard);
 router.post('/', passport.authenticate('jwt', { session: false }), boardController.createBoard);
 router.put('/:id', passport.authenticate('jwt', { session: false }), boardController.updateBoard);
 router.delete('/:id', passport.authenticate('jwt', { session: false }), boardController.deleteBoard);

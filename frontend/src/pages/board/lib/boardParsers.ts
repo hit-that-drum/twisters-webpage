@@ -1,6 +1,7 @@
 import {
   BOARD_REACTION_TYPES,
   type BoardCommentItem,
+  type BoardPostListResult,
   type BoardPostItem,
   type BoardReactionSummary,
   type BoardReactionType,
@@ -131,6 +132,49 @@ export const parseBoardPosts = (payload: unknown): BoardPostItem[] => {
     .filter((item): item is BoardPostItem => item !== null);
 };
 
+const getPayloadNumber = (payload: Record<string, unknown>, key: string, fallback: number) => {
+  const value = payload[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+};
+
+export const parseBoardPostList = (payload: unknown): BoardPostListResult => {
+  if (Array.isArray(payload)) {
+    const posts = parseBoardPosts(payload);
+    return {
+      posts,
+      page: 1,
+      pageSize: posts.length,
+      totalCount: posts.length,
+      hasMore: false,
+    };
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return {
+      posts: [],
+      page: 1,
+      pageSize: 0,
+      totalCount: 0,
+      hasMore: false,
+    };
+  }
+
+  const row = payload as Record<string, unknown>;
+  const posts = parseBoardPosts(row.items);
+  const page = getPayloadNumber(row, 'page', 1);
+  const pageSize = getPayloadNumber(row, 'pageSize', posts.length);
+  const totalCount = getPayloadNumber(row, 'totalCount', posts.length);
+  const hasMore = row.hasMore === true;
+
+  return {
+    posts,
+    page,
+    pageSize,
+    totalCount,
+    hasMore,
+  };
+};
+
 export const parseBoardComments = (payload: unknown): BoardCommentItem[] => {
   if (!Array.isArray(payload)) {
     return [];
@@ -183,7 +227,12 @@ export const parseBoardComments = (payload: unknown): BoardCommentItem[] => {
     .filter((item): item is BoardCommentItem => item !== null);
 };
 
-export const buildBoardListPath = (search: string, sort: BoardSortOption) => {
+export const buildBoardListPath = (
+  search: string,
+  sort: BoardSortOption,
+  page = 1,
+  pageSize?: number,
+) => {
   const queryParams = new URLSearchParams();
   if (search.trim()) {
     queryParams.set('search', search.trim());
@@ -193,10 +242,32 @@ export const buildBoardListPath = (search: string, sort: BoardSortOption) => {
     queryParams.set('sort', sort);
   }
 
+  if (page > 1) {
+    queryParams.set('page', String(page));
+  }
+
+  if (typeof pageSize === 'number' && Number.isFinite(pageSize) && pageSize > 0) {
+    queryParams.set('pageSize', String(pageSize));
+  }
+
   const queryString = queryParams.toString();
   if (!queryString) {
     return '/board';
   }
 
   return `/board?${queryString}`;
+};
+
+export const buildMyReactionBoardListPath = (page = 1, pageSize = 100) => {
+  const queryParams = new URLSearchParams();
+  if (page > 1) {
+    queryParams.set('page', String(page));
+  }
+
+  if (pageSize > 0) {
+    queryParams.set('pageSize', String(pageSize));
+  }
+
+  const queryString = queryParams.toString();
+  return queryString ? `/board/reactions/me?${queryString}` : '/board/reactions/me';
 };

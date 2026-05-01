@@ -57,6 +57,8 @@ Deploy the `backend` directory as a separate Vercel project.
 - `B2_BUCKET_NAME`
 - `B2_KEY_ID`
 - `B2_APPLICATION_KEY`
+- `B2_CDN_BASE_URL` or `B2_PUBLIC_BASE_URL` (optional; use when serving B2 objects through a public CDN/custom domain)
+- `REQUEST_PROFILING=true` (optional; emits `Server-Timing` and request profile logs for latency checks)
 - `DB_SSL=true` (default behavior is SSL enabled)
 
 #### Backend env validation checklist
@@ -71,6 +73,7 @@ Deploy the `backend` directory as a separate Vercel project.
 - `KAKAO_REST_API_KEY` matches Kakao Developers REST API key
 - `KAKAO_REDIRECT_URI` exactly matches Kakao Developers redirect URI entry
 - Backblaze B2 bucket is private, and CORS allows frontend-origin `PUT`, `GET`, and `HEAD`
+- If a CDN/custom domain is in front of B2, set `B2_CDN_BASE_URL` or `B2_PUBLIC_BASE_URL` without a trailing slash
 - `DB_SSL` set to `true` on Vercel
 
 The backend uses:
@@ -143,6 +146,7 @@ B2_REGION=<region>
 B2_BUCKET_NAME=<your-private-bucket-name>
 B2_KEY_ID=<your-bucket-application-key-id>
 B2_APPLICATION_KEY=<your-bucket-application-key>
+B2_CDN_BASE_URL=https://cdn.your-domain.com
 SESSION_IDLE_TIMEOUT_MINUTES=60
 SESSION_ABSOLUTE_TIMEOUT_DAYS=7
 SESSION_ABSOLUTE_TIMEOUT_REMEMBER_DAYS=30

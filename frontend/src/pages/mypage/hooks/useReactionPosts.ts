@@ -6,7 +6,7 @@ import {
   isEmptyListResponse,
   parseApiResponse,
 } from '@/common/lib/api/apiHelpers';
-import { parseBoardPosts } from '@/pages/board/lib/boardParsers';
+import { buildMyReactionBoardListPath, parseBoardPostList } from '@/pages/board/lib/boardParsers';
 import type { BoardPostItem, BoardReactionType } from '@/pages/board/lib/boardTypes';
 import { REACTION_SECTIONS } from '@/pages/mypage/lib/myPageConstants';
 
@@ -20,6 +20,8 @@ interface UseReactionPostsResult {
   reactionPostsByType: Record<BoardReactionType, BoardPostItem[]>;
   isLoadingReactionPosts: boolean;
 }
+
+const REACTION_POSTS_PAGE_SIZE = 100;
 
 const useReactionPosts = ({
   isAuthenticated,
@@ -39,27 +41,49 @@ const useReactionPosts = ({
       setIsLoadingReactionPosts(true);
 
       try {
-        const response = await apiFetch('/board');
-        const payload = await parseApiResponse(response);
+        const posts: BoardPostItem[] = [];
+        const seenPostIds = new Set<number>();
+        let page = 1;
+        let hasMore = true;
 
-        if (!response.ok) {
-          if (response.status === 401) {
-            onExpiredSession();
+        while (hasMore) {
+          const response = await apiFetch(
+            buildMyReactionBoardListPath(page, REACTION_POSTS_PAGE_SIZE),
+          );
+          const payload = await parseApiResponse(response);
+
+          if (!response.ok) {
+            if (response.status === 401) {
+              onExpiredSession();
+              return;
+            }
+
+            if (isEmptyListResponse(response, payload, ['게시글', 'board', 'post', 'data'])) {
+              setReactionPosts([]);
+              return;
+            }
+
+            enqueueSnackbar(`게시글 반응 목록 조회 실패: ${getApiMessage(payload, '알 수 없는 에러')}`, {
+              variant: 'error',
+            });
             return;
           }
 
-          if (isEmptyListResponse(response, payload, ['게시글', 'board', 'post', 'data'])) {
-            setReactionPosts([]);
-            return;
-          }
+          const parsedResult = parseBoardPostList(payload);
+          parsedResult.posts.forEach((post) => {
+            if (seenPostIds.has(post.id)) {
+              return;
+            }
 
-          enqueueSnackbar(`게시글 반응 목록 조회 실패: ${getApiMessage(payload, '알 수 없는 에러')}`, {
-            variant: 'error',
+            seenPostIds.add(post.id);
+            posts.push(post);
           });
-          return;
+
+          hasMore = parsedResult.hasMore && parsedResult.posts.length > 0;
+          page += 1;
         }
 
-        setReactionPosts(parseBoardPosts(payload));
+        setReactionPosts(posts);
       } catch (error) {
         console.error('My page reaction posts fetch error:', error);
         enqueueSnackbar('반응한 게시글을 불러오는 중 오류가 발생했습니다.', { variant: 'error' });

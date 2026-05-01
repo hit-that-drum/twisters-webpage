@@ -161,6 +161,23 @@ export const normalizeBoardSearch = (rawSearch: string | undefined) => {
   return trimmed.slice(0, 100);
 };
 
+const normalizePositiveInteger = (rawValue: string | undefined, fallback: number) => {
+  const parsedValue = Number(rawValue);
+  if (!Number.isInteger(parsedValue) || parsedValue <= 0) {
+    return fallback;
+  }
+
+  return parsedValue;
+};
+
+export const normalizeBoardPage = (rawPage: string | undefined) => {
+  return normalizePositiveInteger(rawPage, 1);
+};
+
+export const normalizeBoardPageSize = (rawPageSize: string | undefined) => {
+  return Math.min(normalizePositiveInteger(rawPageSize, 20), 100);
+};
+
 export const normalizeBoardReactionType = (rawReactionType: unknown): BoardReactionType => {
   if (typeof rawReactionType !== 'string') {
     throw new HttpError(400, '유효한 반응 타입이 필요합니다.');

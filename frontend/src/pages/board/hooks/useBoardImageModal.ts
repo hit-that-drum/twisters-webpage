@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { ModalCloseReason } from '@/common/components/GlobalModal';
 import type { BoardPostItem } from '@/pages/board/lib/boardTypes';
 
@@ -18,9 +18,8 @@ interface UseBoardImageModalResult {
 
 /**
  * Owns the per-post image carousel index and the fullscreen image modal
- * target. Resets carousel/modal state whenever the upstream `boardPosts`
- * identity changes so stale indexes never point at a post that has since
- * been deleted or refetched.
+ * target. The active modal post is derived from the current board rows, so a
+ * deleted or refetched-away post naturally closes by resolving to `null`.
  */
 export default function useBoardImageModal({
   boardPosts,
@@ -29,11 +28,6 @@ export default function useBoardImageModal({
     Record<number, number>
   >({});
   const [imageModalPostId, setImageModalPostId] = useState<number | null>(null);
-
-  useEffect(() => {
-    setCurrentImageIndexByPost({});
-    setImageModalPostId(null);
-  }, [boardPosts]);
 
   const handleOpenImageModal = useCallback((postId: number) => {
     setImageModalPostId(postId);
@@ -81,7 +75,12 @@ export default function useBoardImageModal({
 
   const imageModalCurrentIndex = imageModalPost
     ? (currentImageIndexByPost[imageModalPost.id] ?? 0) %
-      Math.max(imageModalPost.imageUrl.length, 1)
+      Math.max(
+        imageModalPost.imageRefs.length > 0
+          ? imageModalPost.imageRefs.length
+          : imageModalPost.imageUrl.length,
+        1,
+      )
     : 0;
 
   return {

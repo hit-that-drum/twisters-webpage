@@ -74,7 +74,13 @@ export default function useMemberDues({
       return;
     }
 
-    void loadMemberDuesStatus();
+    const timerId = window.setTimeout(() => {
+      void loadMemberDuesStatus();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
   }, [isAuthLoading, isAuthenticated, loadMemberDuesStatus]);
 
   const selectedUserDuesStatus = useMemo(() => {

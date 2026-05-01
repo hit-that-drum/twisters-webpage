@@ -13,9 +13,11 @@ import {
   isB2ImageReference,
   toB2ImageReference,
 } from '../../utils/imageReference.js';
+import { profileSegment } from '../../utils/requestProfiler.js';
 
 const SIGNED_UPLOAD_EXPIRES_SECONDS = 5 * 60;
 const SIGNED_DOWNLOAD_EXPIRES_SECONDS = 15 * 60;
+const SIGNED_DOWNLOAD_CACHE_TTL_MS = (SIGNED_DOWNLOAD_EXPIRES_SECONDS - 60) * 1000;
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 const ALLOWED_IMAGE_CONTENT_TYPES = new Set([
@@ -47,6 +49,27 @@ type B2Config = {
 };
 
 let s3Client: S3Client | null = null;
+const signedDownloadUrlCache = new Map<string, { imageUrl: string; expiresAtMs: number }>();
+
+const readPublicImageBaseUrl = () => {
+  const publicBaseUrl = (
+    process.env.B2_PUBLIC_BASE_URL ??
+    process.env.B2_CDN_BASE_URL ??
+    ''
+  ).trim();
+
+  return publicBaseUrl ? publicBaseUrl.replace(/\/+$/, '') : null;
+};
+
+const createPublicImageUrl = (objectKey: string) => {
+  const publicBaseUrl = readPublicImageBaseUrl();
+  if (!publicBaseUrl) {
+    return null;
+  }
+
+  const encodedObjectKey = objectKey.split('/').map(encodeURIComponent).join('/');
+  return `${publicBaseUrl}/${encodedObjectKey}`;
+};
 
 const readB2Config = (): B2Config | null => {
   const endpoint = process.env.B2_ENDPOINT?.trim();
@@ -166,9 +189,17 @@ class B2StorageService {
       ContentType: contentType,
     });
 
-    const uploadUrl = await getSignedUrl(getS3Client(), command, {
-      expiresIn: SIGNED_UPLOAD_EXPIRES_SECONDS,
-    });
+    const uploadUrl = await profileSegment(
+      'b2.signUploadUrl',
+      () =>
+        getSignedUrl(getS3Client(), command, {
+          expiresIn: SIGNED_UPLOAD_EXPIRES_SECONDS,
+        }),
+      {
+        scope,
+        contentType,
+      },
+    );
     const imageRef = toB2ImageReference(objectKey);
 
     return {
@@ -189,13 +220,15 @@ class B2StorageService {
     }
 
     const imageRef = payload.imageRef.trim();
+    const shouldExpire = isB2ImageReference(imageRef) && readPublicImageBaseUrl() === null;
+
     return {
       imageUrl: await this.createImageDownloadUrlFromRef(imageRef),
-      expiresInSeconds: isB2ImageReference(imageRef) ? SIGNED_DOWNLOAD_EXPIRES_SECONDS : null,
+      expiresInSeconds: shouldExpire ? SIGNED_DOWNLOAD_EXPIRES_SECONDS : null,
     };
   }
 
-  async createImageDownloadUrlFromRef(imageRef: string | null) {
+  async createImageDownloadUrlFromRef(imageRef: string | null): Promise<string | null> {
     if (!imageRef) {
       return null;
     }
@@ -209,27 +242,59 @@ class B2StorageService {
       return null;
     }
 
+    const publicImageUrl = createPublicImageUrl(objectKey);
+    if (publicImageUrl) {
+      return publicImageUrl;
+    }
+
+    const cachedSignedUrl = signedDownloadUrlCache.get(imageRef);
+    if (cachedSignedUrl && cachedSignedUrl.expiresAtMs > Date.now()) {
+      return cachedSignedUrl.imageUrl;
+    }
+
     const config = requireB2Config();
     const command = new GetObjectCommand({
       Bucket: config.bucketName,
       Key: objectKey,
     });
 
-    return getSignedUrl(getS3Client(), command, {
-      expiresIn: SIGNED_DOWNLOAD_EXPIRES_SECONDS,
+    const imageUrl = await profileSegment(
+      'b2.signDownloadUrl',
+      () =>
+        getSignedUrl(getS3Client(), command, {
+          expiresIn: SIGNED_DOWNLOAD_EXPIRES_SECONDS,
+        }),
+      {
+        isB2ImageReference: true,
+      },
+    );
+
+    signedDownloadUrlCache.set(imageRef, {
+      imageUrl,
+      expiresAtMs: Date.now() + SIGNED_DOWNLOAD_CACHE_TTL_MS,
     });
+
+    return imageUrl;
   }
 
-  async resolveImageResponse(imageRef: string | null) {
+  async resolveImageResponse(
+    imageRef: string | null,
+  ): Promise<{ imageRef: string | null; imageUrl: string | null }> {
     return {
       imageRef,
       imageUrl: await this.createImageDownloadUrlFromRef(imageRef),
     };
   }
 
-  async resolveImageListResponse(imageRefs: string[]) {
-    const imageUrls = await Promise.all(
-      imageRefs.map((imageRef) => this.createImageDownloadUrlFromRef(imageRef)),
+  async resolveImageListResponse(
+    imageRefs: string[],
+  ): Promise<{ imageRefs: string[]; imageUrl: string[] }> {
+    const imageUrls = await profileSegment(
+      'b2.resolveImageListResponse',
+      () => Promise.all(imageRefs.map((imageRef) => this.createImageDownloadUrlFromRef(imageRef))),
+      {
+        imageRefCount: imageRefs.length,
+      },
     );
 
     return {
