@@ -7,6 +7,8 @@ export const boardRepository = {
   initializeSchema: () => ensureBoardSchema(),
   // Post operations
   findAll: boardPostRepository.findAll.bind(boardPostRepository),
+  findPostRowById: boardPostRepository.findPostRowById.bind(boardPostRepository),
+  findReactedByUser: boardPostRepository.findReactedByUser.bind(boardPostRepository),
   findById: boardPostRepository.findById.bind(boardPostRepository),
   create: boardPostRepository.create.bind(boardPostRepository),
   updateById: boardPostRepository.updateById.bind(boardPostRepository),

@@ -85,6 +85,7 @@ export default function Board() {
     displayedPosts,
     hasMorePosts,
     isLoading,
+    isFetchingNextPage,
     searchInput,
     sortOption,
     setSearchInput,
@@ -124,16 +125,21 @@ export default function Board() {
   });
 
   useEffect(() => {
-    if (!targetPostId || isLoading || boardPosts.length === 0) {
+    if (!targetPostId || isLoading) {
       return;
     }
 
-    if (!boardPosts.some((post) => post.id === targetPostId)) {
-      return;
-    }
+    let isCancelled = false;
+    void (async () => {
+      const isVisible = await ensurePostVisible(targetPostId);
+      if (!isCancelled && isVisible) {
+        expandPost(targetPostId);
+      }
+    })();
 
-    ensurePostVisible(targetPostId);
-    expandPost(targetPostId);
+    return () => {
+      isCancelled = true;
+    };
   }, [boardPosts, ensurePostVisible, expandPost, isLoading, targetPostId]);
 
   useEffect(() => {
@@ -172,6 +178,12 @@ export default function Board() {
       disabled: mutations.isSubmitting,
     },
   ];
+
+  const imageModalImages = imageModal.imageModalPost
+    ? imageModal.imageModalPost.imageRefs.length > 0
+      ? imageModal.imageModalPost.imageRefs
+      : imageModal.imageModalPost.imageUrl
+    : [];
 
   if (isLoading) {
     return <LoadingComponent />;
@@ -257,10 +269,11 @@ export default function Board() {
             <button
               type="button"
               onClick={handleLoadMorePosts}
-              className="flex h-10 items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-6 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50 sm:h-11 sm:px-8"
+              disabled={isFetchingNextPage}
+              className="flex h-10 items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-6 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60 sm:h-11 sm:px-8"
             >
-              <span>Load More Posts</span>
-              <span aria-hidden="true">⌄</span>
+              <span>{isFetchingNextPage ? 'Loading Posts...' : 'Load More Posts'}</span>
+              <span aria-hidden="true">{isFetchingNextPage ? '...' : '⌄'}</span>
             </button>
           </div>
         )}
@@ -318,7 +331,7 @@ export default function Board() {
         open={imageModal.imageModalPost !== null}
         handleClose={imageModal.handleCloseImageModal}
         title={imageModal.imageModalPost?.title ?? 'BOARD IMAGE'}
-        images={imageModal.imageModalPost?.imageUrl ?? []}
+        images={imageModalImages}
         currentIndex={imageModal.imageModalCurrentIndex}
         onPrevious={() => {
           const modalPost = imageModal.imageModalPost;
@@ -326,7 +339,7 @@ export default function Board() {
             return;
           }
 
-          imageModal.handleMovePostImage(modalPost.id, modalPost.imageUrl.length, 'prev');
+          imageModal.handleMovePostImage(modalPost.id, imageModalImages.length, 'prev');
         }}
         onNext={() => {
           const modalPost = imageModal.imageModalPost;
@@ -334,7 +347,7 @@ export default function Board() {
             return;
           }
 
-          imageModal.handleMovePostImage(modalPost.id, modalPost.imageUrl.length, 'next');
+          imageModal.handleMovePostImage(modalPost.id, imageModalImages.length, 'next');
         }}
         onSelectImage={(index) => {
           const modalPost = imageModal.imageModalPost;

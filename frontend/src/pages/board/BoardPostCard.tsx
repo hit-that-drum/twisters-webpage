@@ -1,9 +1,11 @@
+import { useMemo } from 'react';
 import { AiTwotonePushpin } from 'react-icons/ai';
 import { IoPersonCircleSharp } from 'react-icons/io5';
 import { FaClock, FaHeart, FaStar, FaThumbsDown, FaThumbsUp } from 'react-icons/fa';
 import { IoIosArrowBack, IoIosArrowDown, IoIosArrowForward, IoIosArrowUp } from 'react-icons/io';
 import { EditDeleteButton } from '@/common/components';
 import { formatDateTime, formatRelativeTime } from '@/common/lib/api/apiHelpers';
+import useResolvedBoardImages from '@/pages/board/hooks/useResolvedBoardImages';
 import { COLLAPSED_POST_CONTENT_STYLE } from '@/pages/board/lib/boardConstants';
 import BoardCommentSection from '@/pages/board/BoardCommentSection';
 import type {
@@ -74,16 +76,25 @@ export default function BoardPostCard({
   onDeleteComment,
 }: BoardPostCardProps) {
   const postContent = post.content.trim() || '내용이 없습니다.';
+  const postImageRefs = useMemo(
+    () => (post.imageRefs.length > 0 ? post.imageRefs : post.imageUrl),
+    [post.imageRefs, post.imageUrl],
+  );
   const safeImageIndex =
-    post.imageUrl.length > 0 ? currentImageIndex % post.imageUrl.length : 0;
-  const activeImageUrl = post.imageUrl[safeImageIndex] ?? null;
-  const imageStyle = activeImageUrl
-    ? {
-        backgroundImage: `linear-gradient(140deg, rgba(15,23,42,0.1) 0%, rgba(15,23,42,0.36) 100%), url(${activeImageUrl})`,
-      }
-    : {
-        background: imagePreset.gradient,
-      };
+    postImageRefs.length > 0 ? currentImageIndex % postImageRefs.length : 0;
+  const activeImageRef = postImageRefs[safeImageIndex] ?? null;
+  const imageRefsToResolve = useMemo(() => {
+    if (!activeImageRef) {
+      return [];
+    }
+
+    return isExpanded ? postImageRefs : [activeImageRef];
+  }, [activeImageRef, isExpanded, postImageRefs]);
+  const resolvedImageUrlByRef = useResolvedBoardImages(imageRefsToResolve);
+  const activeImageUrl = activeImageRef ? resolvedImageUrlByRef[activeImageRef] : null;
+  const imageStyle = {
+    background: imagePreset.gradient,
+  };
   const reactionButtons: Array<{
     key: BoardReactionType;
     label: string;
@@ -132,12 +143,12 @@ export default function BoardPostCard({
       >
         <div className="flex flex-col border-r border-gray-300 bg-white xl:w-[282px] xl:min-w-[282px] xl:flex-shrink-0">
           <div
-            role={post.imageUrl.length > 0 ? 'button' : 'img'}
+            role={postImageRefs.length > 0 ? 'button' : 'img'}
             aria-label={imagePreset.alt}
-            aria-haspopup={post.imageUrl.length > 0 ? 'dialog' : undefined}
-            tabIndex={post.imageUrl.length > 0 ? 0 : undefined}
+            aria-haspopup={postImageRefs.length > 0 ? 'dialog' : undefined}
+            tabIndex={postImageRefs.length > 0 ? 0 : undefined}
             onClick={(event) => {
-              if (post.imageUrl.length === 0) {
+              if (postImageRefs.length === 0) {
                 return;
               }
 
@@ -148,7 +159,7 @@ export default function BoardPostCard({
               onOpenImageModal(post.id);
             }}
             onKeyDown={(event) => {
-              if (event.target !== event.currentTarget || post.imageUrl.length === 0) {
+              if (event.target !== event.currentTarget || postImageRefs.length === 0) {
                 return;
               }
 
@@ -158,12 +169,24 @@ export default function BoardPostCard({
               }
             }}
             className={`relative min-h-[282px] overflow-hidden bg-center bg-cover bg-no-repeat ${
-              post.imageUrl.length > 0
+              postImageRefs.length > 0
                 ? 'cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset'
                 : ''
             }`}
             style={imageStyle}
           >
+            {activeImageUrl ? (
+              <>
+                <img
+                  src={activeImageUrl}
+                  alt={imagePreset.alt}
+                  loading="lazy"
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-950/10 to-slate-950/35" />
+              </>
+            ) : null}
+
             {post.pinned && (
               <div className="absolute left-3 top-3 sm:left-4 sm:top-4">
                 <span className="flex items-center gap-1 rounded bg-amber-300 px-2 py-1 text-[10px] font-black uppercase text-slate-900 shadow-sm">
@@ -172,21 +195,21 @@ export default function BoardPostCard({
               </div>
             )}
 
-            {post.imageUrl.length > 0 && (
+            {postImageRefs.length > 0 && (
               <div className="pointer-events-none absolute right-3 top-3 sm:right-4 sm:top-4">
                 <div className="rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-sm backdrop-blur-sm">
-                  {`${safeImageIndex + 1}/${post.imageUrl.length}`}
+                  {`${safeImageIndex + 1}/${postImageRefs.length}`}
                 </div>
               </div>
             )}
 
-            {post.imageUrl.length > 1 && (
+            {postImageRefs.length > 1 && (
               <>
                 <button
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    onMovePostImage(post.id, post.imageUrl.length, 'prev');
+                    onMovePostImage(post.id, postImageRefs.length, 'prev');
                   }}
                   className="absolute left-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-lg font-bold text-white backdrop-blur-sm transition hover:bg-black/60"
                   aria-label="Previous image"
@@ -197,7 +220,7 @@ export default function BoardPostCard({
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    onMovePostImage(post.id, post.imageUrl.length, 'next');
+                    onMovePostImage(post.id, postImageRefs.length, 'next');
                   }}
                   className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-lg font-bold text-white backdrop-blur-sm transition hover:bg-black/60"
                   aria-label="Next image"
@@ -213,26 +236,37 @@ export default function BoardPostCard({
               className="grid grid-cols-4 gap-2 border-t border-slate-200 p-3"
               aria-label={`${post.title} image thumbnails`}
             >
-              {post.imageUrl.map((imageUrl, imageIndex) => (
-                <button
-                  key={`${post.id}-thumb-${imageIndex}`}
-                  type="button"
-                  onClick={() => onSelectPostImage(post.id, imageIndex)}
-                  className={`overflow-hidden rounded-lg border-2 transition ${
-                    safeImageIndex === imageIndex
-                      ? 'border-blue-500 shadow-sm shadow-blue-200/70'
-                      : 'border-transparent opacity-70 hover:opacity-100'
-                  }`}
-                  aria-label={`Select image ${imageIndex + 1} for ${post.title}`}
-                  aria-pressed={safeImageIndex === imageIndex}
-                >
-                  <img
-                    src={imageUrl}
-                    alt={`${post.title} thumbnail ${imageIndex + 1}`}
-                    className="aspect-square w-full object-cover"
-                  />
-                </button>
-              ))}
+              {postImageRefs.map((imageRef, imageIndex) => {
+                const thumbnailUrl = resolvedImageUrlByRef[imageRef];
+
+                return (
+                  <button
+                    key={`${post.id}-thumb-${imageIndex}`}
+                    type="button"
+                    onClick={() => onSelectPostImage(post.id, imageIndex)}
+                    className={`overflow-hidden rounded-lg border-2 transition ${
+                      safeImageIndex === imageIndex
+                        ? 'border-blue-500 shadow-sm shadow-blue-200/70'
+                        : 'border-transparent opacity-70 hover:opacity-100'
+                    }`}
+                    aria-label={`Select image ${imageIndex + 1} for ${post.title}`}
+                    aria-pressed={safeImageIndex === imageIndex}
+                  >
+                    {thumbnailUrl ? (
+                      <img
+                        src={thumbnailUrl}
+                        alt={`${post.title} thumbnail ${imageIndex + 1}`}
+                        loading="lazy"
+                        className="aspect-square w-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex aspect-square w-full items-center justify-center bg-slate-100 text-[10px] font-semibold text-slate-400">
+                        Loading
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

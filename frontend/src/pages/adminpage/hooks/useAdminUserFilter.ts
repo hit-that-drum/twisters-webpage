@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { AdminUserRecord } from '@/entities/user/types';
 import {
   USERS_PAGE_SIZE,
@@ -51,21 +51,18 @@ export default function useAdminUserFilter({
   }, [sortedAllUsers, statusFilter]);
 
   const maxPage = Math.max(0, Math.ceil(filteredUsers.length / USERS_PAGE_SIZE) - 1);
-
-  useEffect(() => {
-    setUsersPage((previous) => Math.min(previous, maxPage));
-  }, [maxPage]);
+  const currentPage = Math.min(usersPage, maxPage);
 
   const pagedUsers = useMemo(() => {
-    const start = usersPage * USERS_PAGE_SIZE;
+    const start = currentPage * USERS_PAGE_SIZE;
     return filteredUsers.slice(start, start + USERS_PAGE_SIZE);
-  }, [filteredUsers, usersPage]);
+  }, [currentPage, filteredUsers]);
 
-  const showingStart = filteredUsers.length === 0 ? 0 : usersPage * USERS_PAGE_SIZE + 1;
+  const showingStart = filteredUsers.length === 0 ? 0 : currentPage * USERS_PAGE_SIZE + 1;
   const showingEnd =
     filteredUsers.length === 0
       ? 0
-      : Math.min((usersPage + 1) * USERS_PAGE_SIZE, filteredUsers.length);
+      : Math.min((currentPage + 1) * USERS_PAGE_SIZE, filteredUsers.length);
 
   const handleToggleFilter = useCallback(() => {
     setStatusFilter((previous) => {
@@ -83,16 +80,16 @@ export default function useAdminUserFilter({
   }, []);
 
   const handlePreviousPage = useCallback(() => {
-    setUsersPage((previous) => Math.max(0, previous - 1));
-  }, []);
+    setUsersPage(Math.max(0, currentPage - 1));
+  }, [currentPage]);
 
   const handleNextPage = useCallback(() => {
-    setUsersPage((previous) => Math.min(maxPage, previous + 1));
-  }, [maxPage]);
+    setUsersPage(Math.min(maxPage, currentPage + 1));
+  }, [currentPage, maxPage]);
 
   return {
     statusFilter,
-    usersPage,
+    usersPage: currentPage,
     filteredUsers,
     pagedUsers,
     maxPage,

@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { GlobalButton } from '@/common/components';
-import type { ModalCloseReason } from '@/common/components/GlobalModal';
 import useExpiredSession from '@/common/hooks/useExpiredSession';
 import {
   formatPhoneInput,
@@ -54,7 +53,7 @@ export default function Mypage() {
     [activeReactionModalKey],
   );
 
-  const handleCloseReactionModal = (_event: object, _reason: ModalCloseReason) => {
+  const handleCloseReactionModal = () => {
     setActiveReactionModalKey(null);
   };
 

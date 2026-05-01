@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ROWS_PER_PAGE_OPTIONS,
   type SettlementRecord,
@@ -58,28 +58,20 @@ export default function useSettlementGridState({
     [sortedRows],
   );
 
-  useEffect(() => {
-    if (relationFilter && !relationOptions.includes(relationFilter)) {
-      setRelationFilterState('');
-      setPage(0);
-    }
-  }, [relationFilter, relationOptions]);
+  const activeRelationFilter =
+    relationFilter && relationOptions.includes(relationFilter) ? relationFilter : '';
 
   const filteredRows = useMemo(() => {
-    if (!relationFilter) {
+    if (!activeRelationFilter) {
       return sortedRows;
     }
 
-    return sortedRows.filter((row) => row.relation.trim() === relationFilter);
-  }, [relationFilter, sortedRows]);
+    return sortedRows.filter((row) => row.relation.trim() === activeRelationFilter);
+  }, [activeRelationFilter, sortedRows]);
 
   const totalRows = filteredRows.length;
   const maxPage = Math.max(0, Math.ceil(totalRows / rowsPerPage) - 1);
   const currentPage = Math.min(page, maxPage);
-
-  useEffect(() => {
-    setPage((previous) => Math.min(previous, maxPage));
-  }, [maxPage]);
 
   const pagedRows = useMemo(() => {
     const startIndex = currentPage * rowsPerPage;
@@ -115,17 +107,17 @@ export default function useSettlementGridState({
   }, []);
 
   const handlePreviousPage = useCallback(() => {
-    setPage((previous) => Math.max(0, previous - 1));
-  }, []);
+    setPage(Math.max(0, currentPage - 1));
+  }, [currentPage]);
 
   const handleNextPage = useCallback(() => {
-    setPage((previous) => Math.min(maxPage, previous + 1));
-  }, [maxPage]);
+    setPage(Math.min(maxPage, currentPage + 1));
+  }, [currentPage, maxPage]);
 
   return {
     rowsPerPage,
     page: currentPage,
-    relationFilter,
+    relationFilter: activeRelationFilter,
     relationOptions,
     pagedRows,
     totalRows,

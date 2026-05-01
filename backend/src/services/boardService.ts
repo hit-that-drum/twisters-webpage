@@ -4,36 +4,87 @@ import { meetingAttendanceService } from './meetingAttendanceService.js';
 import { type AuthenticatedUser } from '../types/common.types.js';
 import {
   type Board,
+  type BoardListResponse,
   type BoardListFilters,
   type BoardListQuery,
+  type BoardRow,
   type CreateBoardDTO,
   type UpdateBoardDTO,
   createEmptyBoardReactionSummary,
 } from '../types/board.types.js';
-import { resolveDataScopeByUser } from '../utils/dataScope.js';
+import { resolveDataScopeByUser, type DataScope } from '../utils/dataScope.js';
 import {
   isAdminUser,
   normalizeBoardMutationPayload,
+  normalizeBoardPage,
+  normalizeBoardPageSize,
   normalizeBoardSearch,
   normalizeBoardSort,
   parseBoardId,
   requireAuthenticatedUser,
 } from './board/boardValidation.js';
-import { b2StorageService } from './storage/b2StorageService.js';
+import { profileSegment } from '../utils/requestProfiler.js';
 
 export { boardCommentService } from './board/boardCommentService.js';
 export { boardReactionService } from './board/boardReactionService.js';
 
 class BoardService {
-  async getBoards(
+  private async mapBoardRowsWithoutImageSigning(
+    scope: DataScope,
+    rows: BoardRow[],
     authenticatedUser: AuthenticatedUser | undefined,
-    query: BoardListQuery,
-  ): Promise<Board[]> {
-    const scope = resolveDataScopeByUser(authenticatedUser);
-    await boardRepository.initializeSchema();
+    segmentName: string,
+  ) {
+    const boardIds = rows.map((row) => row.id);
+    const reactionSummaryByBoardId = await profileSegment(
+      'board.findReactionSummaries',
+      () =>
+        boardRepository.findReactionSummariesByBoardIds(
+          scope,
+          boardIds,
+          authenticatedUser?.id ?? null,
+        ),
+      {
+        boardCount: boardIds.length,
+        hasAuthenticatedUser: Boolean(authenticatedUser?.id),
+        scope,
+      },
+    );
 
+    return profileSegment(
+      segmentName,
+      async () =>
+        rows.map((row): Board => {
+          const imageRefs = Array.isArray(row.imageUrl)
+            ? row.imageUrl
+                .filter((item): item is string => typeof item === 'string')
+                .map((item) => item.trim())
+                .filter((item) => item.length > 0)
+            : [];
+
+          return {
+            ...row,
+            imageRefs,
+            imageUrl: [],
+            pinned: Boolean(row.pinned),
+            reactions: reactionSummaryByBoardId[row.id] ?? createEmptyBoardReactionSummary(),
+          };
+        }),
+      {
+        boardCount: rows.length,
+        imageRefCount: rows.reduce(
+          (count, row) => count + (Array.isArray(row.imageUrl) ? row.imageUrl.length : 0),
+          0,
+        ),
+      },
+    );
+  }
+
+  private normalizeBoardListQuery(query: BoardListQuery): BoardListFilters {
     const normalizedQuery: BoardListFilters = {
       sort: normalizeBoardSort(query.sort),
+      page: normalizeBoardPage(query.page),
+      pageSize: normalizeBoardPageSize(query.pageSize),
     };
 
     const normalizedSearch = normalizeBoardSearch(query.search);
@@ -41,32 +92,119 @@ class BoardService {
       normalizedQuery.search = normalizedSearch;
     }
 
-    const rows = await boardRepository.findAll(scope, normalizedQuery);
-    const reactionSummaryByBoardId = await boardRepository.findReactionSummariesByBoardIds(
+    return normalizedQuery;
+  }
+
+  async getBoards(
+    authenticatedUser: AuthenticatedUser | undefined,
+    query: BoardListQuery,
+  ): Promise<BoardListResponse> {
+    const scope = resolveDataScopeByUser(authenticatedUser);
+    await profileSegment('board.initializeSchema', () => boardRepository.initializeSchema(), {
       scope,
-      rows.map((row) => row.id),
-      authenticatedUser?.id ?? null,
+    });
+
+    const normalizedQuery = this.normalizeBoardListQuery(query);
+
+    const boardPage = await profileSegment(
+      'board.findAll',
+      () => boardRepository.findAll(scope, normalizedQuery),
+      {
+        hasSearch: Boolean(normalizedQuery.search),
+        sort: normalizedQuery.sort,
+        page: normalizedQuery.page,
+        pageSize: normalizedQuery.pageSize,
+        scope,
+      },
+    );
+    const rows = boardPage.rows;
+    const items = await this.mapBoardRowsWithoutImageSigning(
+      scope,
+      rows,
+      authenticatedUser,
+      'board.mapRowsWithoutImageSigning',
     );
 
-    return Promise.all(
-      rows.map(async (row) => {
-        const imageRefs = Array.isArray(row.imageUrl)
-          ? row.imageUrl
-              .filter((item): item is string => typeof item === 'string')
-              .map((item) => item.trim())
-              .filter((item) => item.length > 0)
-          : [];
-        const imageResponse = await b2StorageService.resolveImageListResponse(imageRefs);
+    return {
+      items,
+      page: normalizedQuery.page,
+      pageSize: normalizedQuery.pageSize,
+      totalCount: boardPage.totalCount,
+      hasMore: normalizedQuery.page * normalizedQuery.pageSize < boardPage.totalCount,
+    };
+  }
 
-        return {
-          ...row,
-          imageRefs: imageResponse.imageRefs,
-          imageUrl: imageResponse.imageUrl,
-          pinned: Boolean(row.pinned),
-          reactions: reactionSummaryByBoardId[row.id] ?? createEmptyBoardReactionSummary(),
-        };
-      }),
+  async getBoardById(
+    authenticatedUser: AuthenticatedUser | undefined,
+    rawBoardId: string | undefined,
+  ): Promise<Board> {
+    const scope = resolveDataScopeByUser(authenticatedUser);
+    await profileSegment('board.initializeSchema', () => boardRepository.initializeSchema(), {
+      scope,
+    });
+
+    const boardId = parseBoardId(rawBoardId);
+    if (!boardId) {
+      throw new HttpError(400, '유효한 게시글 ID가 필요합니다.');
+    }
+
+    const row = await profileSegment(
+      'board.findPostRowById',
+      () => boardRepository.findPostRowById(scope, boardId),
+      {
+        boardId,
+        scope,
+      },
     );
+    if (!row) {
+      throw new HttpError(404, '해당 게시글을 찾을 수 없습니다.');
+    }
+
+    const items = await this.mapBoardRowsWithoutImageSigning(
+      scope,
+      [row],
+      authenticatedUser,
+      'board.mapSingleRowWithoutImageSigning',
+    );
+    return items[0]!;
+  }
+
+  async getMyReactionBoards(
+    authenticatedUser: AuthenticatedUser | undefined,
+    query: BoardListQuery,
+  ): Promise<BoardListResponse> {
+    const sessionUser = requireAuthenticatedUser(authenticatedUser);
+    const scope = resolveDataScopeByUser(sessionUser);
+    await profileSegment('board.initializeSchema', () => boardRepository.initializeSchema(), {
+      scope,
+    });
+
+    const normalizedQuery = this.normalizeBoardListQuery(query);
+    const boardPage = await profileSegment(
+      'board.findReactedByUser',
+      () => boardRepository.findReactedByUser(scope, sessionUser.id, normalizedQuery),
+      {
+        hasSearch: Boolean(normalizedQuery.search),
+        sort: normalizedQuery.sort,
+        page: normalizedQuery.page,
+        pageSize: normalizedQuery.pageSize,
+        scope,
+      },
+    );
+    const items = await this.mapBoardRowsWithoutImageSigning(
+      scope,
+      boardPage.rows,
+      sessionUser,
+      'board.mapReactionRowsWithoutImageSigning',
+    );
+
+    return {
+      items,
+      page: normalizedQuery.page,
+      pageSize: normalizedQuery.pageSize,
+      totalCount: boardPage.totalCount,
+      hasMore: normalizedQuery.page * normalizedQuery.pageSize < boardPage.totalCount,
+    };
   }
 
   async createBoard(authenticatedUser: AuthenticatedUser | undefined, payload: CreateBoardDTO) {

@@ -19,8 +19,9 @@ class BoardPostRepository {
   async findAll(scope: DataScope, filters: BoardListFilters) {
     const boardTableName = getScopedTableNames(scope).board;
     const orderBy = BOARD_ORDER_BY[filters.sort] ?? BOARD_ORDER_BY.latest;
+    const offset = (filters.page - 1) * filters.pageSize;
 
-    const values: string[] = [];
+    const values: Array<string | number> = [];
     let whereClause = '';
 
     if (filters.search) {
@@ -28,11 +29,87 @@ class BoardPostRepository {
       whereClause = 'WHERE title ILIKE $1 OR content ILIKE $1 OR "createUser" ILIKE $1';
     }
 
-    const result = await pool.query<BoardRow>(
-      `SELECT id, "authorId", title, "createUser", "createDate", "updateUser", "updateDate", "imageUrl", content, pinned FROM ${boardTableName} ${whereClause} ORDER BY ${orderBy} LIMIT 200`,
-      values,
+    const result = await pool.query<BoardRow & { totalCount: number }>(
+      `SELECT id, "authorId", title, "createUser", "createDate", "updateUser", "updateDate", "imageUrl", content, pinned, COUNT(*) OVER()::int AS "totalCount"
+         FROM ${boardTableName}
+         ${whereClause}
+        ORDER BY ${orderBy}
+        LIMIT $${values.length + 1}
+       OFFSET $${values.length + 2}`,
+      [...values, filters.pageSize, offset],
     );
-    return result.rows;
+    let totalCount = result.rows[0]?.totalCount ?? 0;
+    if (result.rows.length === 0 && offset > 0) {
+      const countResult = await pool.query<{ totalCount: number }>(
+        `SELECT COUNT(*)::int AS "totalCount"
+           FROM ${boardTableName}
+           ${whereClause}`,
+        values,
+      );
+      totalCount = countResult.rows[0]?.totalCount ?? 0;
+    }
+
+    return {
+      rows: result.rows.map(({ totalCount: _totalCount, ...row }) => row),
+      totalCount,
+    };
+  }
+
+  async findPostRowById(scope: DataScope, boardId: number) {
+    const boardTableName = getScopedTableNames(scope).board;
+    const result = await pool.query<BoardRow>(
+      `SELECT id, "authorId", title, "createUser", "createDate", "updateUser", "updateDate", "imageUrl", content, pinned
+         FROM ${boardTableName}
+        WHERE id = $1
+        LIMIT 1`,
+      [boardId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async findReactedByUser(scope: DataScope, userId: number, filters: BoardListFilters) {
+    const { board: boardTableName, boardReactions: boardReactionsTableName } =
+      getScopedTableNames(scope);
+    const orderBy = BOARD_ORDER_BY[filters.sort] ?? BOARD_ORDER_BY.latest;
+    const offset = (filters.page - 1) * filters.pageSize;
+    const values: Array<string | number> = [userId];
+
+    let whereClause = `WHERE EXISTS (
+      SELECT 1
+        FROM ${boardReactionsTableName} br
+       WHERE br."boardId" = ${boardTableName}.id
+         AND br."userId" = $1
+    )`;
+
+    if (filters.search) {
+      values.push(`%${filters.search}%`);
+      whereClause += ` AND (title ILIKE $${values.length} OR content ILIKE $${values.length} OR "createUser" ILIKE $${values.length})`;
+    }
+
+    const result = await pool.query<BoardRow & { totalCount: number }>(
+      `SELECT id, "authorId", title, "createUser", "createDate", "updateUser", "updateDate", "imageUrl", ''::text AS content, pinned, COUNT(*) OVER()::int AS "totalCount"
+         FROM ${boardTableName}
+         ${whereClause}
+        ORDER BY ${orderBy}
+        LIMIT $${values.length + 1}
+       OFFSET $${values.length + 2}`,
+      [...values, filters.pageSize, offset],
+    );
+    let totalCount = result.rows[0]?.totalCount ?? 0;
+    if (result.rows.length === 0 && offset > 0) {
+      const countResult = await pool.query<{ totalCount: number }>(
+        `SELECT COUNT(*)::int AS "totalCount"
+           FROM ${boardTableName}
+           ${whereClause}`,
+        values,
+      );
+      totalCount = countResult.rows[0]?.totalCount ?? 0;
+    }
+
+    return {
+      rows: result.rows.map(({ totalCount: _totalCount, ...row }) => row),
+      totalCount,
+    };
   }
 
   async findById(scope: DataScope, boardId: number) {

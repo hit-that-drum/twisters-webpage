@@ -25,6 +25,14 @@ export interface BoardPostItem {
   reactions: BoardReactionSummary;
 }
 
+export interface BoardPostListResult {
+  posts: BoardPostItem[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  hasMore: boolean;
+}
+
 export interface BoardCommentItem {
   id: number;
   boardId: number;
