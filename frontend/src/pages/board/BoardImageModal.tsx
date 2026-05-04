@@ -33,7 +33,7 @@ export default function BoardImageModal({
 
     return images;
   }, [images, open]);
-  const resolvedImageUrlByRef = useResolvedBoardImages(imageRefsToResolve, open);
+  const resolvedImageUrlByRef = useResolvedBoardImages(imageRefsToResolve, open, 'large');
   const activeImage = activeImageRef ? resolvedImageUrlByRef[activeImageRef] : null;
 
   const handleKeyDown = useCallback(

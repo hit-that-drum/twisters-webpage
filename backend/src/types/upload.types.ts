@@ -9,4 +9,5 @@ export interface CreateImageUploadUrlDTO {
 
 export interface CreateImageDownloadUrlDTO {
   imageRef?: unknown;
+  variant?: unknown;
 }

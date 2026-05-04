@@ -53,6 +53,7 @@ export const getAdminUsers = async (authenticatedUser: AuthenticatedUser | undef
       email: row.email,
       profileImage: await b2StorageService.createImageDownloadUrlFromRef(
         normalizeStoredImageReference(row.profileImage),
+        { variant: 'avatar' },
       ),
       isAdmin: normalizeBoolean(row.isAdmin, false),
       isAllowed: normalizeBoolean(row.isAllowed, false),

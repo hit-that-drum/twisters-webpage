@@ -2,6 +2,7 @@ import { apiFetch } from '@/common/lib/api/apiClient';
 import { parseApiResponse } from '@/common/lib/api/apiHelpers';
 
 export type ImageUploadScope = 'profile' | 'notice' | 'board';
+export type ImageDownloadVariant = 'thumbnail' | 'large' | 'avatar';
 
 export const B2_IMAGE_REF_PREFIX = 'b2://';
 const DOWNLOAD_URL_CACHE_TTL_MS = 14 * 60 * 1000;
@@ -64,17 +65,25 @@ export const uploadImageFileToB2 = async (file: File, scope: ImageUploadScope) =
   };
 };
 
-export const createImageDownloadUrl = async (imageRef: string) => {
+const createDownloadUrlCacheKey = (imageRef: string, variant?: ImageDownloadVariant) => {
+  return `${imageRef}::${variant ?? 'default'}`;
+};
+
+export const createImageDownloadUrl = async (
+  imageRef: string,
+  options: { variant?: ImageDownloadVariant } = {},
+) => {
   if (!isB2ImageReference(imageRef)) {
     return imageRef;
   }
 
-  const cachedUrl = downloadUrlCache.get(imageRef);
+  const cacheKey = createDownloadUrlCacheKey(imageRef, options.variant);
+  const cachedUrl = downloadUrlCache.get(cacheKey);
   if (cachedUrl && cachedUrl.expiresAtMs > Date.now()) {
     return cachedUrl.imageUrl;
   }
 
-  const pendingUrl = downloadUrlPromiseCache.get(imageRef);
+  const pendingUrl = downloadUrlPromiseCache.get(cacheKey);
   if (pendingUrl) {
     return pendingUrl;
   }
@@ -82,7 +91,7 @@ export const createImageDownloadUrl = async (imageRef: string) => {
   const requestPromise = (async () => {
     const response = await apiFetch('/uploads/image-download-url', {
       method: 'POST',
-      body: JSON.stringify({ imageRef }),
+      body: JSON.stringify({ imageRef, variant: options.variant }),
     });
     const payload = await parseApiResponse(response);
 
@@ -91,15 +100,15 @@ export const createImageDownloadUrl = async (imageRef: string) => {
     }
 
     const imageUrl = getPayloadString(payload, 'imageUrl');
-    downloadUrlCache.set(imageRef, {
+    downloadUrlCache.set(cacheKey, {
       imageUrl,
       expiresAtMs: Date.now() + DOWNLOAD_URL_CACHE_TTL_MS,
     });
     return imageUrl;
   })().finally(() => {
-    downloadUrlPromiseCache.delete(imageRef);
+    downloadUrlPromiseCache.delete(cacheKey);
   });
 
-  downloadUrlPromiseCache.set(imageRef, requestPromise);
+  downloadUrlPromiseCache.set(cacheKey, requestPromise);
   return requestPromise;
 };
