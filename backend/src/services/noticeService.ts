@@ -96,7 +96,9 @@ class NoticeService {
     return Promise.all(
       rows.map(async (row) => {
         const imageRef = normalizeStoredImageReference(row.imageUrl);
-        const imageResponse = await b2StorageService.resolveImageResponse(imageRef);
+        const imageResponse = await b2StorageService.resolveImageResponse(imageRef, {
+          variant: 'thumbnail',
+        });
 
         return {
           ...row,

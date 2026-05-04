@@ -57,7 +57,9 @@ Deploy the `backend` directory as a separate Vercel project.
 - `B2_BUCKET_NAME`
 - `B2_KEY_ID`
 - `B2_APPLICATION_KEY`
-- `B2_CDN_BASE_URL` or `B2_PUBLIC_BASE_URL` (optional; use when serving B2 objects through a public CDN/custom domain)
+- `IMAGE_CDN_BASE_URL` (optional; Cloudflare Worker image proxy URL, for example `https://twisters-image-proxy.<subdomain>.workers.dev`)
+- `IMAGE_CDN_SIGNING_SECRET` (required when `IMAGE_CDN_BASE_URL` points at the private-image Worker)
+- `B2_CDN_BASE_URL` or `B2_PUBLIC_BASE_URL` (optional legacy public CDN/custom domain fallback)
 - `REQUEST_PROFILING=true` (optional; emits `Server-Timing` and request profile logs for latency checks)
 - `DB_SSL=true` (default behavior is SSL enabled)
 
@@ -73,7 +75,8 @@ Deploy the `backend` directory as a separate Vercel project.
 - `KAKAO_REST_API_KEY` matches Kakao Developers REST API key
 - `KAKAO_REDIRECT_URI` exactly matches Kakao Developers redirect URI entry
 - Backblaze B2 bucket is private, and CORS allows frontend-origin `PUT`, `GET`, and `HEAD`
-- If a CDN/custom domain is in front of B2, set `B2_CDN_BASE_URL` or `B2_PUBLIC_BASE_URL` without a trailing slash
+- If using the Cloudflare private-image Worker, set `IMAGE_CDN_BASE_URL` and use the same `IMAGE_CDN_SIGNING_SECRET` in both Vercel and Cloudflare
+- If a public CDN/custom domain is in front of B2, set `B2_CDN_BASE_URL` or `B2_PUBLIC_BASE_URL` without a trailing slash
 - `DB_SSL` set to `true` on Vercel
 
 The backend uses:
@@ -146,7 +149,8 @@ B2_REGION=<region>
 B2_BUCKET_NAME=<your-private-bucket-name>
 B2_KEY_ID=<your-bucket-application-key-id>
 B2_APPLICATION_KEY=<your-bucket-application-key>
-B2_CDN_BASE_URL=https://cdn.your-domain.com
+IMAGE_CDN_BASE_URL=https://twisters-image-proxy.<subdomain>.workers.dev
+IMAGE_CDN_SIGNING_SECRET=<shared-random-secret-used-by-backend-and-worker>
 SESSION_IDLE_TIMEOUT_MINUTES=60
 SESSION_ABSOLUTE_TIMEOUT_DAYS=7
 SESSION_ABSOLUTE_TIMEOUT_REMEMBER_DAYS=30

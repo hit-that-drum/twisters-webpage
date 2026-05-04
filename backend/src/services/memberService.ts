@@ -29,6 +29,7 @@ class MemberService {
         email: row.email,
         profileImage: await b2StorageService.createImageDownloadUrlFromRef(
           normalizeStoredImageReference(row.profileImage),
+          { variant: 'avatar' },
         ),
         isAdmin: normalizeBoolean(row.isAdmin, false),
         phone: row.phone ? normalizePhoneNumber(row.phone) : null,

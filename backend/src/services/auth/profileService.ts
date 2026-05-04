@@ -69,7 +69,10 @@ class ProfileService {
     }
 
     const profileImageRef = normalizeStoredImageReference(me.profileImage);
-    const profileImageUrl = await b2StorageService.createImageDownloadUrlFromRef(profileImageRef);
+    const profileImageUrl = await b2StorageService.createImageDownloadUrlFromRef(
+      profileImageRef,
+      { variant: 'avatar' },
+    );
 
     return {
       id: me.id,
@@ -128,7 +131,9 @@ class ProfileService {
 
     return {
       message: '프로필 이미지가 저장되었습니다.',
-      profileImage: await b2StorageService.createImageDownloadUrlFromRef(profileImage),
+      profileImage: await b2StorageService.createImageDownloadUrlFromRef(profileImage, {
+        variant: 'avatar',
+      }),
       profileImageRef: profileImage,
     };
   }

@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { createImageDownloadUrl } from '@/common/lib/images/b2ImageStorage';
+import {
+  createImageDownloadUrl,
+  type ImageDownloadVariant,
+} from '@/common/lib/images/b2ImageStorage';
 
 const getUniqueImageRefs = (imageRefs: string[]) => {
   return [...new Set(imageRefs.map((imageRef) => imageRef.trim()).filter(Boolean))];
 };
 
-export default function useResolvedBoardImages(imageRefs: string[], enabled = true) {
+export default function useResolvedBoardImages(
+  imageRefs: string[],
+  enabled = true,
+  variant: ImageDownloadVariant = 'thumbnail',
+) {
   const [resolvedImageUrlByRef, setResolvedImageUrlByRef] = useState<Record<string, string | null>>(
     {},
   );
@@ -34,7 +41,10 @@ export default function useResolvedBoardImages(imageRefs: string[], enabled = tr
         }
 
         try {
-          resolvedEntries.push([imageRef, await createImageDownloadUrl(imageRef)] as const);
+          resolvedEntries.push([
+            imageRef,
+            await createImageDownloadUrl(imageRef, { variant }),
+          ] as const);
         } catch (error) {
           console.error('Board image URL resolve failed:', error);
           resolvedEntries.push([imageRef, null] as const);
@@ -59,7 +69,7 @@ export default function useResolvedBoardImages(imageRefs: string[], enabled = tr
     return () => {
       isCancelled = true;
     };
-  }, [enabled, resolvedImageUrlByRef, stableImageRefs]);
+  }, [enabled, resolvedImageUrlByRef, stableImageRefs, variant]);
 
   return resolvedImageUrlByRef;
 }

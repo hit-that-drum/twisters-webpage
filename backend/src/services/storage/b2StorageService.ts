@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { createHmac, randomUUID } from 'crypto';
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { HttpError } from '../../errors/httpError.js';
@@ -18,7 +18,10 @@ import { profileSegment } from '../../utils/requestProfiler.js';
 const SIGNED_UPLOAD_EXPIRES_SECONDS = 5 * 60;
 const SIGNED_DOWNLOAD_EXPIRES_SECONDS = 15 * 60;
 const SIGNED_DOWNLOAD_CACHE_TTL_MS = (SIGNED_DOWNLOAD_EXPIRES_SECONDS - 60) * 1000;
+const CDN_DOWNLOAD_EXPIRES_SECONDS = 24 * 60 * 60;
+const CDN_DOWNLOAD_CACHE_TTL_MS = (CDN_DOWNLOAD_EXPIRES_SECONDS - 60) * 1000;
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+const SIGNED_CDN_IMAGE_PARAMS = ['w', 'h', 'q', 'fit'] as const;
 
 const ALLOWED_IMAGE_CONTENT_TYPES = new Set([
   'image/jpeg',
@@ -48,27 +51,157 @@ type B2Config = {
   applicationKey: string;
 };
 
+type ImageDownloadVariant = 'thumbnail' | 'large' | 'avatar';
+
+type ImageDownloadTransformOptions = {
+  w?: number;
+  h?: number;
+  q?: number;
+  fit?: 'scale-down' | 'contain' | 'cover' | 'crop';
+};
+
+type ImageDownloadOptions = {
+  variant?: ImageDownloadVariant;
+};
+
 let s3Client: S3Client | null = null;
 const signedDownloadUrlCache = new Map<string, { imageUrl: string; expiresAtMs: number }>();
+const cdnDownloadUrlCache = new Map<string, { imageUrl: string; expiresAtMs: number }>();
+
+const IMAGE_TRANSFORM_BY_VARIANT: Record<ImageDownloadVariant, ImageDownloadTransformOptions> = {
+  thumbnail: {
+    w: 640,
+    q: 75,
+    fit: 'scale-down',
+  },
+  large: {
+    w: 1440,
+    q: 85,
+    fit: 'scale-down',
+  },
+  avatar: {
+    w: 256,
+    h: 256,
+    q: 80,
+    fit: 'cover',
+  },
+};
+
+const normalizeImageDownloadVariant = (rawVariant: unknown): ImageDownloadVariant | undefined => {
+  if (typeof rawVariant === 'undefined' || rawVariant === null || rawVariant === '') {
+    return undefined;
+  }
+
+  if (rawVariant === 'thumbnail' || rawVariant === 'large' || rawVariant === 'avatar') {
+    return rawVariant;
+  }
+
+  throw new HttpError(400, '유효한 이미지 변환 옵션이 필요합니다.');
+};
+
+const getImageTransformOptions = (
+  options?: ImageDownloadOptions,
+): ImageDownloadTransformOptions => {
+  if (!options?.variant) {
+    return {};
+  }
+
+  return IMAGE_TRANSFORM_BY_VARIANT[options.variant];
+};
+
+const createTransformCacheKey = (transformOptions: ImageDownloadTransformOptions) => {
+  return SIGNED_CDN_IMAGE_PARAMS.map((key) => `${key}:${transformOptions[key] ?? ''}`).join('|');
+};
 
 const readPublicImageBaseUrl = () => {
   const publicBaseUrl = (
+    process.env.IMAGE_CDN_BASE_URL ??
     process.env.B2_PUBLIC_BASE_URL ??
     process.env.B2_CDN_BASE_URL ??
     ''
   ).trim();
 
-  return publicBaseUrl ? publicBaseUrl.replace(/\/+$/, '') : null;
+  if (!publicBaseUrl) {
+    return null;
+  }
+
+  const normalizedBaseUrl = /^https?:\/\//i.test(publicBaseUrl)
+    ? publicBaseUrl
+    : `https://${publicBaseUrl}`;
+
+  return normalizedBaseUrl.replace(/\/+$/, '');
 };
 
-const createPublicImageUrl = (objectKey: string) => {
+const readImageCdnSigningSecret = () => process.env.IMAGE_CDN_SIGNING_SECRET?.trim() || null;
+
+const createCdnSignatureMessage = (
+  signedPath: string,
+  expiresAtSeconds: number,
+  transformOptions: ImageDownloadTransformOptions,
+) => {
+  const signedValues = SIGNED_CDN_IMAGE_PARAMS.map((key) =>
+    typeof transformOptions[key] === 'undefined' ? '' : String(transformOptions[key]),
+  );
+
+  return [signedPath, String(expiresAtSeconds), ...signedValues].join('\n');
+};
+
+const createCdnSignature = (
+  secret: string,
+  signedPath: string,
+  expiresAtSeconds: number,
+  transformOptions: ImageDownloadTransformOptions,
+) => {
+  return createHmac('sha256', secret)
+    .update(createCdnSignatureMessage(signedPath, expiresAtSeconds, transformOptions))
+    .digest('hex');
+};
+
+const createCdnExpiresAtSeconds = () => {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const currentBucketStart =
+    Math.floor(nowSeconds / CDN_DOWNLOAD_EXPIRES_SECONDS) * CDN_DOWNLOAD_EXPIRES_SECONDS;
+
+  return currentBucketStart + CDN_DOWNLOAD_EXPIRES_SECONDS * 2;
+};
+
+const createPublicImageUrl = (
+  objectKey: string,
+  transformOptions: ImageDownloadTransformOptions = {},
+) => {
   const publicBaseUrl = readPublicImageBaseUrl();
   if (!publicBaseUrl) {
     return null;
   }
 
   const encodedObjectKey = objectKey.split('/').map(encodeURIComponent).join('/');
-  return `${publicBaseUrl}/${encodedObjectKey}`;
+  const imageUrl = new URL(`${publicBaseUrl}/${encodedObjectKey}`);
+  const signingSecret = readImageCdnSigningSecret();
+
+  SIGNED_CDN_IMAGE_PARAMS.forEach((key) => {
+    const value = transformOptions[key];
+    if (typeof value !== 'undefined') {
+      imageUrl.searchParams.set(key, String(value));
+    }
+  });
+
+  if (!signingSecret) {
+    return imageUrl.toString();
+  }
+
+  const expiresAtSeconds = createCdnExpiresAtSeconds();
+  const signedPath = `/${objectKey}`;
+  const signature = createCdnSignature(
+    signingSecret,
+    signedPath,
+    expiresAtSeconds,
+    transformOptions,
+  );
+
+  imageUrl.searchParams.set('exp', String(expiresAtSeconds));
+  imageUrl.searchParams.set('sig', signature);
+
+  return imageUrl.toString();
 };
 
 const readB2Config = (): B2Config | null => {
@@ -205,7 +338,7 @@ class B2StorageService {
     return {
       uploadUrl,
       imageRef,
-      imageUrl: await this.createImageDownloadUrlFromRef(imageRef),
+      imageUrl: await this.createImageDownloadUrlFromRef(imageRef, { variant: 'large' }),
       objectKey,
       expiresInSeconds: SIGNED_UPLOAD_EXPIRES_SECONDS,
       headers: {
@@ -220,15 +353,30 @@ class B2StorageService {
     }
 
     const imageRef = payload.imageRef.trim();
-    const shouldExpire = isB2ImageReference(imageRef) && readPublicImageBaseUrl() === null;
+    const variant = normalizeImageDownloadVariant(payload.variant);
+    const imageDownloadOptions: ImageDownloadOptions | undefined = variant
+      ? { variant }
+      : undefined;
+    const hasPublicImageBaseUrl = readPublicImageBaseUrl() !== null;
+    const hasCdnSigningSecret = readImageCdnSigningSecret() !== null;
+    const expiresInSeconds = isB2ImageReference(imageRef)
+      ? hasCdnSigningSecret
+        ? CDN_DOWNLOAD_EXPIRES_SECONDS
+        : hasPublicImageBaseUrl
+          ? null
+          : SIGNED_DOWNLOAD_EXPIRES_SECONDS
+      : null;
 
     return {
-      imageUrl: await this.createImageDownloadUrlFromRef(imageRef),
-      expiresInSeconds: shouldExpire ? SIGNED_DOWNLOAD_EXPIRES_SECONDS : null,
+      imageUrl: await this.createImageDownloadUrlFromRef(imageRef, imageDownloadOptions),
+      expiresInSeconds,
     };
   }
 
-  async createImageDownloadUrlFromRef(imageRef: string | null): Promise<string | null> {
+  async createImageDownloadUrlFromRef(
+    imageRef: string | null,
+    options?: ImageDownloadOptions,
+  ): Promise<string | null> {
     if (!imageRef) {
       return null;
     }
@@ -242,8 +390,22 @@ class B2StorageService {
       return null;
     }
 
-    const publicImageUrl = createPublicImageUrl(objectKey);
+    const transformOptions = getImageTransformOptions(options);
+    const cdnCacheKey = `${imageRef}:${createTransformCacheKey(transformOptions)}`;
+    const cachedCdnUrl = cdnDownloadUrlCache.get(cdnCacheKey);
+    if (cachedCdnUrl && cachedCdnUrl.expiresAtMs > Date.now()) {
+      return cachedCdnUrl.imageUrl;
+    }
+
+    const publicImageUrl = createPublicImageUrl(objectKey, transformOptions);
     if (publicImageUrl) {
+      if (readImageCdnSigningSecret()) {
+        cdnDownloadUrlCache.set(cdnCacheKey, {
+          imageUrl: publicImageUrl,
+          expiresAtMs: Date.now() + CDN_DOWNLOAD_CACHE_TTL_MS,
+        });
+      }
+
       return publicImageUrl;
     }
 
@@ -279,21 +441,27 @@ class B2StorageService {
 
   async resolveImageResponse(
     imageRef: string | null,
+    options?: ImageDownloadOptions,
   ): Promise<{ imageRef: string | null; imageUrl: string | null }> {
     return {
       imageRef,
-      imageUrl: await this.createImageDownloadUrlFromRef(imageRef),
+      imageUrl: await this.createImageDownloadUrlFromRef(imageRef, options),
     };
   }
 
   async resolveImageListResponse(
     imageRefs: string[],
+    options?: ImageDownloadOptions,
   ): Promise<{ imageRefs: string[]; imageUrl: string[] }> {
     const imageUrls = await profileSegment(
       'b2.resolveImageListResponse',
-      () => Promise.all(imageRefs.map((imageRef) => this.createImageDownloadUrlFromRef(imageRef))),
+      () =>
+        Promise.all(
+          imageRefs.map((imageRef) => this.createImageDownloadUrlFromRef(imageRef, options)),
+        ),
       {
         imageRefCount: imageRefs.length,
+        variant: options?.variant ?? null,
       },
     );
 
