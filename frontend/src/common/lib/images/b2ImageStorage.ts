@@ -6,6 +6,8 @@ export type ImageDownloadVariant = 'thumbnail' | 'large' | 'avatar';
 
 export const B2_IMAGE_REF_PREFIX = 'b2://';
 const DOWNLOAD_URL_CACHE_TTL_MS = 14 * 60 * 1000;
+const THUMBNAIL_CONTENT_TYPE = 'image/webp';
+const THUMBNAIL_QUALITY = 0.78;
 
 const downloadUrlCache = new Map<string, { imageUrl: string | null; expiresAtMs: number }>();
 const downloadUrlPromiseCache = new Map<string, Promise<string | null>>();
@@ -21,6 +23,87 @@ const getPayloadString = (payload: unknown, key: string) => {
 
   const value = (payload as Record<string, unknown>)[key];
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+};
+
+const getThumbnailSizeForScope = (scope: ImageUploadScope) => {
+  if (scope === 'profile') {
+    return {
+      width: 256,
+      height: 256,
+      cover: true,
+    };
+  }
+
+  return {
+    width: 640,
+    height: 640,
+    cover: false,
+  };
+};
+
+const canCreateThumbnail = (file: File) => {
+  return ['image/jpeg', 'image/png', 'image/webp'].includes(file.type);
+};
+
+const loadImageElement = async (file: File) => {
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = objectUrl;
+
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error('썸네일 이미지를 읽지 못했습니다.'));
+    });
+
+    return image;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
+
+const createImageThumbnailBlob = async (file: File, scope: ImageUploadScope) => {
+  if (!canCreateThumbnail(file)) {
+    return null;
+  }
+
+  const image = await loadImageElement(file);
+  const target = getThumbnailSizeForScope(scope);
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+
+  if (sourceWidth <= 0 || sourceHeight <= 0) {
+    return null;
+  }
+
+  const scale = target.cover
+    ? Math.max(target.width / sourceWidth, target.height / sourceHeight)
+    : Math.min(target.width / sourceWidth, target.height / sourceHeight, 1);
+  const canvasWidth = Math.max(1, Math.round(target.cover ? target.width : sourceWidth * scale));
+  const canvasHeight = Math.max(
+    1,
+    Math.round(target.cover ? target.height : sourceHeight * scale),
+  );
+  const drawWidth = sourceWidth * scale;
+  const drawHeight = sourceHeight * scale;
+  const dx = target.cover ? (canvasWidth - drawWidth) / 2 : 0;
+  const dy = target.cover ? (canvasHeight - drawHeight) / 2 : 0;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+
+  const context = canvas.getContext('2d');
+  if (!context) {
+    return null;
+  }
+
+  context.drawImage(image, dx, dy, drawWidth, drawHeight);
+
+  return new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, THUMBNAIL_CONTENT_TYPE, THUMBNAIL_QUALITY);
+  });
 };
 
 export const uploadImageFileToB2 = async (file: File, scope: ImageUploadScope) => {
@@ -41,6 +124,8 @@ export const uploadImageFileToB2 = async (file: File, scope: ImageUploadScope) =
 
   const uploadUrl = getPayloadString(presignPayload, 'uploadUrl');
   const imageRef = getPayloadString(presignPayload, 'imageRef');
+  const imageRefWithThumbnail = getPayloadString(presignPayload, 'imageRefWithThumbnail');
+  const thumbnailUploadUrl = getPayloadString(presignPayload, 'thumbnailUploadUrl');
   const imageUrl = getPayloadString(presignPayload, 'imageUrl');
 
   if (!uploadUrl || !imageRef) {
@@ -59,8 +144,30 @@ export const uploadImageFileToB2 = async (file: File, scope: ImageUploadScope) =
     throw new Error('이미지를 B2에 업로드하지 못했습니다.');
   }
 
+  let finalImageRef = imageRef;
+  if (thumbnailUploadUrl && imageRefWithThumbnail) {
+    try {
+      const thumbnailBlob = await createImageThumbnailBlob(file, scope);
+      if (thumbnailBlob) {
+        const thumbnailUploadResponse = await fetch(thumbnailUploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': THUMBNAIL_CONTENT_TYPE,
+          },
+          body: thumbnailBlob,
+        });
+
+        if (thumbnailUploadResponse.ok) {
+          finalImageRef = imageRefWithThumbnail;
+        }
+      }
+    } catch (error) {
+      console.warn('Image thumbnail upload failed; using original image only.', error);
+    }
+  }
+
   return {
-    imageRef,
+    imageRef: finalImageRef,
     imageUrl,
   };
 };

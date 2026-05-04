@@ -59,6 +59,7 @@ Deploy the `backend` directory as a separate Vercel project.
 - `B2_APPLICATION_KEY`
 - `IMAGE_CDN_BASE_URL` (optional; Cloudflare Worker image proxy URL, for example `https://twisters-image-proxy.<subdomain>.workers.dev`)
 - `IMAGE_CDN_SIGNING_SECRET` (required when `IMAGE_CDN_BASE_URL` points at the private-image Worker)
+- `IMAGE_CDN_TRANSFORMS=true` (optional; only enable after Cloudflare Image Transformations are active on a zone/custom domain)
 - `B2_CDN_BASE_URL` or `B2_PUBLIC_BASE_URL` (optional legacy public CDN/custom domain fallback)
 - `REQUEST_PROFILING=true` (optional; emits `Server-Timing` and request profile logs for latency checks)
 - `DB_SSL=true` (default behavior is SSL enabled)
@@ -76,6 +77,7 @@ Deploy the `backend` directory as a separate Vercel project.
 - `KAKAO_REDIRECT_URI` exactly matches Kakao Developers redirect URI entry
 - Backblaze B2 bucket is private, and CORS allows frontend-origin `PUT`, `GET`, and `HEAD`
 - If using the Cloudflare private-image Worker, set `IMAGE_CDN_BASE_URL` and use the same `IMAGE_CDN_SIGNING_SECRET` in both Vercel and Cloudflare
+- Leave `IMAGE_CDN_TRANSFORMS` unset when using only the default `workers.dev` URL; new uploads include a generated WebP thumbnail instead
 - If a public CDN/custom domain is in front of B2, set `B2_CDN_BASE_URL` or `B2_PUBLIC_BASE_URL` without a trailing slash
 - `DB_SSL` set to `true` on Vercel
 
@@ -151,6 +153,7 @@ B2_KEY_ID=<your-bucket-application-key-id>
 B2_APPLICATION_KEY=<your-bucket-application-key>
 IMAGE_CDN_BASE_URL=https://twisters-image-proxy.<subdomain>.workers.dev
 IMAGE_CDN_SIGNING_SECRET=<shared-random-secret-used-by-backend-and-worker>
+# IMAGE_CDN_TRANSFORMS=true
 SESSION_IDLE_TIMEOUT_MINUTES=60
 SESSION_ABSOLUTE_TIMEOUT_DAYS=7
 SESSION_ABSOLUTE_TIMEOUT_REMEMBER_DAYS=30

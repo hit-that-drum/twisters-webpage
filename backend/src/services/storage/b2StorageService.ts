@@ -10,6 +10,7 @@ import {
 } from '../../types/upload.types.js';
 import {
   getB2ObjectKeyFromReference,
+  getB2ThumbnailObjectKeyFromReference,
   isB2ImageReference,
   toB2ImageReference,
 } from '../../utils/imageReference.js';
@@ -22,6 +23,7 @@ const CDN_DOWNLOAD_EXPIRES_SECONDS = 24 * 60 * 60;
 const CDN_DOWNLOAD_CACHE_TTL_MS = (CDN_DOWNLOAD_EXPIRES_SECONDS - 60) * 1000;
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
 const SIGNED_CDN_IMAGE_PARAMS = ['w', 'h', 'q', 'fit'] as const;
+const THUMBNAIL_CONTENT_TYPE = 'image/webp';
 
 const ALLOWED_IMAGE_CONTENT_TYPES = new Set([
   'image/jpeg',
@@ -36,6 +38,8 @@ const IMAGE_EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
   'image/webp': 'webp',
   'image/gif': 'gif',
 };
+
+const THUMBNAIL_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const OBJECT_KEY_PREFIX_BY_SCOPE: Record<ImageUploadScope, string> = {
   profile: 'profiles',
@@ -111,6 +115,12 @@ const getImageTransformOptions = (
 
 const createTransformCacheKey = (transformOptions: ImageDownloadTransformOptions) => {
   return SIGNED_CDN_IMAGE_PARAMS.map((key) => `${key}:${transformOptions[key] ?? ''}`).join('|');
+};
+
+const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on']);
+
+const readShouldUseImageCdnTransforms = () => {
+  return TRUE_VALUES.has((process.env.IMAGE_CDN_TRANSFORMS ?? '').trim().toLowerCase());
 };
 
 const readPublicImageBaseUrl = () => {
@@ -301,6 +311,24 @@ const createObjectKey = (
   return `${OBJECT_KEY_PREFIX_BY_SCOPE[scope]}/${authenticatedUser.id}/${month}/${randomUUID()}.${extension}`;
 };
 
+const createThumbnailObjectKey = (objectKey: string) => {
+  const extensionIndex = objectKey.lastIndexOf('.');
+  const objectKeyWithoutExtension =
+    extensionIndex === -1 ? objectKey : objectKey.slice(0, extensionIndex);
+
+  return `thumbnails/${objectKeyWithoutExtension}.webp`;
+};
+
+const shouldUseGeneratedThumbnail = (
+  imageRef: string,
+  options?: ImageDownloadOptions,
+): options is Required<ImageDownloadOptions> => {
+  return (
+    Boolean(getB2ThumbnailObjectKeyFromReference(imageRef)) &&
+    (options?.variant === 'thumbnail' || options?.variant === 'avatar')
+  );
+};
+
 class B2StorageService {
   isConfigured() {
     return readB2Config() !== null;
@@ -333,17 +361,54 @@ class B2StorageService {
         contentType,
       },
     );
+    const thumbnailObjectKey = THUMBNAIL_CONTENT_TYPES.has(contentType)
+      ? createThumbnailObjectKey(objectKey)
+      : null;
+    const thumbnailUploadUrl = thumbnailObjectKey
+      ? await profileSegment(
+          'b2.signThumbnailUploadUrl',
+          () =>
+            getSignedUrl(
+              getS3Client(),
+              new PutObjectCommand({
+                Bucket: config.bucketName,
+                Key: thumbnailObjectKey,
+                ContentType: THUMBNAIL_CONTENT_TYPE,
+              }),
+              {
+                expiresIn: SIGNED_UPLOAD_EXPIRES_SECONDS,
+              },
+            ),
+          {
+            scope,
+            contentType: THUMBNAIL_CONTENT_TYPE,
+          },
+        )
+      : null;
     const imageRef = toB2ImageReference(objectKey);
+    const imageRefWithThumbnail = thumbnailObjectKey
+      ? toB2ImageReference(objectKey, { thumbnailObjectKey })
+      : imageRef;
 
     return {
       uploadUrl,
       imageRef,
-      imageUrl: await this.createImageDownloadUrlFromRef(imageRef, { variant: 'large' }),
+      imageRefWithThumbnail,
+      thumbnailUploadUrl,
+      thumbnailImageRef: thumbnailObjectKey ? toB2ImageReference(thumbnailObjectKey) : null,
+      imageUrl: await this.createImageDownloadUrlFromRef(imageRefWithThumbnail, {
+        variant: 'large',
+      }),
       objectKey,
       expiresInSeconds: SIGNED_UPLOAD_EXPIRES_SECONDS,
       headers: {
         'Content-Type': contentType,
       },
+      thumbnailHeaders: thumbnailUploadUrl
+        ? {
+            'Content-Type': THUMBNAIL_CONTENT_TYPE,
+          }
+        : null,
     };
   }
 
@@ -390,14 +455,20 @@ class B2StorageService {
       return null;
     }
 
-    const transformOptions = getImageTransformOptions(options);
-    const cdnCacheKey = `${imageRef}:${createTransformCacheKey(transformOptions)}`;
+    const thumbnailObjectKey = getB2ThumbnailObjectKeyFromReference(imageRef);
+    const cdnObjectKey = shouldUseGeneratedThumbnail(imageRef, options)
+      ? (thumbnailObjectKey ?? objectKey)
+      : objectKey;
+    const transformOptions = readShouldUseImageCdnTransforms()
+      ? getImageTransformOptions(options)
+      : {};
+    const cdnCacheKey = `${cdnObjectKey}:${createTransformCacheKey(transformOptions)}`;
     const cachedCdnUrl = cdnDownloadUrlCache.get(cdnCacheKey);
     if (cachedCdnUrl && cachedCdnUrl.expiresAtMs > Date.now()) {
       return cachedCdnUrl.imageUrl;
     }
 
-    const publicImageUrl = createPublicImageUrl(objectKey, transformOptions);
+    const publicImageUrl = createPublicImageUrl(cdnObjectKey, transformOptions);
     if (publicImageUrl) {
       if (readImageCdnSigningSecret()) {
         cdnDownloadUrlCache.set(cdnCacheKey, {
@@ -417,7 +488,7 @@ class B2StorageService {
     const config = requireB2Config();
     const command = new GetObjectCommand({
       Bucket: config.bucketName,
-      Key: objectKey,
+      Key: cdnObjectKey,
     });
 
     const imageUrl = await profileSegment(
