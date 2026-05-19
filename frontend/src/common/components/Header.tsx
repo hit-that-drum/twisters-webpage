@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { HiMenu, HiX } from 'react-icons/hi';
 import LNB from '@/common/components/LNB';
 import { useAuth } from '@/features';
 import logo from '@/assets/twisters_logo_260304.svg';
@@ -59,6 +60,28 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
     };
   }, [isProfileMenuOpen]);
 
+  // Close drawer on Escape & lock body scroll when drawer is open.
+  useEffect(() => {
+    if (!isMobileMenuOpen) {
+      return;
+    }
+
+    const closeDrawerOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', closeDrawerOnEscape);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.removeEventListener('keydown', closeDrawerOnEscape);
+    };
+  }, [isMobileMenuOpen]);
+
   const handleProfileNavigation = (path: string) => {
     setIsProfileMenuOpen(false);
     navigate(path);
@@ -99,32 +122,40 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
   });
 
   return (
-    <header className="font-grand-hotel mb-4 rounded-2xl border border-gray-200 bg-white px-4 py-3">
-      <div className="flex items-center gap-3">
-        <img src={logo} alt="TWISTERS" className="h-15 w-35" />
+    <header className="font-grand-hotel mb-4 rounded-2xl border border-gray-200 bg-white px-3 py-2 md:px-4 md:py-3">
+      <div className="flex items-center gap-2 md:gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setIsMobileMenuOpen(true);
+            setIsProfileMenuOpen(false);
+          }}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-300 text-gray-700 transition hover:bg-amber-100 md:hidden"
+          aria-expanded={isMobileMenuOpen}
+          aria-controls="header-mobile-drawer"
+          aria-label="Open navigation menu"
+        >
+          <HiMenu size={22} />
+        </button>
+
+        <img
+          src={logo}
+          alt="TWISTERS"
+          className="h-10 w-24 shrink-0 md:h-15 md:w-35"
+        />
 
         <div className="hidden min-w-0 flex-1 md:block">
           <LNB />
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setIsMobileMenuOpen((previous) => !previous);
-            setIsProfileMenuOpen(false);
-          }}
-          className="rounded-lg border border-amber-300 px-3 py-2 text-xl font-light text-gray-700 transition hover:bg-amber-200 md:hidden"
-          aria-expanded={isMobileMenuOpen}
-          aria-controls="header-mobile-lnb"
-        >
-          {isMobileMenuOpen ? 'Close' : 'LNB'}
-        </button>
+        {/* Spacer on mobile so the avatar is pushed to the right edge */}
+        <div className="flex-1 md:hidden" />
 
         <div ref={profileMenuContainerRef} className="relative shrink-0">
           <button
             type="button"
             onClick={() => setIsProfileMenuOpen((previous) => !previous)}
-            className="flex h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-full border-2 border-amber-300 bg-amber-50 transition hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+            className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-amber-300 bg-amber-50 transition hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 md:h-[60px] md:w-[60px]"
             aria-haspopup="menu"
             aria-expanded={isProfileMenuOpen}
             aria-controls="header-profile-menu"
@@ -137,7 +168,9 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
                 className="h-full w-full object-cover"
               />
             ) : (
-              <span className="text-2xl font-semibold text-amber-900">{profileInitial}</span>
+              <span className="text-base font-semibold text-amber-900 md:text-2xl">
+                {profileInitial}
+              </span>
             )}
           </button>
 
@@ -146,7 +179,7 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
               id="header-profile-menu"
               role="menu"
               aria-label="User account menu"
-              className="absolute right-0 z-20 mt-2 w-35 overflow-hidden rounded-xl border border-amber-200 bg-white shadow-lg"
+              className="absolute right-0 z-20 mt-2 w-40 overflow-hidden rounded-xl border border-amber-200 bg-white shadow-lg md:w-35"
             >
               {visibleProfileMenuItems.map((item, index) => {
                 return (
@@ -155,7 +188,7 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
                     role="menuitem"
                     key={item.label}
                     onClick={item.onClick}
-                    className={`block w-full px-4 py-3 text-left text-xl font-semibold transition ${
+                    className={`block w-full px-4 py-3 text-left text-base font-semibold transition md:text-xl ${
                       index > 0 ? 'border-t border-gray-100' : ''
                     } ${
                       item.danger
@@ -172,9 +205,41 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
         </div>
       </div>
 
+      {/* Mobile slide-in drawer (only rendered on <md) */}
       {isMobileMenuOpen && (
-        <div id="header-mobile-lnb" className="mt-3 border-t border-amber-300 pt-3 md:hidden">
-          <LNB onNavigate={() => setIsMobileMenuOpen(false)} />
+        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true">
+          {/* Backdrop */}
+          <button
+            type="button"
+            aria-label="Close navigation menu"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="absolute inset-0 h-full w-full bg-black/40 backdrop-blur-[1px]"
+          />
+
+          {/* Drawer panel */}
+          <aside
+            id="header-mobile-drawer"
+            className="absolute left-0 top-0 flex h-full w-[78%] max-w-[320px] flex-col border-r border-amber-200 bg-white shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-amber-200 px-4 py-3">
+              <img src={logo} alt="TWISTERS" className="h-10 w-24" />
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-lg border border-amber-300 text-gray-700 transition hover:bg-amber-100"
+                aria-label="Close navigation menu"
+              >
+                <HiX size={22} />
+              </button>
+            </div>
+
+            <nav className="flex-1 overflow-y-auto px-3 py-4">
+              <LNB
+                direction="vertical"
+                onNavigate={() => setIsMobileMenuOpen(false)}
+              />
+            </nav>
+          </aside>
         </div>
       )}
     </header>

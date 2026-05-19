@@ -103,12 +103,12 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
         </>
       ) : null}
 
-      <div className="flex min-h-screen w-full items-center justify-center bg-white p-4 md:p-8">
-        <div className="flex h-full w-full max-w-[1400px] min-h-[630px] overflow-hidden">
+      <div className="flex min-h-screen w-full items-center justify-center bg-white p-3 md:p-8">
+        <div className="flex h-full w-full max-w-[1400px] flex-col overflow-hidden md:min-h-[630px] md:flex-row">
           {/* 왼쪽 영역 */}
-          <div className="flex w-full flex-col justify-center px-6 md:w-1/2 lg:px-24">
-            <div className="max-w-[400px]">
-              <h2 className="font-grand-hotel mb-10 text-5xl font-bold tracking-tight text-gray-900">
+          <div className="flex w-full flex-col justify-center px-4 py-6 md:w-1/2 md:px-6 md:py-0 lg:px-24">
+            <div className="mx-auto w-full max-w-[400px]">
+              <h2 className="font-grand-hotel mb-6 text-4xl font-bold tracking-tight text-gray-900 md:mb-10 md:text-5xl">
                 {isLogin ? 'COME ON!' : 'WELCOME!'}
               </h2>
 
@@ -134,7 +134,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                 onForgotPassword={passwordReset.handleForgotPassword}
               />
 
-              <div className="relative my-10 flex items-center justify-center">
+              <div className="relative my-6 flex items-center justify-center md:my-10">
                 <div className="w-full border-t border-gray-200"></div>
                 <span className="absolute bg-white px-4 text-xs text-gray-400">Or</span>
               </div>
@@ -148,7 +148,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
                 onKakaoLogin={kakaoOAuth.handleKakaoLogin}
               />
 
-              <p className="mt-10 text-center text-sm text-gray-600">
+              <p className="mt-6 text-center text-sm text-gray-600 md:mt-10">
                 {isLogin ? '아직 가입하지 않으셨나요?' : '가입하셨나요?'}{' '}
                 <button
                   type="button"

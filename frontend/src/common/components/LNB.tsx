@@ -7,7 +7,17 @@ interface LnbMenuItem {
   adminOnly?: boolean;
 }
 
-export default function LNB({ onNavigate }: { onNavigate?: () => void }) {
+interface LnbProps {
+  onNavigate?: () => void;
+  /**
+   * Layout direction:
+   *  - 'horizontal' (default): items in a row, used in the desktop header.
+   *  - 'vertical': items stacked, used inside the mobile drawer.
+   */
+  direction?: 'horizontal' | 'vertical';
+}
+
+export default function LNB({ onNavigate, direction = 'horizontal' }: LnbProps) {
   const { meInfo } = useAuth();
 
   const homePath = meInfo ? `/${meInfo.id}` : '/home';
@@ -27,19 +37,26 @@ export default function LNB({ onNavigate }: { onNavigate?: () => void }) {
     return meInfo?.isAdmin === true;
   });
 
+  const isVertical = direction === 'vertical';
+
+  const navClassName = isVertical
+    ? 'flex flex-col gap-1'
+    : 'flex items-center justify-around gap-1 overflow-x-auto';
+
+  const linkBaseClassName = isVertical
+    ? 'block whitespace-nowrap rounded-lg px-4 py-3 text-2xl font-light transition'
+    : 'whitespace-nowrap rounded-lg px-3 py-2 text-3xl font-light transition';
+
   return (
-    <div className="mx-auto max-w-5xl">
-      <nav
-        aria-label="Main navigation"
-        className="flex items-center justify-around gap-1 overflow-x-auto"
-      >
+    <div className={isVertical ? 'w-full' : 'mx-auto max-w-5xl'}>
+      <nav aria-label="Main navigation" className={navClassName}>
         {visibleMenuItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             onClick={onNavigate}
             className={({ isActive }) =>
-              `whitespace-nowrap rounded-lg px-3 py-2 text-3xl font-light transition ${
+              `${linkBaseClassName} ${
                 isActive
                   ? 'bg-amber-300 text-white shadow-sm'
                   : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'

@@ -34,10 +34,10 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-[#f4d14f] px-6 pb-10 pt-10 md:px-12 lg:px-16">
+    <footer className="bg-[#f4d14f] px-4 pb-6 pt-6 md:px-12 md:pb-10 md:pt-10 lg:px-16">
       <div className="mx-auto w-full max-w-7xl">
-        <div className="flex flex-col items-center justify-between gap-6 md:flex-row md:gap-4">
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs font-medium text-white-900/80 md:justify-start md:gap-8 md:text-sm">
+        <div className="flex flex-col items-center justify-between gap-4 md:flex-row md:gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] font-medium text-white-900/80 md:justify-start md:gap-8 md:text-sm">
             <span className="text-white font-extrabold">TWISTERS © {currentYear}</span>
             {legalLinks.map((link) => (
               <a
@@ -51,7 +51,7 @@ export default function Footer() {
             ))}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             {socialLinks.map((social) => {
               const Icon = social.icon;
 
@@ -59,11 +59,11 @@ export default function Footer() {
                 <a
                   key={social.label}
                   aria-label={social.label}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black transition-transform hover:-translate-y-0.5 md:h-10 md:w-10"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-black transition-transform hover:-translate-y-0.5 md:h-10 md:w-10"
                   href={social.href}
                   target="_blank"
                 >
-                  <Icon className="text-sm" />
+                  <Icon className="text-xs md:text-sm" />
                 </a>
               );
             })}

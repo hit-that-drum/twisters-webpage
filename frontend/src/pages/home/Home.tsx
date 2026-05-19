@@ -53,13 +53,13 @@ export default function Home() {
   }, [isAuthLoading, meInfo, navigate, userId]);
 
   return (
-    <div className={user?.isTest ? '' : 'p-6'}>
+    <div className={user?.isTest ? '' : 'p-4 md:p-6'}>
       {user?.isTest ? (
         <ResumeHomeForTestUser />
       ) : (
         <>
-          <h2>User ID: {user?.id}</h2>
-          <p>User Name: {user?.name}</p>
+          <h2 className="text-lg font-semibold md:text-xl">User ID: {user?.id}</h2>
+          <p className="text-sm md:text-base">User Name: {user?.name}</p>
         </>
       )}
     </div>
