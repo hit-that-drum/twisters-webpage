@@ -104,7 +104,7 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
       ) : null}
 
       <div className="flex min-h-screen w-full justify-center bg-white p-3 md:items-center md:p-8">
-        <div className="flex h-full w-full max-w-[1400px] flex-col overflow-hidden md:min-h-[630px] md:flex-row">
+        <div className="my-auto flex h-full w-full max-w-[1400px] flex-col overflow-hidden md:my-0 md:min-h-[630px] md:flex-row">
           {/* 왼쪽 영역 */}
           <div className="flex w-full flex-col justify-center px-4 py-6 md:w-1/2 md:px-6 md:py-0 lg:px-24">
             <div className="mx-auto w-full max-w-[400px]">
