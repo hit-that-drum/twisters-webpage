@@ -6,3 +6,5 @@ export { default as Settlement } from '@/pages/settlement/Settlement';
 export { default as Board } from '@/pages/board/Board';
 export { default as MyPage } from '@/pages/mypage/MyPage';
 export { default as AdminPage } from '@/pages/adminpage/AdminPage';
+export { default as Terms } from '@/pages/legal/Terms';
+export { default as Privacy } from '@/pages/legal/Privacy';

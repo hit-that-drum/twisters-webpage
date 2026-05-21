@@ -1,4 +1,5 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
+import { FiChevronDown } from 'react-icons/fi';
 import MemberAvatar from '@/pages/member/MemberAvatar';
 import { renderDetailValue } from '@/pages/member/lib/memberFormatters';
 import type { MemberUser } from '@/entities/user/types';
@@ -10,18 +11,44 @@ interface MemberSidebarProps {
 }
 
 function MemberSidebarComponent({ users, selectedUserId, onSelectUser }: MemberSidebarProps) {
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const listId = 'member-directory-list';
+
+  const handleSelectUser = (userId: number) => {
+    onSelectUser(userId);
+    setIsMobileOpen(false);
+  };
+
   return (
     <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:col-span-3 lg:sticky lg:top-6">
-      <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
+      <button
+        type="button"
+        onClick={() => setIsMobileOpen((previous) => !previous)}
+        aria-expanded={isMobileOpen}
+        aria-controls={listId}
+        className="flex w-full items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-4 text-left lg:cursor-default lg:pointer-events-none"
+      >
         <h3
           id="member-directory-heading"
           className="text-sm font-bold uppercase tracking-wider text-slate-500"
         >
           Member Directory
         </h3>
-      </div>
+        <FiChevronDown
+          aria-hidden="true"
+          className={`text-slate-500 transition-transform lg:hidden ${
+            isMobileOpen ? 'rotate-180' : ''
+          }`}
+          size={18}
+        />
+      </button>
 
-      <div className="flex flex-col" role="listbox" aria-labelledby="member-directory-heading">
+      <div
+        id={listId}
+        role="listbox"
+        aria-labelledby="member-directory-heading"
+        className={`flex-col ${isMobileOpen ? 'flex' : 'hidden'} lg:flex`}
+      >
         {users.length === 0 ? (
           <p className="px-4 py-5 text-sm font-medium text-slate-500">No members available.</p>
         ) : (
@@ -32,7 +59,7 @@ function MemberSidebarComponent({ users, selectedUserId, onSelectUser }: MemberS
               <button
                 key={user.id}
                 type="button"
-                onClick={() => onSelectUser(user.id)}
+                onClick={() => handleSelectUser(user.id)}
                 role="option"
                 aria-selected={isActive}
                 tabIndex={isActive ? 0 : -1}

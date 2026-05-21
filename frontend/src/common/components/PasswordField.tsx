@@ -135,7 +135,13 @@ export default function PasswordField({
             </div>
           ) : null}
 
-          <div className="rounded-md border border-slate-300 bg-white px-5 py-4 text-sm text-slate-700 shadow-sm">
+          <div
+            className={`rounded-md border border-slate-300 bg-white px-5 py-4 text-sm text-slate-700 shadow-sm ${
+              isFocused || (hasValue && !validation.isValid)
+                ? 'block'
+                : 'hidden md:block'
+            }`}
+          >
             <p className="mb-3 font-medium text-slate-800">* 비밀번호 규칙</p>
             <ul className="space-y-2">
               <RuleStatus passed={validation.hasMinimumLength} label="최소 8자리 이상" />

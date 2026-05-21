@@ -227,13 +227,41 @@ export default function BoardPostCard({
                 >
                   <IoIosArrowForward />
                 </button>
+
+                <div
+                  className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/45 px-3 py-2 backdrop-blur-sm md:hidden"
+                  role="tablist"
+                  aria-label={`${post.title} image carousel indicators`}
+                >
+                  {postImageRefs.map((_, dotIndex) => {
+                    const isCurrentDot = safeImageIndex === dotIndex;
+                    return (
+                      <button
+                        key={`${post.id}-dot-${dotIndex}`}
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onSelectPostImage(post.id, dotIndex);
+                        }}
+                        role="tab"
+                        aria-selected={isCurrentDot}
+                        aria-label={`Go to image ${dotIndex + 1}`}
+                        className={`size-2.5 rounded-full transition ${
+                          isCurrentDot
+                            ? 'bg-blue-500 scale-110'
+                            : 'bg-white/60 hover:bg-white/90'
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
               </>
             )}
           </div>
 
           {isExpanded && (
             <div
-              className="grid grid-cols-4 gap-2 border-t border-slate-200 p-3"
+              className="hidden grid-cols-4 gap-2 border-t border-slate-200 p-3 md:grid"
               aria-label={`${post.title} image thumbnails`}
             >
               {postImageRefs.map((imageRef, imageIndex) => {
@@ -273,34 +301,46 @@ export default function BoardPostCard({
 
         <div className="flex flex-1 flex-col justify-end p-6">
           <div className="flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="text-xl font-bold leading-tight text-slate-900 transition-colors">
-                {post.title}
-              </h3>
+            {/*
+              Mobile: 2-row layout — title + edit/delete buttons on top, metadata on bottom.
+              Desktop (md+): single-row layout — title, metadata, edit/delete buttons all in a row.
+              `md:contents` collapses the inner wrapper at md+, promoting its children to siblings
+              of the metadata so they can sit in one row together.
+            */}
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
+              <div className="flex items-start justify-between gap-2 md:contents">
+                <h3 className="min-w-0 text-xl font-bold leading-tight text-slate-900 transition-colors">
+                  {post.title}
+                </h3>
+                {canEditOrDelete && (
+                  <div className="shrink-0 md:order-last">
+                    <EditDeleteButton
+                      onEditClick={() => onOpenEditDialog(post)}
+                      onDeleteClick={() => {
+                        void onDeletePost(post);
+                      }}
+                      isDeleting={deletingPostId === post.id}
+                    />
+                  </div>
+                )}
+              </div>
 
-              <div className="flex gap-5">
-                <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-500">
+              <div className="flex flex-col gap-1 text-sm font-medium text-slate-500 md:flex-row md:flex-wrap md:items-center md:gap-2">
+                <div className="flex items-center gap-2">
                   <span aria-hidden="true">
                     <IoPersonCircleSharp size="20px" />
                   </span>
                   <span>Posted by {post.createUser}</span>
-                  <span className="mx-1" aria-hidden="true">
-                    •
-                  </span>
+                </div>
+                <span className="mx-1 hidden md:inline" aria-hidden="true">
+                  •
+                </span>
+                <div className="flex items-center gap-2">
                   <span aria-hidden="true">
                     <FaClock size="16px" />
                   </span>
                   <span>{formatRelativeTime(post.createDate)}</span>
                 </div>
-                {canEditOrDelete && (
-                  <EditDeleteButton
-                    onEditClick={() => onOpenEditDialog(post)}
-                    onDeleteClick={() => {
-                      void onDeletePost(post);
-                    }}
-                    isDeleting={deletingPostId === post.id}
-                  />
-                )}
               </div>
             </div>
 
@@ -332,7 +372,7 @@ export default function BoardPostCard({
               </div>
 
               {isExpanded && (
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                <div className="flex flex-nowrap items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-2 md:flex-wrap md:gap-2 md:px-3">
                   {reactionButtons.map(({ key, label, count, icon: Icon, accentClassName }) => {
                     const isActive = reactions.userReactions.includes(key);
 
@@ -344,14 +384,15 @@ export default function BoardPostCard({
                         disabled={isSubmittingReaction}
                         aria-pressed={isActive}
                         aria-label={`${label} ${count}`}
-                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${accentClassName} ${
+                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold transition md:gap-2 md:px-3 md:py-1.5 ${accentClassName} ${
                           isActive ? 'shadow-sm ring-1 ring-current/10' : 'opacity-70 hover:opacity-100'
                         } ${isSubmittingReaction ? 'cursor-wait opacity-70' : ''}`}
                       >
-                        <Icon size="12px" />
-                        <span>{label}</span>
+                        <Icon size="14px" />
+                        {/* Label hidden on mobile — icon alone communicates the reaction type */}
+                        <span className="hidden md:inline">{label}</span>
                         <span
-                          className="min-w-5 rounded-full border border-white/70 bg-white/80 px-1.5 py-0.5 text-[11px] text-current"
+                          className="rounded-full border border-white/70 bg-white/80 px-1 py-0.5 text-[11px] text-current md:min-w-5 md:px-1.5"
                         >
                           {count}
                         </span>
@@ -384,9 +425,13 @@ export default function BoardPostCard({
               )}
             </div>
 
-            <p className="text-xs font-medium text-slate-400 mt-4">
-              Updated by {post.updateUser} · {formatDateTime(post.updateDate)}
-            </p>
+            <div className="mt-4 flex flex-col gap-0.5 text-xs font-medium text-slate-400 md:flex-row md:flex-wrap md:items-center md:gap-2">
+              <span>Updated by {post.updateUser}</span>
+              <span className="hidden md:inline" aria-hidden="true">
+                ·
+              </span>
+              <span>{formatDateTime(post.updateDate)}</span>
+            </div>
           </div>
         </div>
       </div>

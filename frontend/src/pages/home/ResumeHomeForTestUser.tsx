@@ -19,7 +19,7 @@ export default function ResumeHomeForTestUser() {
       <main>
         <section
           id="home"
-          className="mx-auto flex max-w-7xl flex-col items-center px-6 py-20 text-center md:py-32 lg:px-8"
+          className="mx-auto flex max-w-7xl flex-col items-center px-4 py-12 text-center md:px-6 md:py-32 lg:px-8"
         >
           <div className="mb-6 inline-flex rounded-full bg-amber-100 px-4 py-1.5 text-sm font-semibold tracking-wide text-amber-800">
             JUNIOR FRONTEND DEVELOPER
@@ -30,7 +30,7 @@ export default function ResumeHomeForTestUser() {
             <span className="italic text-amber-600">Portfolio</span>
           </h1>
 
-          <p className="mb-12 max-w-3xl text-lg leading-8 text-stone-600 md:text-lg">
+          <p className="mb-8 max-w-3xl text-sm leading-6 text-stone-600 md:mb-12 md:text-lg md:leading-8">
             React/Typescript 기반 백오피스와 웹뷰 경험으로 기능을 안정적으로 구현하는 프론트엔드
             개발자
           </p>
@@ -45,8 +45,8 @@ export default function ResumeHomeForTestUser() {
           </div> */}
         </section>
 
-        <section id="about" className="bg-stone-100 py-24">
-          <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-16 px-6 md:grid-cols-2 lg:gap-20 lg:px-8">
+        <section id="about" className="bg-stone-100 py-12 md:py-24">
+          <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-4 md:grid-cols-2 md:gap-16 md:px-6 lg:gap-20 lg:px-8">
             <div className="relative">
               <div className="aspect-square overflow-hidden rounded-3xl shadow-2xl shadow-stone-300/40 grayscale transition duration-700 hover:grayscale-0">
                 <img
@@ -65,10 +65,10 @@ export default function ResumeHomeForTestUser() {
             </div>
 
             <div>
-              <h2 className="mb-8 text-4xl font-black tracking-tight text-stone-900">
+              <h2 className="mb-6 text-3xl font-black tracking-tight text-stone-900 md:mb-8 md:text-4xl">
                 <span className="text-amber-600">Introduction</span>
               </h2>
-              <p className="mb-12 text-lg leading-8 text-stone-600">
+              <p className="mb-8 text-sm leading-6 text-stone-600 md:mb-12 md:text-lg md:leading-8">
                 엔터테인먼트 계열의 회사에서 홍보팀으로의 경험과 작게는 전시회, 크게는 국제 행사까지
                 담당했던 행사 담당 경험을 통해 다수의 이해관계자들간의 소통을 조율하며 명확한
                 커뮤니케이션의 중요성을 체감했습니다. 모종의 계기로 개발로 직무전환을 마음먹고
@@ -125,18 +125,18 @@ export default function ResumeHomeForTestUser() {
           </div>
         </section>
 
-        <section id="skills" className="mx-auto max-w-7xl px-6 py-24 lg:px-8">
-          <div className="mb-16 text-center">
-            <h2 className="text-4xl font-black tracking-tight text-stone-900">
+        <section id="skills" className="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-24 lg:px-8">
+          <div className="mb-10 text-center md:mb-16">
+            <h2 className="text-3xl font-black tracking-tight text-stone-900 md:text-4xl">
               Technical <span className="text-amber-600">SKILLS</span>
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
             {skillCategories.map((category, index) => (
               <div
                 key={category.title}
-                className="rounded-3xl border border-stone-200 bg-white p-8 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+                className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg md:p-8"
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-sm">
                   <img src={category.icon} />
@@ -162,15 +162,15 @@ export default function ResumeHomeForTestUser() {
           </div>
         </section>
 
-        <section className="bg-stone-950 py-20 text-white">
-          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-6 md:grid-cols-2 lg:grid-cols-2 lg:px-8">
+        <section className="bg-stone-950 py-12 text-white md:py-20">
+          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-4 px-4 md:grid-cols-2 md:gap-6 md:px-6 lg:grid-cols-2 lg:px-8">
             {socialLinks.map((item) => (
               <a
                 key={item.title}
                 href={item.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-3xl border border-white/10 p-8 transition hover:bg-white/5"
+                className="rounded-3xl border border-white/10 p-5 transition hover:bg-white/5 md:p-8"
               >
                 <span className="material-symbols-outlined mb-4 block text-3xl text-amber-400">
                   {item.icon}
@@ -230,10 +230,10 @@ export default function ResumeHomeForTestUser() {
           </div>
         </section> */}
 
-        <section id="career" className="bg-stone-100 py-24">
-          <div className="mx-auto max-w-4xl px-6 lg:px-8">
-            <div className="mb-16 text-center">
-              <h2 className="text-4xl font-black tracking-tight text-stone-900">
+        <section id="career" className="bg-stone-100 py-12 md:py-24">
+          <div className="mx-auto max-w-4xl px-4 md:px-6 lg:px-8">
+            <div className="mb-10 text-center md:mb-16">
+              <h2 className="text-3xl font-black tracking-tight text-stone-900 md:text-4xl">
                 Professional <span className="text-amber-600">Journey</span>
               </h2>
               {/* <p className="mt-4 text-stone-600">
@@ -241,11 +241,11 @@ export default function ResumeHomeForTestUser() {
               </p> */}
             </div>
 
-            <div className="space-y-16">
+            <div className="space-y-10 md:space-y-16">
               {timeline.map((companyItem) => (
                 <div
                   key={`${companyItem.company}-${companyItem.period}`}
-                  className="relative border-l-2 border-stone-300 pl-12"
+                  className="relative border-l-2 border-stone-300 pl-6 md:pl-12"
                 >
                   <div
                     className={[
@@ -258,7 +258,7 @@ export default function ResumeHomeForTestUser() {
                   <div className="mb-6">
                     <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
                       <div>
-                        <h3 className="text-2xl font-bold text-stone-900">{companyItem.company}</h3>
+                        <h3 className="text-xl font-bold text-stone-900 md:text-2xl">{companyItem.company}</h3>
                         <p className="mt-1 text-base font-semibold text-amber-600">
                           {companyItem.role}
                           {companyItem.employmentType ? ` · ${companyItem.employmentType}` : ''}
@@ -282,7 +282,7 @@ export default function ResumeHomeForTestUser() {
 
                   {/* 서브 태스크 */}
                   {companyItem.subTasks && companyItem.subTasks.length > 0 && (
-                    <div className="space-y-6 border-l border-stone-200 pl-6">
+                    <div className="space-y-6 border-l border-stone-200 pl-4 md:pl-6">
                       {companyItem.subTasks.map((task) => (
                         <div key={`${task.title}-${task.period}`} className="relative">
                           <div className="mb-2 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
@@ -323,19 +323,19 @@ export default function ResumeHomeForTestUser() {
           </div>
         </section>
 
-        <section id="education" className="py-24">
-          <div className="mx-auto max-w-4xl px-6 lg:px-8">
-            <div className="mb-16 text-center">
-              <h2 className="text-4xl font-black tracking-tight text-stone-900">
+        <section id="education" className="py-12 md:py-24">
+          <div className="mx-auto max-w-4xl px-4 md:px-6 lg:px-8">
+            <div className="mb-10 text-center md:mb-16">
+              <h2 className="text-3xl font-black tracking-tight text-stone-900 md:text-4xl">
                 Education <span className="text-amber-600">Background</span>
               </h2>
             </div>
 
-            <div className="space-y-12">
+            <div className="space-y-8 md:space-y-12">
               {educationItems.map((item) => (
                 <div
                   key={`${item.school}-${item.period}`}
-                  className="relative border-l-2 border-stone-300 pl-12"
+                  className="relative border-l-2 border-stone-300 pl-8 md:pl-12"
                 >
                   {item.icon ? (
                     <div className="absolute -left-[18px] w-[35px] h-[35px] rounded-full ring-4 ring-stone-50 overflow-hidden">
@@ -349,7 +349,7 @@ export default function ResumeHomeForTestUser() {
 
                   <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <h3 className="text-2xl font-bold text-stone-900">{item.school}</h3>
+                      <h3 className="text-xl font-bold text-stone-900 md:text-2xl">{item.school}</h3>
                       <p className="mt-1 text-base font-semibold text-amber-600">
                         {item.status}
                         {item.course ? ` · ${item.course}` : ''}
@@ -404,19 +404,19 @@ export default function ResumeHomeForTestUser() {
           </div>
         </section>
 
-        <section id="certification" className="bg-stone-50 py-24">
-          <div className="mx-auto max-w-4xl px-6 lg:px-8">
-            <div className="mb-16 text-center">
-              <h2 className="text-4xl font-black tracking-tight text-stone-900">
+        <section id="certification" className="bg-stone-50 py-12 md:py-24">
+          <div className="mx-auto max-w-4xl px-4 md:px-6 lg:px-8">
+            <div className="mb-10 text-center md:mb-16">
+              <h2 className="text-3xl font-black tracking-tight text-stone-900 md:text-4xl">
                 Certification <span className="text-amber-600">License</span>
               </h2>
             </div>
 
-            <div className="space-y-10">
+            <div className="space-y-8 md:space-y-10">
               {certificationItems.map((item) => (
                 <div
                   key={`${item.name}-${item.period}`}
-                  className="relative border-l-2 border-stone-300 pl-12"
+                  className="relative border-l-2 border-stone-300 pl-8 md:pl-12"
                 >
                   <div className="absolute -left-[18px] top-1 w-[35px] h-[35px] rounded-full bg-gray-100 ring-4 ring-stone-50 flex items-center justify-center">
                     <TbCertificate className="text-gray-400 text-lg" />
@@ -447,17 +447,17 @@ export default function ResumeHomeForTestUser() {
           </div>
         </section>
 
-        <section id="languages" className=" py-24">
-          <div className="mx-auto max-w-4xl px-6 lg:px-8">
-            <div className="mb-16 text-center">
-              <h2 className="text-4xl font-black tracking-tight text-stone-900">
+        <section id="languages" className=" py-12 md:py-24">
+          <div className="mx-auto max-w-4xl px-4 md:px-6 lg:px-8">
+            <div className="mb-10 text-center md:mb-16">
+              <h2 className="text-3xl font-black tracking-tight text-stone-900 md:text-4xl">
                 Language <span className="text-amber-600">Skills</span>
               </h2>
             </div>
 
-            <div className="space-y-10">
+            <div className="space-y-8 md:space-y-10">
               {languageItems.map((item) => (
-                <div key={item.language} className="relative border-l-2 border-stone-300 pl-12">
+                <div key={item.language} className="relative border-l-2 border-stone-300 pl-8 md:pl-12">
                   <div className="absolute -left-[18px] top-1 flex h-[35px] w-[35px] items-center justify-center rounded-full bg-gray-100 ring-4 ring-stone-50">
                     <TbLanguage className="text-lg text-gray-400" />
                   </div>

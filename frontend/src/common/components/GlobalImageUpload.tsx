@@ -451,7 +451,7 @@ export default function GlobalImageUpload({
           <div className="text-3xl" aria-hidden="true">
             🖼
           </div>
-          <div>
+          <div className="hidden md:block">
             <p className="text-sm font-semibold text-slate-700">
               이미지 파일을 여기에 드래그 & 드롭 해주세요
             </p>
