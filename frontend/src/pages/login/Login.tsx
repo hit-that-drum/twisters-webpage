@@ -103,10 +103,10 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
         </>
       ) : null}
 
-      <div className="flex min-h-screen w-full items-center justify-center bg-white p-4 md:p-8">
-        <div className="flex h-full w-full max-w-[1400px] min-h-[630px] overflow-hidden">
+      <div className="flex min-h-[100svh] w-full items-center justify-center bg-white p-4 md:p-8">
+        <div className="grid w-full max-w-[1400px] overflow-hidden md:min-h-[630px] md:grid-cols-2">
           {/* 왼쪽 영역 */}
-          <div className="flex w-full flex-col justify-center px-6 md:w-1/2 lg:px-24">
+          <div className="flex w-full flex-col justify-center px-6 py-10 lg:px-24">
             <div className="max-w-[400px]">
               <h2 className="font-grand-hotel mb-10 text-5xl font-bold tracking-tight text-gray-900">
                 {isLogin ? 'COME ON!' : 'WELCOME!'}
@@ -163,15 +163,18 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
           </div>
 
           {/* 오른쪽 영역 */}
-          <div className="hidden w-1/2 p-4 md:block">
-            <div
-              className="h-full w-full rounded-[48px] bg-cover bg-center transition-all duration-500"
-              style={{
-                backgroundImage: `url(${loginPageRightImage})`,
-                backgroundColor: 'var(--twister-grey-100)',
-              }}
-            >
-              <div className="h-full w-full rounded-[48px] bg-black/5"></div>
+          <div className="hidden min-h-[630px] p-4 md:block">
+            <div className="relative h-full min-h-[630px] w-full overflow-hidden rounded-[48px] bg-[var(--twister-grey-100)]">
+              <img
+                src={loginPageRightImage}
+                alt=""
+                aria-hidden="true"
+                draggable={false}
+                loading="eager"
+                decoding="async"
+                className="absolute inset-0 h-full w-full select-none object-cover object-center"
+              />
+              <div className="absolute inset-0 bg-black/5" />
             </div>
           </div>
         </div>

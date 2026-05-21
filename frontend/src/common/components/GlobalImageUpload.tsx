@@ -125,6 +125,7 @@ export default function GlobalImageUpload({
   const [dragOverImageIndex, setDragOverImageIndex] = useState<number | null>(null);
   const activeUploadScope = import.meta.env.PROD ? uploadScope : undefined;
   const isUploadDisabled = disabled || isUploadingImages;
+  const allowsMultipleImages = maxImages > 1;
   const canReorderImages = !isUploadDisabled && value.length > 1;
 
   useEffect(() => {
@@ -499,7 +500,7 @@ export default function GlobalImageUpload({
       </div>
 
       {helperText ? <p className="text-xs text-slate-500">{helperText}</p> : null}
-      {canReorderImages ? (
+      {allowsMultipleImages ? (
         <p className="text-xs font-medium text-slate-500">
           사진을 드래그해서 순서를 변경할 수 있습니다.
         </p>
