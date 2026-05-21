@@ -1,10 +1,11 @@
+import { Link } from 'react-router-dom';
 import { RiFlowerFill } from 'react-icons/ri';
 import { PiFlowerLotusBold, PiFlowerTulipBold } from 'react-icons/pi';
 import { TbFlowerFilled } from 'react-icons/tb';
 
 const legalLinks = [
-  { label: 'Privacy', href: '#' },
-  { label: 'Terms', href: '#' },
+  { label: 'Privacy', to: '/privacy' },
+  { label: 'Terms', to: '/terms' },
 ];
 
 const socialLinks = [
@@ -40,14 +41,13 @@ export default function Footer() {
           <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] font-medium text-white-900/80 md:justify-start md:gap-8 md:text-sm">
             <span className="text-white font-extrabold">TWISTERS © {currentYear}</span>
             {legalLinks.map((link) => (
-              <a
+              <Link
                 key={link.label}
                 className="text-white transition-colors hover:text-white-700"
-                href={link.href}
-                target="_blank"
+                to={link.to}
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
           </div>
 
