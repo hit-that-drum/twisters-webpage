@@ -68,7 +68,11 @@ function BoardDetailForm({
         value={form.content}
         onChange={onFormChange}
         onKeyDown={handleBulletListKeyDown}
-        helperText="tab키를 사용하면 불렛포인트를 사용 할 수 있습니다(최대 3 depth)"
+        helperText={
+          <span className="hidden md:inline">
+            tab키를 사용하면 불렛포인트를 사용 할 수 있습니다(최대 3 depth)
+          </span>
+        }
         disabled={isSubmitting}
         placeholder="내용을 입력해주세요"
       />
