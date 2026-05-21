@@ -89,9 +89,13 @@ function NoticeCardComponent({
               <p className="whitespace-pre-wrap">{notice.content}</p>
             </div>
           </div>
-          <p className="text-xs font-medium text-slate-400 mt-4">
-            Updated by {notice.updateUser} · {formatDateTime(notice.updateDate)}
-          </p>
+          <div className="mt-4 flex flex-col gap-0.5 text-xs font-medium text-slate-400 md:flex-row md:flex-wrap md:items-center md:gap-2">
+            <span>Updated by {notice.updateUser}</span>
+            <span className="hidden md:inline" aria-hidden="true">
+              ·
+            </span>
+            <span>{formatDateTime(notice.updateDate)}</span>
+          </div>
         </div>
       </div>
     </article>
