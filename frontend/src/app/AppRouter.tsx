@@ -1,7 +1,18 @@
 import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from '@/app/AppLayout';
 import { useAuth } from '@/features';
-import { AdminPage, Board, Home, Login, Member, MyPage, Notice, Settlement } from '@/pages';
+import {
+  AdminPage,
+  Board,
+  Home,
+  Login,
+  Member,
+  MyPage,
+  Notice,
+  Privacy,
+  Settlement,
+  Terms,
+} from '@/pages';
 import InformationArchitecture from '@/pages/informationArchitecture/InformationArchitecture';
 import LoadingComponent from '@/common/LoadingComponent.tsx';
 import NotFoundComponent from '@/common/NotFoundComponent.tsx';
@@ -32,6 +43,8 @@ export default function AppRouter() {
         <Route path="/signup" element={<Login isLogin={false} />} />
         <Route path="/signin" element={<Login isLogin />} />
         <Route path="/auth/kakao/callback" element={<Login isLogin />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
 
         <Route element={<AppLayout />}>
           <Route path="/:userId" element={<Home />} />
