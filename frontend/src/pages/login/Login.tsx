@@ -163,18 +163,15 @@ export default function Login({ isLogin }: { isLogin: boolean }) {
           </div>
 
           {/* 오른쪽 영역 */}
-          <div className="hidden min-h-[630px] p-4 md:block">
-            <div className="relative h-full min-h-[630px] w-full overflow-hidden rounded-[48px] bg-[var(--twister-grey-100)]">
-              <img
-                src={loginPageRightImage}
-                alt=""
-                aria-hidden="true"
-                draggable={false}
-                loading="eager"
-                decoding="async"
-                className="absolute inset-0 h-full w-full select-none object-cover object-center"
-              />
-              <div className="absolute inset-0 bg-black/5" />
+          <div className="hidden w-1/2 p-4 md:block">
+            <div
+              className="h-full w-full rounded-[48px] bg-cover bg-center transition-all duration-500"
+              style={{
+                backgroundImage: `url(${loginPageRightImage})`,
+                backgroundColor: 'var(--twister-grey-100)',
+              }}
+            >
+              <div className="h-full w-full rounded-[48px] bg-black/5"></div>
             </div>
           </div>
         </div>
