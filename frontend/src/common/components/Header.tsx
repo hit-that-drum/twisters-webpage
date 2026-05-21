@@ -219,7 +219,7 @@ export default function Header({ handleLogout }: { handleLogout: () => void }) {
           {/* Drawer panel */}
           <aside
             id="header-mobile-drawer"
-            className="absolute left-0 top-0 flex h-full w-[78%] max-w-[320px] flex-col border-r border-amber-200 bg-white shadow-2xl"
+            className="absolute left-0 top-0 flex h-full w-[45%] max-w-[230px] flex-col border-r border-amber-200 bg-white shadow-2xl"
           >
             <div className="flex items-center justify-between border-b border-amber-200 px-4 py-3">
               <img src={logo} alt="TWISTERS" className="h-10 w-24" />
