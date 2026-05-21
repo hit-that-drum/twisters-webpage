@@ -52,10 +52,8 @@
   - ✅ Footer 초기 디자인
     - FOOTER에 들어가야 하는 정보  
       [https://blog.duda.co/website-footer-design-best-practices-examples](https://blog.duda.co/website-footer-design-best-practices-examples)
-
-<br>
-
-- ☑️✅ Privacy, Terms에 들어가는 정보 만들기
+- **(2026.05.21)**
+  - ️✅ Privacy, Terms에 들어가는 정보 만들기
 
 ---
 
@@ -69,7 +67,7 @@
   - ✅ 도메인 설정(vercel이 알아서 해줬지만...)
   - ✅ 배포
 - **(2026.03.30)**
-- ✅ init.sql DB 초기셋팅 버전으로 작성
+  - ✅ init.sql DB 초기셋팅 버전으로 작성
 
 <<<<<<< HEAD
 =======
@@ -214,11 +212,6 @@
 
 - **(2026.04.02)**
   - ✅ FlowChart -> IA로 명칭 변경
-
-<br>
-
-- ☑️✅ 유저 타입 구분해서 IA 그리기
-- ☑️✅ IA embed || 이미지로 첨부 (이건 해 보고 생각해보기)
 
 ---
 
