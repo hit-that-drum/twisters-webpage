@@ -94,11 +94,24 @@ export const isEmptyListResponse = (
   return normalizedHints.some((hint) => normalizedMessage.includes(hint));
 };
 
-/**
- * Human-friendly relative time ("just now", "5 minutes ago", "3 days ago").
- * Falls back to a localized date once the delta exceeds one week.
- * Returns "unknown" when the input cannot be parsed.
- */
+const pad2 = (value: number) => String(value).padStart(2, '0');
+
+export const formatDateTime = (rawDate: string): string => {
+  const parsedDate = new Date(rawDate);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return '-';
+  }
+
+  const year = parsedDate.getFullYear();
+  const month = pad2(parsedDate.getMonth() + 1);
+  const day = pad2(parsedDate.getDate());
+  const hours = pad2(parsedDate.getHours());
+  const minutes = pad2(parsedDate.getMinutes());
+  const seconds = pad2(parsedDate.getSeconds());
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
 export const formatRelativeTime = (rawDate: string): string => {
   const parsedDate = new Date(rawDate);
   if (Number.isNaN(parsedDate.getTime())) {
@@ -106,38 +119,25 @@ export const formatRelativeTime = (rawDate: string): string => {
   }
 
   const elapsedMs = Date.now() - parsedDate.getTime();
+
   if (elapsedMs < 60_000) {
-    return 'just now';
+    return '방금 전';
   }
 
   const minutes = Math.floor(elapsedMs / 60_000);
   if (minutes < 60) {
-    return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+    return `${minutes}분 전`;
   }
 
   const hours = Math.floor(minutes / 60);
   if (hours < 24) {
-    return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+    return `${hours}시간 전`;
   }
 
   const days = Math.floor(hours / 24);
   if (days < 7) {
-    return `${days} day${days === 1 ? '' : 's'} ago`;
+    return `${days}일 전`;
   }
 
-  return parsedDate.toLocaleDateString();
-};
-
-/**
- * Locale-default date+time formatting. Returns "-" when the input cannot be
- * parsed. Use a dedicated locale-specific formatter (e.g. ko-KR) at the
- * call site when a fixed locale is required.
- */
-export const formatDateTime = (rawDate: string): string => {
-  const parsedDate = new Date(rawDate);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return '-';
-  }
-
-  return parsedDate.toLocaleString();
+  return formatDateTime(rawDate);
 };

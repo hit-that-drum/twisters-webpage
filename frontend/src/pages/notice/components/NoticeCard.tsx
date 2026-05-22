@@ -2,8 +2,8 @@ import { memo } from 'react';
 import { AiTwotonePushpin } from 'react-icons/ai';
 import { IoPersonCircleSharp } from 'react-icons/io5';
 import { FaClock } from 'react-icons/fa';
-import { EditDeleteButton } from '@/common/components';
-import { formatDateTime, formatRelativeTime } from '@/common/lib/api/apiHelpers';
+import { EditDeleteButton, ToggleableTime } from '@/common/components';
+import { formatDateTime } from '@/common/lib/api/apiHelpers';
 import type { NoticeImagePreset, NoticeItem } from '@/pages/notice/lib/noticeTypes';
 
 interface NoticeCardProps {
@@ -87,7 +87,7 @@ function NoticeCardComponent({
                 <span aria-hidden="true" className="inline-flex w-5 justify-center">
                   <FaClock size="16px" />
                 </span>
-                <span>{formatRelativeTime(notice.createDate)}</span>
+                <ToggleableTime rawDate={notice.createDate} />
               </div>
             </div>
 

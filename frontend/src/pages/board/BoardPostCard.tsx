@@ -3,8 +3,8 @@ import { AiTwotonePushpin } from 'react-icons/ai';
 import { IoPersonCircleSharp } from 'react-icons/io5';
 import { FaClock, FaHeart, FaStar, FaThumbsDown, FaThumbsUp } from 'react-icons/fa';
 import { IoIosArrowBack, IoIosArrowDown, IoIosArrowForward, IoIosArrowUp } from 'react-icons/io';
-import { EditDeleteButton } from '@/common/components';
-import { formatDateTime, formatRelativeTime } from '@/common/lib/api/apiHelpers';
+import { EditDeleteButton, ToggleableTime } from '@/common/components';
+import { formatDateTime } from '@/common/lib/api/apiHelpers';
 import useResolvedBoardImages from '@/pages/board/hooks/useResolvedBoardImages';
 import { COLLAPSED_POST_CONTENT_STYLE } from '@/pages/board/lib/boardConstants';
 import BoardCommentSection from '@/pages/board/BoardCommentSection';
@@ -339,7 +339,7 @@ export default function BoardPostCard({
                   <span aria-hidden="true" className="inline-flex w-5 justify-center">
                     <FaClock size="16px" />
                   </span>
-                  <span>{formatRelativeTime(post.createDate)}</span>
+                  <ToggleableTime rawDate={post.createDate} />
                 </div>
               </div>
             </div>
