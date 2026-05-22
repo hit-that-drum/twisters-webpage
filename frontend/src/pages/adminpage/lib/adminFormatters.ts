@@ -1,5 +1,6 @@
 import type { AdminUserRecord, AuthProvider } from '@/entities/user/types';
 import type { AdminUserFormState } from '@/pages/adminpage/AdminUserDetailModal';
+import { formatDateTime } from '@/common/lib/api/apiHelpers';
 import { AVATAR_TONES } from './adminConstants';
 
 const AUTH_PROVIDER_META: Record<AuthProvider, { label: string; className: string }> = {
@@ -19,26 +20,7 @@ const AUTH_PROVIDER_META: Record<AuthProvider, { label: string; className: strin
 
 const countFormatter = new Intl.NumberFormat('en-US');
 
-/**
- * Admin-specific date+time formatting — always Korean locale with explicit
- * YYYY-MM-DD HH:MM fields. Deliberately named differently from the shared
- * `formatDateTime` in `@/common/lib/api/apiHelpers` so importers pick the
- * intended behavior.
- */
-export const formatKoreanDateTime = (raw: string) => {
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) {
-    return '-';
-  }
-
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+export const formatKoreanDateTime = (raw: string) => formatDateTime(raw);
 
 export const getEmailVerificationMeta = (raw: string | null) => {
   if (!raw) {

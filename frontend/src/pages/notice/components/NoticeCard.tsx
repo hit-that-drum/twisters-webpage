@@ -2,8 +2,8 @@ import { memo } from 'react';
 import { AiTwotonePushpin } from 'react-icons/ai';
 import { IoPersonCircleSharp } from 'react-icons/io5';
 import { FaClock } from 'react-icons/fa';
-import { EditDeleteButton } from '@/common/components';
-import { formatDateTime, formatRelativeTime } from '@/common/lib/api/apiHelpers';
+import { EditDeleteButton, ToggleableTime } from '@/common/components';
+import { formatDateTime } from '@/common/lib/api/apiHelpers';
 import type { NoticeImagePreset, NoticeItem } from '@/pages/notice/lib/noticeTypes';
 
 interface NoticeCardProps {
@@ -73,16 +73,22 @@ function NoticeCardComponent({
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-500">
-              <span aria-hidden="true">
-                <IoPersonCircleSharp size="20px" />
+            <div className="flex flex-col gap-1 text-sm font-medium text-slate-500 md:flex-row md:flex-wrap md:items-center md:gap-2">
+              <div className="flex items-center gap-2">
+                <span aria-hidden="true" className="inline-flex w-5 justify-center">
+                  <IoPersonCircleSharp size="20px" />
+                </span>
+                <span>Posted by {notice.createUser}</span>
+              </div>
+              <span className="mx-1 hidden md:inline" aria-hidden="true">
+                •
               </span>
-              <span>Posted by {notice.createUser}</span>
-              <span className="mx-1">•</span>
-              <span aria-hidden="true">
-                <FaClock size="16px" />
-              </span>
-              <span>{formatRelativeTime(notice.createDate)}</span>
+              <div className="flex items-center gap-2">
+                <span aria-hidden="true" className="inline-flex w-5 justify-center">
+                  <FaClock size="16px" />
+                </span>
+                <ToggleableTime rawDate={notice.createDate} />
+              </div>
             </div>
 
             <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 min-h-[122px]">

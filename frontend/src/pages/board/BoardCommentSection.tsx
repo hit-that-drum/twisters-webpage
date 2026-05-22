@@ -1,5 +1,4 @@
-import { EditDeleteButton } from '@/common/components';
-import { formatRelativeTime } from '@/common/lib/api/apiHelpers';
+import { EditDeleteButton, ToggleableTime } from '@/common/components';
 import { handleBulletListKeyDown } from '@/common/lib/textareaBulletList';
 import type { BoardCommentItem } from '@/pages/board/lib/boardTypes';
 
@@ -56,7 +55,7 @@ export default function BoardCommentSection({
                   <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
                     <span className="font-semibold text-slate-700">{comment.authorName}</span>
                     <span aria-hidden="true">•</span>
-                    <span>{formatRelativeTime(comment.createdAt)}</span>
+                    <ToggleableTime rawDate={comment.createdAt} />
                   </div>
 
                   {canDelete && (

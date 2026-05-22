@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { formatRelativeTime } from '@/common/lib/api/apiHelpers';
+import { ToggleableTime } from '@/common/components';
 import type { BoardPostItem } from '@/pages/board/lib/boardTypes';
 import { createBoardPostUrl, getReactionCount } from '@/pages/mypage/lib/myPageHelpers';
 import type { ReactionSectionDefinition } from '@/pages/mypage/lib/myPageTypes';
@@ -31,7 +31,7 @@ function ReactionPostCardList({ section, posts }: ReactionPostCardListProps) {
                 {post.title}
               </a>
               <p className="mt-1 text-sm text-slate-500">
-                Posted by {post.createUser} · {formatRelativeTime(post.createDate)}
+                Posted by {post.createUser} · <ToggleableTime rawDate={post.createDate} />
               </p>
             </div>
 
