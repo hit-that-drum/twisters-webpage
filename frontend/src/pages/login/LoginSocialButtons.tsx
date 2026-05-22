@@ -101,7 +101,7 @@ export default function LoginSocialButtons({
         onClick={onKakaoLogin}
         disabled={isSubmitLoading || !isKakaoOAuthEnabled}
         aria-label="카카오로 로그인"
-        className="inline-flex h-10 w-12 items-center justify-center rounded-sm bg-[#FEE500] text-sm font-semibold text-[#191919] transition hover:bg-[#fada0a] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 md:w-48 md:gap-2 md:px-4"
+        className="inline-flex h-[38px] w-10 items-center justify-center rounded-sm bg-[#FEE500] text-sm font-semibold text-[#191919] transition hover:bg-[#fada0a] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 md:h-10 md:w-48 md:gap-2 md:px-4"
       >
         <SiKakaotalk size={20} />
         <span className="hidden md:inline">카카오로 로그인</span>
