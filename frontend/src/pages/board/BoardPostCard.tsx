@@ -327,7 +327,7 @@ export default function BoardPostCard({
 
               <div className="flex flex-col gap-1 text-sm font-medium text-slate-500 md:flex-row md:flex-wrap md:items-center md:gap-2">
                 <div className="flex items-center gap-2">
-                  <span aria-hidden="true">
+                  <span aria-hidden="true" className="inline-flex w-5 justify-center">
                     <IoPersonCircleSharp size="20px" />
                   </span>
                   <span>Posted by {post.createUser}</span>
@@ -336,7 +336,7 @@ export default function BoardPostCard({
                   •
                 </span>
                 <div className="flex items-center gap-2">
-                  <span aria-hidden="true">
+                  <span aria-hidden="true" className="inline-flex w-5 justify-center">
                     <FaClock size="16px" />
                   </span>
                   <span>{formatRelativeTime(post.createDate)}</span>
