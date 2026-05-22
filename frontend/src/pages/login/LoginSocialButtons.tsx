@@ -65,7 +65,7 @@ export default function LoginSocialButtons({
             width="192"
           />
         ) : (
-          <div className="google-icon-mobile inline-flex h-10 w-12 items-center justify-center overflow-hidden rounded-sm border border-gray-200 bg-white">
+          <div className="google-icon-mobile inline-flex h-10 w-12 items-center justify-center overflow-hidden rounded-sm bg-white">
             <style>{`
               .google-icon-mobile .nsm7Bb-HzV7m-LgbsSe-Bz112c {
                 width: 40px !important;
